@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GetCV — AI Resume Builder by Decompliance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Decompliance chrome (dark) */
+  --dc-ink:#0A1220; --dc-panel:#101B2E; --dc-line:#1E2D45;
+  --dc-blue:#5BC8F5; --dc-text:#E8EEF6; --dc-muted:#8FA3BD; --dc-gold:#E3B341;
+  /* Light working surface */
+  --paper:#F6F7F4; --card:#FFFFFF; --ink:#1A2028; --ink-soft:#4B5563;
+  --line:#E3E6E0; --accent:#2196C9; --accent-soft:#E1F3FB;
+  --ai:#B45309; --ai-soft:#FBEEDC; --danger:#B91C1C; --ok:#15803D;
+  --c1:#2196C9; --c2:#4338CA; --c3:#BE185D; --c4:#B45309; --c5:#166534; --c6:#7C3AED;
+  --radius:12px; --shadow:0 1px 3px rgba(26,32,40,.08),0 6px 18px rgba(26,32,40,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--dc-ink);color:var(--dc-text);line-height:1.55}
+h1,h2,h3{font-family:'Fraunces',serif}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,textarea,select{font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);
+  border:1px solid var(--line);border-radius:8px;padding:9px 12px;width:100%;outline:none;transition:border-color .15s}
+input:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:80px}
+label{font-size:12px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+
+/* ---------- Layout: dark Decompliance chrome ---------- */
+header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px solid var(--dc-line);
+  padding:13px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;
+  position:sticky;top:0;z-index:50;flex-wrap:wrap}
+.brand{cursor:pointer;user-select:none}
+.brand h1{font-size:22px;font-weight:700;letter-spacing:.01em}
+.brand h1 .get{color:#FFFFFF}
+.brand h1 .cv{color:var(--dc-blue)}
+.brand-sub{font-size:11px;color:var(--dc-muted);margin-top:1px}
+.brand-sub a{color:var(--dc-blue);text-decoration:none;font-weight:600}
+.hdr-right{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--dc-muted)}
+.hdr-right .user{color:var(--dc-text);font-weight:600}
+.btn-dline{background:transparent;color:var(--dc-blue);border:1.5px solid var(--dc-blue);
+  font-size:13px;font-weight:600;border-radius:8px;padding:7px 14px;cursor:pointer;font-family:inherit}
+.btn-dline:hover{background:rgba(91,200,245,.12)}
+.btn-dblue{background:var(--dc-blue);color:#06121F;border:none;
+  font-size:13px;font-weight:600;border-radius:8px;padding:8px 15px;cursor:pointer;font-family:inherit}
+.ticker{background:linear-gradient(180deg,#1A2C4A 0%,#0E1B31 45%,#0A1526 100%);
+  border-top:1px solid rgba(91,200,245,.25);border-bottom:1px solid var(--dc-line);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+  color:#B9C9DF;font-size:11.5px;padding:6px 0;white-space:nowrap;overflow:hidden}
+.ticker span{display:inline-block;padding-left:100%;animation:tick 42s linear infinite}
+@keyframes tick{to{transform:translateX(-100%)}}
+.ticker b{color:var(--dc-gold)}
+/* views */
+.view{display:none;max-width:1180px;margin:0 auto;padding:28px 24px}
+.view.on{display:block}
+/* auth cards */
+.auth-card{max-width:410px;margin:6vh auto 0;background:var(--dc-panel);border:1px solid var(--dc-line);
+  border-radius:14px;padding:32px 30px;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+.auth-card h2{font-family:'Fraunces',serif;font-size:23px;margin-bottom:4px;color:var(--dc-text)}
+.auth-card h2 .cv{color:var(--dc-blue)}
+.auth-card>p{font-size:13px;color:var(--dc-muted);margin-bottom:20px}
+.dlabel{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--dc-muted);margin-bottom:5px}
+.dinput{width:100%;font-size:14px;padding:11px 13px;border-radius:8px;margin-bottom:14px;
+  background:#0B1424;border:1.5px solid var(--dc-line);color:var(--dc-text);outline:none;font-family:inherit}
+.dinput:focus{border-color:var(--dc-blue)}
+.pw-hint{font-size:11px;color:var(--dc-muted);margin:-8px 0 14px}
+.auth-card .btn-dblue{width:100%;padding:11px}
+.auth-foot{font-size:12px;color:var(--dc-muted);text-align:center;margin-top:14px;line-height:1.7}
+.auth-foot a{color:var(--dc-blue);text-decoration:none;cursor:pointer}
+.auth-err{display:none;background:#3A1220;border:1px solid #B91C1C;color:#FCA5A5;font-size:12.5px;
+  border-radius:8px;padding:8px 12px;margin-bottom:14px}
+.auth-err.on{display:block}
+/* home */
+.home-hero{text-align:center;margin:2vh 0 34px}
+.home-hero .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dc-gold);margin-bottom:10px}
+.home-hero h2{font-family:'Fraunces',serif;font-size:33px;color:var(--dc-text)}
+.home-hero h2 em{color:var(--dc-blue);font-style:italic}
+.home-hero p{color:var(--dc-muted);font-size:14px;margin-top:9px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:22px;max-width:760px;margin:0 auto}
+@media(max-width:680px){.tiles{grid-template-columns:1fr}}
+.tile{background:var(--dc-panel);border:1.5px solid var(--dc-line);border-radius:16px;padding:32px 28px;
+  cursor:pointer;text-align:left;transition:transform .15s,border-color .15s,box-shadow .15s;color:var(--dc-text);font-family:inherit}
+.tile:hover{transform:translateY(-4px);border-color:var(--dc-blue);box-shadow:0 14px 40px rgba(91,200,245,.14)}
+.tile .ic{font-size:32px;display:block;margin-bottom:12px}
+.tile h3{font-family:'Fraunces',serif;font-size:20px;margin-bottom:8px}
+.tile h3 span{color:var(--dc-blue)}
+.tile p{font-size:13px;color:var(--dc-muted);line-height:1.55}
+.tile .go{display:inline-block;margin-top:14px;font-size:13px;font-weight:600;color:var(--dc-blue)}
+/* module bar + workspace */
+.module-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--dc-panel);border:1.5px solid var(--dc-blue);border-radius:12px;padding:11px 15px;margin-bottom:16px;
+  position:sticky;top:66px;z-index:45;
+  box-shadow:0 0 0 1px rgba(91,200,245,.15), inset 0 1px 0 rgba(91,200,245,.12), 0 6px 18px rgba(0,0,0,.35)}
+.module-bar .mtitle{font-weight:700;font-size:14.5px;color:var(--dc-text)}
+.module-bar .tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  background:rgba(91,200,245,.15);color:var(--dc-blue);border-radius:99px;padding:3px 10px;margin-left:8px}
+.mbtns{display:flex;gap:8px;flex-wrap:wrap}
+.workspace{background:var(--paper);color:var(--ink);border-radius:14px;padding:22px}
+.container{display:grid;grid-template-columns:210px 1fr;gap:22px}
+@media(max-width:860px){.container{grid-template-columns:1fr}}
+
+/* ---------- Section rail (signature) ---------- */
+.rail{position:sticky;top:16px;align-self:start}
+.rail h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);margin-bottom:10px;font-family:'Inter'}
+/* ---------- Section rail: button boxes ---------- */
+.rail-item{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;font-size:13px;
+  font-weight:600;color:var(--ink-soft);width:100%;text-align:left;margin-bottom:7px;
+  background:var(--card);border:1.5px solid var(--line);box-shadow:0 1px 2px rgba(26,32,40,.05);
+  transition:transform .12s,border-color .15s,box-shadow .15s}
+.rail-item:hover{transform:translateX(3px);border-color:var(--sec,var(--accent));
+  box-shadow:0 2px 6px rgba(26,32,40,.1)}
+.rail-item.detected{color:var(--ink);border-left:4px solid var(--sec,var(--accent))}
+.rail-item .dot{width:9px;height:9px;border-radius:50%;background:var(--line);flex-shrink:0}
+.rail-item.detected .dot{background:var(--sec,var(--accent))}
+@media(max-width:860px){.rail{display:none}}
+
+/* ---------- Compact center panel: neat & crisp ---------- */
+.workspace .card{padding:15px 16px;margin-bottom:13px}
+.workspace .card h2{font-size:14px;margin-bottom:9px}
+.workspace .field label{font-size:10.5px;margin-bottom:3px}
+.workspace .field input,.workspace .field textarea,.workspace .field select{font-size:12.5px;padding:8px 10px}
+.workspace textarea{font-size:12.5px;line-height:1.5}
+.workspace .btn{font-size:11.5px;padding:6px 11px}
+.workspace .entry{padding:11px 12px;margin-bottom:9px}
+.workspace .entry .grid2{gap:9px}
+.workspace .grid2{gap:10px}
+.workspace .tags{gap:5px}
+.workspace .tag{font-size:11px;padding:3.5px 9px}
+.workspace .rail-item{font-size:11.5px;padding:6px 9px}
+.workspace .trend-head h3{font-size:11.5px}
+.workspace .sw-lbl{font-size:10.5px}
+.workspace .mini-ai textarea{font-size:12px}
+.workspace .empty-hint{font-size:12px}
+.workspace .add-panel .btn{font-size:11.5px}
+
+/* ---------- Sidebar groups: glossy dark, matching site chrome ---------- */
+.rail-group,.rail-folder{display:flex;align-items:center;justify-content:space-between;width:100%;
+  font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--dc-blue);
+  background:linear-gradient(180deg,#1A2C4A 0%,#0E1B31 55%,#0A1526 100%);
+  border:1px solid rgba(91,200,245,.35);border-radius:10px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 3px 10px rgba(0,0,0,.3);
+  padding:10px 12px;margin-bottom:9px;cursor:pointer;transition:filter .15s,transform .12s}
+.rail-group:hover,.rail-folder:hover{filter:brightness(1.15)}
+.rail-group span{font-size:13px;color:var(--dc-blue)}
+.rail-folder{gap:8px;justify-content:flex-start;margin-top:10px;text-transform:none;font-size:12.5px}
+.rail-folder:hover{transform:translateX(3px)}
+
+/* ---------- Modern slide switches (charts in/out of resume) ---------- */
+.th-btns{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.switch{display:inline-flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
+.switch input{display:none}
+.switch .slider{width:36px;height:20px;border-radius:99px;background:#CBD5E1;position:relative;
+  transition:background .2s;flex-shrink:0;box-shadow:inset 0 1px 2px rgba(0,0,0,.15)}
+.switch .slider::before{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;
+  border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.switch input:checked + .slider{background:var(--accent)}
+.switch input:checked + .slider::before{transform:translateX(16px)}
+.switch .sw-lbl{font-size:11.5px;font-weight:600;color:var(--ink-soft)}
+.switch input:checked ~ .sw-lbl{color:var(--accent)}
+
+/* ---------- Live split-screen preview ---------- */
+#view-pro,#view-fresher{max-width:1560px}
+#view-pro .container{grid-template-columns:200px minmax(0,1fr) 470px}
+.fr-grid{display:grid;grid-template-columns:200px minmax(0,1fr) 470px;gap:22px}
+.pv-live{position:sticky;top:128px;align-self:start;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;overflow:hidden;display:flex;flex-direction:column;
+  max-height:calc(100vh - 148px);box-shadow:var(--shadow)}
+.pv-live-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:9px 12px;border-bottom:1px solid var(--line);background:#FBFBFA;font-size:12.5px;color:var(--ink)}
+.pv-live-tpl{color:var(--accent);font-weight:600;font-size:11.5px}
+.pv-live-btns{display:flex;gap:6px}
+.pv-live-btns .btn{font-size:11.5px;padding:5px 10px}
+.pv-live-body{overflow:auto;background:#E9ECE7;padding:12px;flex:1}
+.pv-live-inner{zoom:.55}
+.pv-live-inner .gcv-page{margin:0 auto}
+.pv-live-empty{background:var(--card);border:1.5px dashed var(--line);border-radius:10px;
+  padding:36px 20px;text-align:center;font-size:13px;color:var(--ink-soft);zoom:1.6}
+@media(max-width:1280px){.pv-live{display:none}#view-pro .container{grid-template-columns:200px 1fr}.fr-grid{grid-template-columns:200px 1fr}}
+@media(max-width:860px){.fr-grid{grid-template-columns:1fr}}
+
+/* ---------- Preview: inline template strip ---------- */
+.pv-tpl-strip{display:none;border:1.5px solid var(--accent-soft);border-radius:10px;
+  padding:10px;margin-bottom:14px;background:#FBFBFA}
+.pv-tpl-strip.open{display:block}
+.tpl-grid-compact{grid-template-columns:repeat(auto-fill,minmax(118px,1fr));max-height:32vh}
+
+/* ---------- Saved resumes ---------- */
+.saved-panel{margin-top:16px}
+.saved-empty{font-size:12.5px;color:var(--ink-soft);padding:10px 4px}
+.saved-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin-bottom:8px;background:#FCFCFB}
+.saved-row .sname{font-weight:600;font-size:13.5px;color:var(--ink)}
+.saved-row .smeta{font-size:11.5px;color:var(--ink-soft);margin-top:1px}
+.saved-row .sbtns{display:flex;gap:7px}
+.pv-tpl-applied{font-size:12px;color:var(--ink-soft);margin-bottom:9px}
+.pv-tpl-applied b{color:var(--accent)}
+
+/* ---------- App footer ---------- */
+.app-footer{margin-top:36px;padding:22px 24px;
+  background:linear-gradient(180deg,#1A2C4A 0%,#0E1B31 45%,#0A1526 100%);
+  border-top:1px solid rgba(91,200,245,.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+  text-align:center;font-size:12.5px;color:#B9C9DF}
+.app-footer a{color:var(--dc-blue);text-decoration:none;font-weight:600}
+.app-footer .sep{color:var(--dc-line)}
+.app-footer a:hover{text-decoration:underline}
+.app-footer .sep{margin:0 8px;color:var(--line)}
+
+/* ---------- Template gallery ---------- */
+.tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;max-height:52vh;overflow-y:auto;padding:2px}
+.tpl-card{border:2px solid var(--line);border-radius:10px;padding:8px;background:var(--card);
+  transition:border-color .15s,transform .1s;text-align:center}
+.tpl-card:hover{transform:translateY(-2px);border-color:var(--ink-soft)}
+.tpl-card.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.tpl-name{font-size:12px;font-weight:700;color:var(--ink);margin-top:7px}
+.tpl-card.sel .tpl-name::after{content:" ✓";color:var(--accent)}
+
+/* ---------- Preview toolbar ---------- */
+.pv-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+
+/* ---------- Chart tooltip ---------- */
+#chartTip{position:fixed;display:none;z-index:300;background:var(--ink);color:#fff;
+  font-size:12.5px;line-height:1.45;padding:8px 12px;border-radius:8px;max-width:320px;
+  pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+
+/* ---------- Insights: chart headers + inline editors ---------- */
+.trend-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px}
+.trend-head h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink);font-weight:600;font-family:'Inter'}
+.edit-btn{font-size:11.5px;font-weight:600;color:var(--accent);background:var(--card);
+  border:1.5px solid var(--accent);border-radius:99px;padding:4px 12px;cursor:pointer;white-space:nowrap}
+.edit-btn:hover{background:var(--accent);color:#fff}
+.ins-divider{height:1px;background:var(--line);margin:14px 0}
+.ins-editor{display:none;background:var(--card);border:1.5px solid var(--accent-soft);border-radius:10px;padding:12px;margin-top:10px}
+.ins-editor.open{display:block}
+.ins-editor table{width:100%;border-collapse:collapse;font-size:12.5px}
+.ins-editor th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent);padding:4px 6px;font-weight:600}
+.ins-editor td{padding:3px 4px}
+.ins-editor input{font-size:12.5px;padding:6px 9px}
+.ins-editor input.yr{width:74px}
+.ins-editor .rm{color:var(--danger);background:none;border:none;cursor:pointer;font-size:16px;font-weight:600;line-height:1}
+.ins-editor .ed-actions{display:flex;gap:8px;margin-top:10px;justify-content:flex-end}
+
+/* ---------- Cards ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--sec,var(--accent));
+  border-radius:var(--radius);box-shadow:var(--shadow);padding:22px;margin-bottom:20px}
+.card h2{font-size:19px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.card h2::before{content:"";width:9px;height:9px;border-radius:3px;background:var(--sec,var(--accent));margin-right:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.grid2{grid-template-columns:1fr}}
+.field{margin-bottom:12px}
+
+/* ---------- Buttons ---------- */
+.btn{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;font-weight:600;
+  padding:9px 16px;border-radius:8px;transition:filter .15s,background .15s}
+.btn:hover{filter:brightness(.96)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-ghost{background:var(--accent-soft);color:var(--accent)}
+.btn-ai{background:var(--ai-soft);color:var(--ai);font-size:12.5px;padding:6px 12px}
+.btn-danger{color:var(--danger);font-size:12.5px;padding:6px 10px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ---------- Upload zone ---------- */
+.dropzone{border:2px dashed var(--line);border-radius:var(--radius);padding:44px 24px;text-align:center;
+  background:var(--card);transition:border-color .2s,background .2s;cursor:pointer}
+.dropzone.drag{border-color:var(--accent);background:var(--accent-soft)}
+.dropzone h2{font-size:22px;margin-bottom:6px}
+.dropzone p{color:var(--ink-soft);font-size:14px}
+.or-line{display:flex;align-items:center;gap:12px;color:var(--ink-soft);font-size:13px;margin:20px 0}
+.or-line::before,.or-line::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* ---------- Progress ---------- */
+.progress-wrap{display:none;margin:0 0 20px}
+.progress-steps{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.pstep{font-size:12.5px;font-weight:600;color:var(--ink-soft);padding:5px 12px;border-radius:99px;background:var(--card);border:1px solid var(--line)}
+.pstep.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pstep.done{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-soft)}
+.pstep.done::before{content:"✓ ";font-weight:700}
+.pbar{height:6px;background:var(--line);border-radius:99px;overflow:hidden}
+.pbar>div{height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .4s}
+.pstatus{display:flex;align-items:center;gap:9px;margin-top:9px;font-size:13px;font-weight:600;color:var(--ink-soft)}
+.pstatus #ppct{margin-left:auto;color:var(--accent);font-variant-numeric:tabular-nums}
+.pspin{width:15px;height:15px;border:2.5px solid var(--accent-soft);border-top-color:var(--accent);
+  border-radius:50%;animation:sp .8s linear infinite;flex-shrink:0}
+.pspin.finished{border:none;animation:none;width:auto;height:auto}
+.pspin.finished::before{content:"✓";color:var(--ok);font-size:16px;font-weight:700}
+.pstatus.finished #pstatusText{color:var(--ok)}
+
+/* ---------- Experience / repeatable entries ---------- */
+.entry{border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px;background:#FCFCFB}
+.entry-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.entry-head strong{font-size:14px}
+
+/* ---------- Skill tags ---------- */
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.tag{background:var(--accent-soft);color:var(--accent);font-size:13px;font-weight:600;
+  padding:5px 12px;border-radius:99px;display:inline-flex;align-items:center;gap:6px}
+.tag button{color:inherit;font-size:15px;line-height:1}
+
+/* ---------- Add-section panel ---------- */
+.add-panel{display:flex;flex-wrap:wrap;gap:8px}
+.add-panel .btn{font-size:12.5px;padding:7px 13px}
+
+/* ---------- Modal ---------- */
+.modal{display:none;position:fixed;inset:0;background:rgba(26,32,40,.55);z-index:100;
+  align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto}
+.modal.open{display:flex}
+.modal-box{background:var(--card);color:var(--ink);border-radius:var(--radius);max-width:840px;width:100%;padding:28px;position:relative}
+.modal-box h2{color:var(--ink)}
+.modal-close{position:absolute;top:10px;right:12px;font-size:20px;color:var(--ink);z-index:10;
+  background:var(--card);border:1.5px solid var(--line);border-radius:50%;width:34px;height:34px;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.15);line-height:1}
+.modal-close:hover{border-color:var(--danger);color:var(--danger)}
+.pv-foot-close{text-align:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.tplm-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:13px}
+/* Templates picker: rectangular panel docked LEFT so the live preview stays visible */
+.modal.tpl-dock{background:transparent;pointer-events:none;justify-content:flex-start;align-items:stretch;padding:0}
+.modal.tpl-dock .modal-box{pointer-events:auto;width:350px;max-width:88vw;height:100vh;max-height:100vh;
+  border-radius:0 14px 14px 0;display:flex;flex-direction:column;padding:18px 16px;
+  box-shadow:6px 0 30px rgba(0,0,0,.35);border-right:1.5px solid var(--accent)}
+.modal.tpl-dock .tpl-grid{grid-template-columns:1fr 1fr;overflow-y:auto;flex:1;max-height:none;
+  align-content:start;padding-right:4px}
+.modal.tpl-dock .tplm-foot{margin-top:10px}
+
+/* ---------- Resume preview: styles generated per-theme in app.js ---------- */
+
+/* ---------- Toast ---------- */
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;
+  padding:11px 20px;border-radius:10px;font-size:14px;display:none;z-index:200;max-width:90vw}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.35);
+  border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+.btn-ai .spin,.btn-ghost .spin{border-color:rgba(15,118,110,.3);border-top-color:var(--accent)}
+@keyframes sp{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+
+/* ---------- Career Insights (charts) ---------- */
+.insights{background:linear-gradient(135deg,#F8FAFC 0%,#EFF6FF 100%);
+  border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin-bottom:20px;box-shadow:var(--shadow)}
+.insights-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.insights-head h2{font-size:19px;font-family:'Fraunces',serif;display:flex;align-items:center;gap:8px}
+.insights-head h2::before{content:"📈"}
+.insights-tabs{display:flex;gap:4px;background:#fff;border-radius:8px;padding:3px;border:1px solid var(--line)}
+.itab{font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:6px;color:var(--ink-soft);white-space:nowrap}
+.itab.on{background:var(--accent);color:#fff}
+.insights-body{background:#fff;border-radius:10px;padding:16px;min-height:230px;position:relative;overflow-x:auto}
+.chart-svg{display:block;width:100%;height:auto;font-family:Inter,sans-serif;font-size:11px}
+.chart-svg .bar{transition:opacity .15s}
+.chart-svg .bar:hover{opacity:.75}
+.chart-svg .grid{stroke:#E5E7EB;stroke-width:1}
+.chart-svg .axis-lbl{fill:#64748B;font-size:10.5px}
+.chart-svg .value-lbl{fill:#1E293B;font-size:11px;font-weight:600}
+.chart-caption{font-size:12.5px;color:var(--ink-soft);margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);line-height:1.5}
+.chart-caption strong{color:var(--ink)}
+.chart-empty{padding:30px 20px;text-align:center;color:var(--ink-soft);font-size:13px}
+
+/* ---------- Per-field AI button ---------- */
+.field-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:6px}
+.field-head label{margin-bottom:0}
+.mini-ai{font-size:11px;font-weight:600;color:var(--ai);background:var(--ai-soft);
+  padding:3px 8px;border-radius:99px;cursor:pointer;white-space:nowrap;line-height:1.4;
+  border:1px solid transparent;transition:filter .15s}
+.mini-ai:hover{filter:brightness(.95)}
+.mini-ai:disabled{opacity:.5;cursor:wait}
+
+/* ---------- Empty section state ---------- */
+.empty-hint{text-align:center;color:var(--ink-soft);font-size:13px;padding:14px 8px;
+  border:1.5px dashed var(--line);border-radius:10px;background:#FAFAF8}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand" id="brandHome" title="Back to Home">
+    <h1><span class="get">Get</span><span class="cv">CV</span></h1>
+    <div class="brand-sub">Powered by <a href="https://www.decompliance.uk" target="_blank" rel="noopener">DeCompliance</a> · AI GRC Intelligence</div>
+  </div>
+  <div class="hdr-right" id="hdrRight" style="display:none">
+    <span class="user" id="hdrUser"></span>
+    <button class="btn-dline" id="btnLogout" type="button">Log out</button>
+  </div>
+</header>
+<div class="ticker"><span><b>◆</b> Build your CV in minutes &nbsp;<b>◆</b> 15 professional templates &nbsp;<b>◆</b> Career timeline &amp; domain analytics &nbsp;<b>◆</b> AI-enhanced summaries &nbsp;<b>◆</b> Export to PDF &amp; Word &nbsp;<b>◆</b> Built by DeCompliance · decompliance.uk &nbsp;<b>◆</b> Build your CV in minutes &nbsp;<b>◆</b> 15 professional templates &nbsp;<b>◆</b> Career timeline &amp; domain analytics</span></div>
+
+
+<!-- ============ LOGIN ============ -->
+<div class="view on" id="view-login">
+  <div class="auth-card">
+    <h2>Welcome to Get<span class="cv">CV</span></h2>
+    <p>Sign in to build your professional resume</p>
+    <div class="auth-err" id="loginErr"></div>
+    <label class="dlabel" for="liEmail">Email address</label>
+    <input class="dinput" id="liEmail" type="email" autocomplete="email" placeholder="you@example.com">
+    <label class="dlabel" for="liPw">Password</label>
+    <input class="dinput" id="liPw" type="password" autocomplete="current-password" placeholder="••••••••">
+    <button class="btn-dblue" id="btnLogin" type="button">Sign in →</button>
+    <div class="auth-foot">New here? <a id="goSignup">Create an account</a></div>
+  </div>
+</div>
+
+<!-- ============ SIGN-UP ============ -->
+<div class="view" id="view-signup">
+  <div class="auth-card">
+    <h2>Create your Get<span class="cv">CV</span> account</h2>
+    <p>Free to start — build and download your first CV</p>
+    <div class="auth-err" id="signupErr"></div>
+    <label class="dlabel" for="suName">Full name</label>
+    <input class="dinput" id="suName" placeholder="Your name">
+    <label class="dlabel" for="suEmail">Email address</label>
+    <input class="dinput" id="suEmail" type="email" autocomplete="email" placeholder="you@example.com">
+    <label class="dlabel" for="suPw">Password</label>
+    <input class="dinput" id="suPw" type="password" autocomplete="new-password" placeholder="••••••••">
+    <div class="pw-hint">Minimum 8 characters. Stored securely — hashed, never in plain text.</div>
+    <label class="dlabel" for="suPw2">Confirm password</label>
+    <input class="dinput" id="suPw2" type="password" autocomplete="new-password" placeholder="••••••••">
+    <button class="btn-dblue" id="btnSignup" type="button">Create account →</button>
+    <div class="auth-foot">Already have an account? <a id="goLogin">Sign in</a><br>
+    By creating an account you agree to our <a href="https://www.decompliance.uk/terms-of-use" target="_blank" rel="noopener">Terms of Use</a> and <a href="https://www.decompliance.uk/privacy-policy" target="_blank" rel="noopener">Privacy Policy</a>.</div>
+  </div>
+</div>
+
+<!-- ============ HOME ============ -->
+<div class="view" id="view-home">
+  <div class="home-hero">
+    <div class="kicker">◆ GetCV Workspace</div>
+    <h2>What would you like to <em>build</em> today?</h2>
+    <p>Choose your path — you can switch between modules at any time.</p>
+  </div>
+  <div class="tiles">
+    <button class="tile" id="tilePro" type="button"><span class="ic">💼</span>
+      <h3>Create CV for <span>Professionals</span></h3>
+      <p>Upload your existing resume — AI extracts every role, detects all sections, builds your career timeline and domain expertise charts, then exports a polished CV.</p>
+      <span class="go">Enter workspace →</span></button>
+    <button class="tile" id="tileFresher" type="button"><span class="ic">🎓</span>
+      <h3>For <span>Freshers</span></h3>
+      <p>No work experience yet? Tell us your target field, education and skills — AI builds a strong starter resume with a professional summary and suggested projects.</p>
+      <span class="go">Enter workspace →</span></button>
+  </div>
+</div>
+
+<!-- ============ PROFESSIONAL MODULE ============ -->
+<div class="view" id="view-pro">
+  <div class="module-bar">
+    <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="btn-dline js-home" type="button">🏠 Home</button>
+      <span class="mtitle">💼 Professional CV Builder Console<span class="tag">Module</span></span>
+    </span>
+    <span class="mbtns">
+      <button class="btn-dline js-upload" type="button" title="Upload a new CV anytime — replaces the current one in the builder">⬆ Upload CV</button>
+      <button class="btn-dline js-refresh" type="button" title="Clear the current resume data">↻ Refresh</button>
+      <button class="btn-dline js-save" type="button">💾 Save</button>
+      <button class="btn-dline js-preview" type="button">👁 Preview</button>
+      <button class="btn-dline js-switch" data-to="fresher" type="button">Switch to Freshers →</button>
+    </span>
+  </div>
+  <div class="workspace">
+    <div class="container">
+      <nav class="rail" aria-label="Builder sidebar">
+        <button class="rail-group js-railtoggle" type="button">📑 Sections <span>▾</span></button>
+        <div data-rail></div>
+        <button class="rail-folder js-tplopen" type="button">🎨 Templates</button>
+        <button class="rail-folder js-savedopen" type="button">📁 Saved Resumes</button>
+      </nav>
+      <main>
+        <!-- Import progress -->
+        <div class="progress-wrap" id="progressWrap">
+          <div class="progress-steps">
+            <span class="pstep" data-step="0">1 · Uploading</span>
+            <span class="pstep" data-step="1">2 · Extracting text</span>
+            <span class="pstep" data-step="2">3 · AI parsing</span>
+            <span class="pstep" data-step="3">4 · Building form</span>
+            <span class="pstep" data-step="4">5 · Done</span>
+          </div>
+          <div class="pbar"><div id="pbarFill"></div></div>
+          <div class="pstatus" id="pstatus"><span class="pspin" id="pspin"></span><span id="pstatusText">Uploading…</span><span id="ppct">0%</span></div>
+        </div>
+        <!-- Upload -->
+        <div id="startArea">
+          <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload resume">
+            <h2>Upload your resume</h2>
+            <p>PDF or DOCX &middot; drag &amp; drop or click to browse</p>
+            <p style="margin-top:8px;font-size:12.5px">Every section is detected automatically — including publications, patents, volunteer work and more.</p>
+            <input type="file" id="fileInput" accept=".pdf,.docx,.doc" hidden>
+          </div>
+        </div>
+        <!-- Shared editor slot -->
+        <div id="editorSlotPro"></div>
+      </main>
+      <aside class="pv-live">
+        <div class="pv-live-head">
+          <span><b>Live Preview</b> <span class="pv-live-tpl" data-livetpl></span></span>
+          <span class="pv-live-btns">
+            <button class="btn btn-ghost js-tplopen" type="button" title="Change template">🎨</button>
+            <button class="btn btn-ghost js-word" type="button">⬇ Word</button>
+            <button class="btn btn-primary js-pdf" type="button">⬇ PDF</button>
+          </span>
+        </div>
+        <div class="pv-live-body"><div class="pv-live-inner" data-livepane>
+          <div class="pv-live-empty">Your resume preview appears here as you build — upload a CV or start fresh.</div>
+        </div></div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- ============ FRESHER MODULE ============ -->
+<div class="view" id="view-fresher">
+  <div class="module-bar">
+    <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="btn-dline js-home" type="button">🏠 Home</button>
+      <span class="mtitle">🎓 Fresher CV Builder Console<span class="tag">Module</span></span>
+    </span>
+    <span class="mbtns">
+      <button class="btn-dline js-refresh" type="button" title="Clear the current resume data">↻ Refresh</button>
+      <button class="btn-dline js-save" type="button">💾 Save</button>
+      <button class="btn-dline js-preview" type="button">👁 Preview</button>
+      <button class="btn-dline js-switch" data-to="pro" type="button">Switch to Professionals →</button>
+    </span>
+  </div>
+  <div class="workspace">
+    <div class="fr-grid">
+    <nav class="rail" aria-label="Builder sidebar">
+      <button class="rail-group js-railtoggle" type="button">📑 Sections <span>▾</span></button>
+      <div data-rail></div>
+      <button class="rail-folder js-tplopen" type="button">🎨 Templates</button>
+      <button class="rail-folder js-savedopen" type="button">📁 Saved Resumes</button>
+    </nav>
+    <div>
+    <div id="fresherStart">
+      <div class="card" style="max-width:640px;margin:0 auto">
+        <h2>Tell us about yourself</h2>
+        <div class="grid2">
+          <div class="field"><label for="frName">Your name</label><input id="frName" placeholder="e.g. Priya Sharma"></div>
+          <div class="field"><label for="frField">Target field *</label><input id="frField" placeholder="e.g. Cyber security, Data analysis"></div>
+          <div class="field"><label for="frEdu">Education</label><input id="frEdu" placeholder="e.g. BSc Computer Science, 2025"></div>
+          <div class="field"><label for="frSkills">Skills you have</label><input id="frSkills" placeholder="e.g. Python, Excel (optional)"></div>
+        </div>
+        <button class="btn btn-primary" id="btnFresher">✦ Build my starter resume</button>
+      </div>
+    </div>
+    <!-- Shared editor slot -->
+    <div id="editorSlotFresher"></div>
+    </div>
+    <aside class="pv-live">
+        <div class="pv-live-head">
+          <span><b>Live Preview</b> <span class="pv-live-tpl" data-livetpl></span></span>
+          <span class="pv-live-btns">
+            <button class="btn btn-ghost js-tplopen" type="button" title="Change template">🎨</button>
+            <button class="btn btn-ghost js-word" type="button">⬇ Word</button>
+            <button class="btn btn-primary js-pdf" type="button">⬇ PDF</button>
+          </span>
+        </div>
+        <div class="pv-live-body"><div class="pv-live-inner" data-livepane>
+          <div class="pv-live-empty">Your resume preview appears here as you build — upload a CV or start fresh.</div>
+        </div></div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<!-- Shared editor (moved between module slots by JS) -->
+<div id="editorWrap" class="hidden">
+  <div id="editor" class="hidden"></div>
+  <div class="card hidden" id="addSectionCard">
+    <h2>Add a missing section</h2>
+    <div class="add-panel" id="addPanel"></div>
+  </div>
+</div>
+
+<!-- ===== Refresh save-prompt modal ===== -->
+<div class="modal" id="refreshModal" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:460px;text-align:center">
+    <h2 style="margin-bottom:6px">💾 Save before clearing?</h2>
+    <p style="font-size:13px;color:var(--ink-soft);margin-bottom:18px">You have a resume in the builder. Save it to your Saved Resumes folder, or clear it and start from the beginning with a new import.</p>
+    <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap">
+      <button class="btn btn-primary" id="refSave" type="button">💾 Save &amp; clear</button>
+      <button class="btn btn-danger" id="refClear" type="button">Don't save — clear</button>
+      <button class="btn btn-ghost" id="refCancel" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Templates picker modal ===== -->
+<div class="modal tpl-dock" id="templatesModal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <button class="modal-close" data-close>&times;</button>
+    <h2 style="margin-bottom:4px">🎨 Choose your template</h2>
+    <p style="font-size:12.5px;color:var(--ink-soft);margin-bottom:12px">Click any template — the live preview on the right applies it instantly so you can compare. Hit Apply when you're happy.</p>
+    <div class="tpl-grid" data-templategrid></div>
+    <div class="tplm-foot">
+      <span>Selected: <b id="tplSelName" style="color:var(--accent)"></b></span>
+      <span style="display:flex;gap:8px">
+        <button class="btn btn-ghost" data-close type="button">Cancel</button>
+        <button class="btn btn-primary" id="tplApply" type="button">✓ Apply template</button>
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Saved resumes modal ===== -->
+<div class="modal" id="savedModal" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:640px">
+    <button class="modal-close" data-close>&times;</button>
+    <h2 style="margin-bottom:4px">📁 Saved Resumes</h2>
+    <p style="font-size:13px;color:var(--ink-soft);margin-bottom:14px">Open one to continue editing, apply a new template and download again.</p>
+    <div class="saved-list" data-savedlist></div>
+  </div>
+</div>
+
+<!-- ===== Preview + Download modal ===== -->
+<div class="modal" id="previewModal" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:900px">
+    <button class="modal-close" data-close>&times;</button>
+    <div class="pv-toolbar">
+      <span style="font-weight:700;font-family:'Fraunces',serif;font-size:17px">Review your resume</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost" id="pvHtml" type="button">HTML</button>
+        <button class="btn btn-primary js-word" id="pvWord" type="button">⬇ Word (.doc)</button>
+        <button class="btn btn-primary js-pdf" id="pvPdf" type="button">⬇ PDF</button>
+      </div>
+    </div>
+    <div id="previewBody"></div>
+    <div class="pv-foot-close">
+      <button class="btn btn-ghost" data-close type="button">✕ Close preview</button>
+    </div>
+  </div>
+</div>
+
+<footer class="app-footer">
+  © <span id="ftYear"></span> Decompliance · GetCV — AI Resume Builder<br>
+  Powered by <a href="https://www.decompliance.uk" target="_blank" rel="noopener">Decompliance · AI GRC Intelligence</a>
+  <span class="sep">|</span><a href="https://www.decompliance.uk/privacy-policy" target="_blank" rel="noopener">Privacy Policy</a>
+  <span class="sep">|</span><a href="https://www.decompliance.uk/terms-of-use" target="_blank" rel="noopener">Terms of Use</a>
+</footer>
+<script>document.getElementById('ftYear').textContent = new Date().getFullYear();</script>
+
+<div id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
