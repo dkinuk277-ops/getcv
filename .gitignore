@@ -1,0 +1,8 @@
+# Never commit these to GitHub
+.env
+.env.local
+.env.production
+data/
+node_modules/
+*.log
+.DS_Store
