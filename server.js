@@ -334,6 +334,10 @@ app.delete('/api/resumes/:id', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// Legal pages: clean URLs
+app.get('/privacy-policy', (req, res) => res.sendFile(path.join(__dirname, 'public', 'legal', 'privacy-policy.html')));
+app.get('/terms-of-use',   (req, res) => res.sendFile(path.join(__dirname, 'public', 'legal', 'terms-of-use.html')));
+
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, model: MODEL, keyConfigured: !!process.env.ANTHROPIC_API_KEY });
 });
