@@ -1628,7 +1628,10 @@ async function doLogout(){
 
 function setUser(user){
   currentUser = user;
-  $('#hdrUser').textContent = user.name ? `${user.name}` : user.email;
+  const display = user.name || user.email;
+  const initial = (display[0] || '?').toUpperCase();
+  const avatar = $('#hdrAvatar'); if(avatar) avatar.textContent = initial;
+  const txt = $('#hdrUserText'); if(txt) txt.textContent = display;
   $('#hdrRight').style.display = 'flex';
   showView('home');
   loadSavedList();
@@ -1784,6 +1787,99 @@ document.querySelectorAll('.js-railtoggle').forEach(btn => btn.addEventListener(
   railEl.style.display = open ? 'none' : '';
   btn.querySelector('span').textContent = open ? '▸' : '▾';
 }));
+
+// ============================================================
+// Account view — profile + delete-account flow
+// ============================================================
+async function openAccount(){
+  if(!currentUser){ showView('login'); return; }
+  showView('account');
+  $('#acctName').textContent = currentUser.name || '(not set)';
+  $('#acctEmail').textContent = currentUser.email;
+  $('#acctSession').textContent = 'This session';
+  // Refresh the saved-resume count
+  try{
+    const out = await api('/api/resumes');
+    const n = (out.resumes || []).length;
+    $('#acctResumeCount').textContent = n === 0 ? 'None yet' : n + (n === 1 ? ' saved resume' : ' saved resumes');
+  }catch{
+    $('#acctResumeCount').textContent = '—';
+  }
+}
+
+// Clicking the header user pill opens the account view
+$('#hdrUser').addEventListener('click', openAccount);
+$('#acctBackHome').addEventListener('click', goHome);
+$('#btnOpenDelete').addEventListener('click', ()=>{
+  $('#delConfirm').value = '';
+  $('#delPassword').value = '';
+  $('#delErr').classList.remove('on');
+  $('#btnConfirmDelete').disabled = true;
+  $('#deleteModal').classList.add('open');
+  setTimeout(()=> $('#delConfirm').focus(), 40);
+});
+
+// Enable the destructive button only when both fields are ready
+function _updateDeleteReady(){
+  const typed = $('#delConfirm').value.trim() === 'DELETE';
+  const pw = $('#delPassword').value.length >= 1;
+  $('#btnConfirmDelete').disabled = !(typed && pw);
+}
+$('#delConfirm').addEventListener('input', _updateDeleteReady);
+$('#delPassword').addEventListener('input', _updateDeleteReady);
+$('#delPassword').addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !$('#btnConfirmDelete').disabled) $('#btnConfirmDelete').click();
+});
+
+function _showDeleteError(msg){
+  const e = $('#delErr');
+  e.textContent = msg;
+  e.classList.add('on');
+}
+
+$('#btnConfirmDelete').addEventListener('click', async ()=>{
+  if($('#delConfirm').value.trim() !== 'DELETE'){
+    return _showDeleteError('Please type DELETE (in capitals) to confirm.');
+  }
+  const password = $('#delPassword').value;
+  if(!password) return _showDeleteError('Please enter your password.');
+
+  const btn = $('#btnConfirmDelete');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Deleting…';
+  try{
+    await api('/api/auth/delete-account', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ password })
+    });
+    // Fully reset the local state — session is now dead server-side
+    currentUser = null;
+    currentResumeId = null; currentResumeName = '';
+    R = emptyResume();
+    $('#hdrRight').style.display = 'none';
+    $('#deleteModal').classList.remove('open');
+    // Reset the UI so nothing from the old session lingers
+    if($('#editorWrap')) $('#editorWrap').classList.add('hidden');
+    if($('#editor')) $('#editor').classList.add('hidden');
+    if($('#startArea')) $('#startArea').classList.remove('hidden');
+    if($('#fresherStart')) $('#fresherStart').classList.remove('hidden');
+    showView('login');
+    toast('Your account has been permanently deleted.', 6000);
+  }catch(err){
+    btn.disabled = false;
+    btn.textContent = originalText;
+    const msg = String(err.message || '');
+    if(/Incorrect password/i.test(msg)){
+      _showDeleteError('Incorrect password — your account has NOT been deleted.');
+    } else if(/rate|Too many/i.test(msg)){
+      _showDeleteError('Too many attempts — please wait a few minutes and try again.');
+    } else {
+      _showDeleteError('Could not delete account: ' + (msg || 'unknown error') + '. Please try again or email hello@decompliance-uk.com for help.');
+    }
+  }
+});
 
 // ---- session check on load ----
 (async ()=>{

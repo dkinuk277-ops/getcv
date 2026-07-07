@@ -116,6 +116,44 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
 .rail-item.detected .dot{background:var(--sec,var(--accent))}
 @media(max-width:860px){.rail{display:none}}
 
+/* ---------- Header: user pill turns into a button ---------- */
+.user-btn{background:rgba(91,200,245,.08);border:1px solid rgba(91,200,245,.35);
+  color:var(--dc-text);font-family:inherit;font-size:13px;font-weight:600;
+  padding:5px 12px 5px 5px;border-radius:99px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:8px;transition:background .15s}
+.user-btn:hover{background:rgba(91,200,245,.16)}
+.user-avatar{width:24px;height:24px;border-radius:50%;background:var(--dc-blue);
+  color:#06121F;font-weight:700;font-size:12px;
+  display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ---------- Account view ---------- */
+.acct-wrap{max-width:720px;margin:0 auto}
+.acct-crumb{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--dc-gold);margin-bottom:8px}
+.acct-title{font-family:'Fraunces',serif;font-size:30px;color:var(--dc-text);margin-bottom:22px}
+.acct-title em{color:var(--dc-blue);font-style:italic}
+.acct-card{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:12px;
+  padding:22px 24px;margin-bottom:16px;box-shadow:var(--shadow)}
+.acct-card h3{font-size:14px;font-weight:700;margin-bottom:12px;color:var(--ink)}
+.acct-hint{font-size:13px;color:var(--ink-soft);margin-bottom:14px;line-height:1.55}
+.acct-hint b{color:var(--ink);font-weight:700}
+.acct-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.acct-row:last-child{border-bottom:none}
+.acct-label{color:var(--ink-soft);font-weight:500}
+.acct-value{color:var(--ink);font-weight:600;word-break:break-word;text-align:right}
+.acct-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.acct-danger{border-color:#FCA5A5;background:#FEF8F7}
+.acct-danger h3{color:var(--danger)}
+.acct-back{text-align:center;margin-top:20px}
+
+/* Delete-account modal input styling (light on white card) */
+.dinput-light{background:#F8FAFC;border:1.5px solid var(--line);color:var(--ink)}
+.dinput-light:focus{border-color:var(--accent);background:#fff}
+.del-err{display:none;background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;
+  font-size:12.5px;border-radius:8px;padding:8px 12px;margin-bottom:12px}
+.del-err.on{display:block}
+.del-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+
 /* ---------- Upload error card (replaces dropzone when a file fails) ---------- */
 .upload-error{background:#FEF2F2;border:1.5px solid #FCA5A5;border-radius:14px;
   padding:26px 24px;text-align:center;max-width:520px;margin:0 auto}
@@ -390,7 +428,10 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
     <div class="brand-sub">Powered by <a href="https://www.decompliance.uk" target="_blank" rel="noopener">DeCompliance</a> · AI GRC Intelligence</div>
   </div>
   <div class="hdr-right" id="hdrRight" style="display:none">
-    <span class="user" id="hdrUser"></span>
+    <button class="user user-btn" id="hdrUser" type="button" title="Your account">
+      <span class="user-avatar" id="hdrAvatar"></span>
+      <span id="hdrUserText"></span>
+    </button>
     <button class="btn-dline" id="btnLogout" type="button">Log out</button>
   </div>
 </header>
@@ -449,6 +490,63 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
       <h3>For <span>Freshers</span></h3>
       <p>No work experience yet? Tell us your target field, education and skills — AI builds a strong starter resume with a professional summary and suggested projects.</p>
       <span class="go">Enter workspace →</span></button>
+  </div>
+</div>
+
+<!-- ============ ACCOUNT / PROFILE ============ -->
+<div class="view" id="view-account">
+  <div class="acct-wrap">
+    <div class="acct-crumb">◆ Account</div>
+    <h2 class="acct-title">Your <em>account</em></h2>
+
+    <section class="acct-card">
+      <h3>Profile</h3>
+      <div class="acct-row"><span class="acct-label">Name</span><span id="acctName" class="acct-value">—</span></div>
+      <div class="acct-row"><span class="acct-label">Email</span><span id="acctEmail" class="acct-value">—</span></div>
+      <div class="acct-row"><span class="acct-label">Signed in since</span><span id="acctSession" class="acct-value">—</span></div>
+    </section>
+
+    <section class="acct-card">
+      <h3>Your data</h3>
+      <p class="acct-hint">Saved resumes stored under your account. Delete individual ones from the Saved Resumes panel; delete everything by deleting your account below.</p>
+      <div class="acct-row"><span class="acct-label">Saved resumes</span><span id="acctResumeCount" class="acct-value">—</span></div>
+      <div class="acct-actions">
+        <a class="btn btn-ghost" href="/privacy-policy" target="_blank" rel="noopener">📄 View Privacy Policy</a>
+        <a class="btn btn-ghost" href="/terms-of-use" target="_blank" rel="noopener">📄 View Terms of Use</a>
+      </div>
+    </section>
+
+    <section class="acct-card acct-danger">
+      <h3>⚠ Danger zone</h3>
+      <p class="acct-hint"><b>Delete your account.</b> This permanently removes your account, all saved resumes, and every active session. <b>This cannot be undone.</b> Backups purge within 30 days per our Privacy Policy.</p>
+      <button class="btn btn-danger" id="btnOpenDelete" type="button">Delete my account</button>
+    </section>
+
+    <div class="acct-back">
+      <button class="btn btn-ghost" id="acctBackHome" type="button">← Back to Home</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DELETE-ACCOUNT MODAL ============ -->
+<div class="modal" id="deleteModal" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:480px">
+    <button class="modal-close" data-close type="button">&times;</button>
+    <h2 style="margin-bottom:4px;color:var(--danger)">Delete your account</h2>
+    <p style="font-size:13px;color:var(--ink-soft);margin-bottom:14px">This will permanently remove your account, every saved resume, and every session. There is no undo.</p>
+
+    <div class="del-err" id="delErr"></div>
+
+    <label class="dlabel" for="delConfirm" style="color:var(--ink-soft)">Type <b style="color:var(--danger)">DELETE</b> to confirm</label>
+    <input class="dinput dinput-light" id="delConfirm" type="text" autocomplete="off" placeholder="DELETE">
+
+    <label class="dlabel" for="delPassword" style="color:var(--ink-soft);margin-top:10px">Enter your password</label>
+    <input class="dinput dinput-light" id="delPassword" type="password" autocomplete="current-password" placeholder="••••••••">
+
+    <div class="del-actions">
+      <button class="btn btn-ghost" data-close type="button">Cancel</button>
+      <button class="btn btn-danger" id="btnConfirmDelete" type="button" disabled>Yes, delete forever</button>
+    </div>
   </div>
 </div>
 
