@@ -147,8 +147,26 @@ function resetProgress(){
 }
 
 async function handleFile(file){
-  if(!/\.(pdf|docx?|)$/i.test(file.name) && !/\.(pdf|docx?)$/i.test(file.name)){
-    return toast('Please upload a PDF or DOCX file');
+  const name = String(file.name || '');
+  // Reject the legacy .doc format explicitly — mammoth can't read it
+  if(/\.doc$/i.test(name)){
+    return showUploadError(
+      'This file is in the old <b>.doc</b> format, which we can\'t read.',
+      'Open your file in Microsoft Word (or Google Docs) and save it as <b>.docx</b>, or export it as a <b>PDF</b>. Then try uploading again.'
+    );
+  }
+  if(!/\.(pdf|docx)$/i.test(name)){
+    return showUploadError(
+      'Only PDF and .docx files are supported.',
+      'Please choose a resume file that ends in <b>.pdf</b> or <b>.docx</b>.'
+    );
+  }
+  // 10 MB limit matches the server — catch it here so we don\'t waste a round-trip
+  if(file.size > 10 * 1024 * 1024){
+    return showUploadError(
+      'This file is too large ('+(file.size/1024/1024).toFixed(1)+' MB).',
+      'Please keep resumes under <b>10 MB</b>. If your file is a PDF with lots of images, save a lighter version and try again.'
+    );
   }
   try{
     _pct = 0;
@@ -174,8 +192,87 @@ async function handleFile(file){
     toast(msg);
   }catch(err){
     resetProgress();
-    toast('Import failed: ' + err.message, 6000);
+    // Server sends actionable messages via {error: "..."} JSON — surface them properly
+    const raw = String(err.message || '').trim();
+    // Common message → nudge pair
+    let title = raw, hint = '';
+    if(/\.doc format|older \.doc/i.test(raw)){
+      title = 'The old .doc format is not supported.';
+      hint = 'Open your file in Word and <b>Save As → .docx</b>, or export it as a <b>PDF</b>, then try again.';
+    } else if(/does not appear to be a valid \.docx|central directory/i.test(raw)){
+      title = 'We couldn\'t read this file.';
+      hint = 'It may be the older <b>.doc</b> format, corrupted, or password-protected. Please save it as <b>.docx</b> or export as <b>PDF</b> and try again.';
+    } else if(/password-protected/i.test(raw)){
+      title = 'This file is password-protected.';
+      hint = 'Please remove the password from the file and try again.';
+    } else if(/scanned|OCR|image-only/i.test(raw)){
+      title = 'This looks like a scanned or image-only PDF.';
+      hint = 'Please upload a <b>text-based PDF</b> or a <b>.docx</b> — resumes typed in Word or exported from LinkedIn work best.';
+    } else if(/AI service is busy|overloaded/i.test(raw)){
+      title = 'The AI service is busy right now.';
+      hint = 'Please wait a minute and try again — this usually clears quickly.';
+    } else if(/timed out|timeout/i.test(raw)){
+      title = 'The request timed out.';
+      hint = 'Very long resumes can take a while. Please try again, or upload a shorter version.';
+    } else if(/too large|10 MB/i.test(raw)){
+      title = 'This file is too large.';
+      hint = 'Please keep resumes under <b>10 MB</b>.';
+    } else if(/rate limit|Too many/i.test(raw)){
+      title = 'You\'ve hit our rate limit.';
+      hint = 'Please wait a few minutes before uploading again.';
+    } else if(/Not signed in|401/i.test(raw)){
+      title = 'Your session has expired.';
+      hint = 'Please log in again to continue.';
+    } else if(!raw || /failed to fetch|network/i.test(raw)){
+      title = 'Could not reach the server.';
+      hint = 'Check your internet connection and try again.';
+    } else if(!hint){
+      hint = 'Please try a different format (<b>PDF</b> works best) or a shorter version.';
+    }
+    showUploadError(title, hint);
   }
+}
+
+// Show a proper actionable error card in place of the dropzone, so the message
+// doesn\'t disappear like a toast. Includes a Try again button.
+function showUploadError(title, hint){
+  const host = $('#startArea');
+  if(!host) return toast(title + ' ' + hint.replace(/<[^>]+>/g,''), 8000);
+  host.classList.remove('hidden');
+  host.innerHTML = `<div class="upload-error">
+    <div class="upload-error-icon">⚠️</div>
+    <h3>${title}</h3>
+    <p>${hint}</p>
+    <button class="btn btn-primary" type="button" id="uploadTryAgain">Choose a different file</button>
+    <div class="upload-error-help">Need help? Email <a href="mailto:hello@decompliance-uk.com">hello@decompliance-uk.com</a></div>
+  </div>`;
+  $('#uploadTryAgain').addEventListener('click', ()=>{
+    // Restore the original dropzone
+    host.innerHTML = `<div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload resume">
+      <h2>Upload your resume</h2>
+      <p>PDF or DOCX &middot; drag &amp; drop or click to browse</p>
+      <p style="margin-top:8px;font-size:12.5px">Every section is detected automatically — including publications, patents, volunteer work and more.</p>
+      <input type="file" id="fileInput" accept=".pdf,.docx" hidden>
+    </div>`;
+    rebindDropzone();
+  });
+  // scroll it into view in case the page was scrolled
+  if(typeof host.scrollIntoView === 'function') host.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+// Rebind dropzone events after we replace the DOM
+function rebindDropzone(){
+  const dz = $('#dropzone'), fi = $('#fileInput');
+  if(!dz || !fi) return;
+  dz.addEventListener('click', ()=> fi.click());
+  dz.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' ') fi.click(); });
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', ()=> dz.classList.remove('drag'));
+  dz.addEventListener('drop', e=>{
+    e.preventDefault(); dz.classList.remove('drag');
+    if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fi.addEventListener('change', ()=>{ if(fi.files[0]) handleFile(fi.files[0]); });
 }
 
 function normalize(d){
