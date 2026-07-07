@@ -36,13 +36,35 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
+    const name = String(file.originalname || '');
+    // reject legacy .doc explicitly with a clear message — mammoth can't read it
+    if (/\.doc$/i.test(name)) {
+      const e = new Error('LEGACY_DOC');
+      return cb(e, false);
+    }
     const ok = ['application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/msword'].includes(file.mimetype)
-      || /\.(pdf|docx|doc)$/i.test(file.originalname);
-    cb(ok ? null : new Error('Only PDF and DOCX files are supported'), ok);
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.mimetype)
+      || /\.(pdf|docx)$/i.test(name);
+    if (!ok) return cb(new Error('UNSUPPORTED_TYPE'), false);
+    cb(null, true);
   }
 });
+// Convert multer errors into user-friendly JSON responses BEFORE they reach the handler
+function handleUploadErrors(err, req, res, next) {
+  if (!err) return next();
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: 'File is too large — please keep resumes under 10 MB.' });
+  }
+  if (err.message === 'LEGACY_DOC') {
+    return res.status(415).json({
+      error: 'The old .doc format is not supported. Please open your file in Word and save it as .docx or export it as a PDF, then upload again.'
+    });
+  }
+  if (err.message === 'UNSUPPORTED_TYPE') {
+    return res.status(415).json({ error: 'Only PDF and .docx files are supported.' });
+  }
+  return res.status(400).json({ error: err.message || 'Upload failed' });
+}
 
 // ============================================================
 // Helpers
@@ -343,7 +365,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ---- 1. Parse an uploaded resume ---------------------------
-app.post('/api/parse-resume', aiLimiter, requireAuth, upload.single('resume'), async (req, res) => {
+app.post('/api/parse-resume', aiLimiter, requireAuth, upload.single('resume'), handleUploadErrors, async (req, res) => {
   try {
     if (!requireKey(res)) return;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -415,7 +437,26 @@ ${resumeText}`;
     res.json({ success: true, data: parsed });
   } catch (err) {
     console.error('parse-resume error:', err.message);
-    res.status(500).json({ error: err.message || 'Parsing failed' });
+    const msg = String(err.message || '');
+    // Map common parser failures to messages users can actually act on
+    if (/central directory|zip file/i.test(msg)) {
+      return res.status(422).json({
+        error: 'This file does not appear to be a valid .docx. It may be the older .doc format, corrupted, or password-protected. Please save it as .docx or export as PDF and try again.'
+      });
+    }
+    if (/password/i.test(msg)) {
+      return res.status(422).json({ error: 'The file appears to be password-protected. Please remove the password and try again.' });
+    }
+    if (/scanned|OCR/i.test(msg)) {
+      return res.status(422).json({ error: 'This looks like a scanned or image-only PDF. Please upload a text-based PDF or a .docx.' });
+    }
+    if (/overloaded|rate|429|529/i.test(msg)) {
+      return res.status(503).json({ error: 'The AI service is busy right now. Please wait a minute and try again.' });
+    }
+    if (/timeout|timed out|ETIMEDOUT/i.test(msg)) {
+      return res.status(504).json({ error: 'The request timed out. Very long resumes can take a while — please try again, or upload a shorter version.' });
+    }
+    res.status(500).json({ error: 'We could not read this file. Please try a different format (PDF works best) or a shorter version.' });
   }
 });
 
