@@ -1881,6 +1881,200 @@ $('#btnConfirmDelete').addEventListener('click', async ()=>{
   }
 });
 
+// ============================================================
+// TAILOR FOR JOB — flagship feature
+// Paste a JD → AI analysis → accept/reject changes → save as new resume
+// ============================================================
+let tailorResult = null;
+
+function tlStep(n){
+  for(let i=1;i<=3;i++){
+    $('#tlPane'+i).classList.toggle('on', i===n);
+    const s = document.querySelector('[data-tstep="'+i+'"]');
+    s.classList.toggle('on', i===n);
+    s.classList.toggle('done', i<n);
+  }
+}
+
+function tlError(paneId, msg){
+  const e = $(paneId);
+  e.textContent = msg; e.classList.add('on');
+  setTimeout(()=> e.classList.remove('on'), 8000);
+}
+
+document.querySelectorAll('.js-tailor').forEach(b => b.addEventListener('click', ()=>{
+  if(resumeIsEmpty()) return toast('Import or open a resume first — then tailor it for a job.', 5000);
+  tailorResult = null;
+  $('#tlErr').classList.remove('on');
+  $('#tlErr2').classList.remove('on');
+  $('#tlResults').classList.add('hidden');
+  $('#tlLoading').style.display = 'block';
+  tlStep(1);
+  $('#tailorModal').classList.add('open');
+  setTimeout(()=> $('#tlJD').focus(), 40);
+}));
+
+$('#tlAnalyse').addEventListener('click', async ()=>{
+  const jd = $('#tlJD').value.trim();
+  if(jd.length < 80) return tlError('#tlErr', 'Please paste the full job description — at least a few sentences.');
+  if(jd.length > 15000) return tlError('#tlErr', 'That is very long — please paste up to ~15,000 characters.');
+  tlStep(2);
+  $('#tlLoading').style.display = 'block';
+  $('#tlResults').classList.add('hidden');
+  try{
+    const out = await api('/api/tailor', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        jobTitle: $('#tlTitle').value.trim(),
+        company: $('#tlCompany').value.trim(),
+        jobDescription: jd,
+        resume: R
+      })
+    });
+    tailorResult = out.result;
+    renderTailorResults();
+  }catch(err){
+    tlStep(1);
+    tlError('#tlErr', err.message || 'Tailoring failed — please try again.');
+  }
+});
+
+function renderTailorResults(){
+  const r = tailorResult;
+  $('#tlLoading').style.display = 'none';
+  $('#tlResults').classList.remove('hidden');
+
+  // Match ring
+  const pct = r.match_score || 0;
+  $('#tlScore').textContent = pct + '%';
+  $('#tlRing').style.background = `conic-gradient(var(--accent) 0 ${pct}%, #E5E7EB ${pct}% 100%)`;
+  const jt = $('#tlTitle').value.trim(), co = $('#tlCompany').value.trim();
+  $('#tlMatchTitle').textContent = 'Your resume vs. ' + (jt || 'this job') + (co ? ' @ ' + co : '');
+  $('#tlMatchSummary').textContent = r.match_summary || '';
+
+  // Coverage chips
+  const cov = $('#tlCoverage'); cov.innerHTML = '';
+  (r.skills_coverage || []).forEach(s=>{
+    const chip = el('span', {class:'sk ' + (s.status || 'partial')});
+    chip.textContent = s.skill + (s.note ? ' — ' + s.note : '');
+    cov.appendChild(chip);
+  });
+
+  // Change cards
+  const list = $('#tlChanges'); list.innerHTML = '';
+  (r.changes || []).forEach((c, i)=>{
+    const card = el('div', {class:'diff-card' + (c.verified ? '' : ' rejected'), 'data-ci': String(i)});
+    const whyClass = c.verified ? 'why' : 'why warn';
+    const whyText = c.verified ? esc(c.reason || '') : '⚠ Only if truthful — you decide';
+    card.innerHTML = `<div class="diff-head">
+        <span class="where">${esc(c.where_label || 'Change')}</span>
+        <span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <span class="${whyClass}">${whyText}</span>
+          <label class="switch"><input type="checkbox" ${c.verified ? 'checked' : ''}><span class="slider"></span><span class="sw-lbl">Apply</span></label>
+        </span>
+      </div>
+      <div class="diff-body">
+        ${c.old_text ? `<div class="d-old">${esc(c.old_text)}</div>` : ''}
+        <div class="d-new">${esc(c.new_text)}</div>
+        ${!c.verified ? `<div class="d-warn">⚠ GetCV can't verify this from your resume — it defaults to OFF. Only enable it if it's true.</div>` : ''}
+      </div>`;
+    card.querySelector('input').addEventListener('change', e=>{
+      card.classList.toggle('rejected', !e.target.checked);
+      updateTailorCount();
+    });
+    list.appendChild(card);
+  });
+
+  $('#tlChangeCount').textContent = (r.changes || []).length + ' proposed change' + ((r.changes||[]).length===1?'':'s');
+  updateTailorCount();
+}
+
+function updateTailorCount(){
+  const n = document.querySelectorAll('#tlChanges .diff-card input:checked').length;
+  $('#tlApply').textContent = `✓ Apply ${n} change${n===1?'':'s'} & save as new resume`;
+  $('#tlApply').disabled = n === 0;
+}
+
+$('#tlAcceptAll').addEventListener('click', ()=>{
+  document.querySelectorAll('#tlChanges .diff-card').forEach((card, i)=>{
+    const c = tailorResult.changes[i];
+    const cb = card.querySelector('input');
+    cb.checked = !!c.verified;            // accept-all only turns on VERIFIED ones
+    card.classList.toggle('rejected', !cb.checked);
+  });
+  updateTailorCount();
+});
+$('#tlRejectAll').addEventListener('click', ()=>{
+  document.querySelectorAll('#tlChanges .diff-card input').forEach(cb=>{
+    cb.checked = false;
+    cb.closest('.diff-card').classList.add('rejected');
+  });
+  updateTailorCount();
+});
+$('#tlBack').addEventListener('click', ()=> tlStep(1));
+
+// Apply the accepted changes to a COPY of the resume, save it as a new record
+function applyTailorChanges(base, changes, acceptedIdx){
+  const r = JSON.parse(JSON.stringify(base));
+  // replacements first, additions after (so adds append to final state)
+  const order = ['summary','skills','experience_desc','summary_append','skills_add','accomplishments_add'];
+  const sorted = acceptedIdx
+    .map(i => changes[i])
+    .sort((a,b)=> order.indexOf(a.apply.field) - order.indexOf(b.apply.field));
+  sorted.forEach(c=>{
+    const a = c.apply;
+    if(a.field === 'summary' && typeof a.new_value === 'string') r.summary = a.new_value;
+    else if(a.field === 'skills' && Array.isArray(a.new_value)) r.skills = a.new_value;
+    else if(a.field === 'experience_desc' && typeof a.new_value === 'string' &&
+            Number.isInteger(a.exp_index) && r.experience[a.exp_index])
+      r.experience[a.exp_index].desc = a.new_value;
+    else if(a.field === 'summary_append' && typeof a.new_value === 'string')
+      r.summary = (r.summary ? r.summary + ' ' : '') + a.new_value;
+    else if(a.field === 'skills_add' && Array.isArray(a.new_value))
+      a.new_value.forEach(s => { if(!r.skills.includes(s)) r.skills.push(s); });
+    else if(a.field === 'accomplishments_add' && Array.isArray(a.new_value))
+      r.accomplishments.push(...a.new_value);
+  });
+  return r;
+}
+
+$('#tlApply').addEventListener('click', async ()=>{
+  const accepted = [];
+  document.querySelectorAll('#tlChanges .diff-card').forEach((card, i)=>{
+    if(card.querySelector('input').checked) accepted.push(i);
+  });
+  if(!accepted.length) return;
+
+  const btn = $('#tlApply');
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Saving…';
+  try{
+    const tailored = applyTailorChanges(R, tailorResult.changes, accepted);
+    const jt = $('#tlTitle').value.trim(), co = $('#tlCompany').value.trim();
+    const name = `${R.personal.name || 'CV'} — ${jt || 'Tailored'}${co ? ' @ ' + co : ''}`.slice(0, 80);
+    const out = await api('/api/resumes', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, template: selectedTemplate, data: tailored })
+    });
+    // Load the tailored version into the builder — original stays saved/untouched
+    R = normalize(tailored);
+    currentResumeId = out.id;
+    currentResumeName = name;
+    buildEditor();
+    renderLivePreview();
+    loadSavedList();
+    $('#tlSavedTitle').textContent = accepted.length + ' change' + (accepted.length===1?'':'s') + ' applied';
+    $('#tlSavedName').textContent = '📄 ' + name;
+    tlStep(3);
+    toast('Tailored resume saved and loaded — ready to download');
+  }catch(err){
+    tlError('#tlErr2', 'Could not save: ' + (err.message || 'unknown error'));
+  }
+  btn.disabled = false;
+  btn.textContent = orig;
+});
+
 // ---- session check on load ----
 (async ()=>{
   try{

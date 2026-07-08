@@ -116,6 +116,66 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
 .rail-item.detected .dot{background:var(--sec,var(--accent))}
 @media(max-width:860px){.rail{display:none}}
 
+/* ---------- Tailor for Job ---------- */
+.btn-gold{background:var(--dc-gold);color:#231A02;border:none;font-size:13px;font-weight:700;
+  border-radius:8px;padding:7px 14px;cursor:pointer;font-family:inherit;
+  box-shadow:0 0 0 1px rgba(227,179,65,.3), 0 2px 8px rgba(227,179,65,.25)}
+.btn-gold:hover{filter:brightness(1.08)}
+.pro-chip{display:inline-block;background:var(--dc-gold);color:#231A02;font-size:10px;font-weight:800;
+  letter-spacing:.05em;border-radius:99px;padding:3px 10px;vertical-align:3px;margin-left:6px}
+.tl-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.tl-head h2{font-size:19px}
+.tl-steps{display:flex;gap:6px}
+.tl-stp{font-size:10.5px;font-weight:700;padding:4px 11px;border-radius:99px;background:#EEF1F4;color:var(--ink-soft)}
+.tl-stp.on{background:var(--accent);color:#fff}
+.tl-stp.done{background:#DCFCE7;color:#15803D}
+.tl-pane{display:none}.tl-pane.on{display:block}
+.tl-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:640px){.tl-grid{grid-template-columns:1fr}}
+.tl-f label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:4px}
+.tl-f input,.tl-f textarea{width:100%;font-size:13px;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;background:#fff;color:var(--ink)}
+.tl-f textarea{resize:vertical;line-height:1.55}
+.tl-f input:focus,.tl-f textarea:focus{border-color:var(--accent);outline:none}
+.tl-tip{font-size:11.5px;color:var(--ink-soft);margin:10px 0 4px;line-height:1.5}
+.tl-err{display:none;background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;font-size:12.5px;border-radius:8px;padding:8px 12px;margin-top:10px}
+.tl-err.on{display:block}
+.tl-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.tl-loading{text-align:center;font-size:13.5px;color:var(--ink-soft);padding:40px 10px}
+.spin{display:inline-block;width:15px;height:15px;border:2.5px solid var(--accent-soft);border-top-color:var(--accent);border-radius:50%;animation:tlsp .8s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes tlsp{to{transform:rotate(360deg)}}
+.match-band{display:flex;gap:16px;flex-wrap:wrap;align-items:center;background:#FBFBFA;border:1px solid var(--line);border-radius:12px;padding:15px 17px;margin-bottom:14px}
+.score-ring{width:84px;height:84px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:conic-gradient(var(--accent) 0 0%, #E5E7EB 0% 100%)}
+.score-ring>div{width:64px;height:64px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.score-ring b{font-size:19px;color:var(--accent)}
+.score-ring span{font-size:8.5px;color:var(--ink-soft);text-transform:uppercase;font-weight:700}
+.match-info{flex:1;min-width:230px}
+.match-info h4{font-size:14px;margin-bottom:3px;color:var(--ink)}
+.match-info p{font-size:12.5px;color:var(--ink-soft);margin-bottom:0}
+.skill-cover{margin-top:10px;display:flex;gap:5px;flex-wrap:wrap}
+.sk{font-size:11px;font-weight:600;border-radius:99px;padding:3px 10px}
+.sk.have{background:#DCFCE7;color:#15803D;border:1px solid #86EFAC}
+.sk.have::before{content:"✓ "}
+.sk.missing{background:#FEE2E2;color:#B91C1C;border:1px solid #FCA5A5}
+.sk.missing::before{content:"✗ "}
+.sk.partial{background:#FEF3C7;color:#B45309;border:1px solid #FCD34D}
+.sk.partial::before{content:"≈ "}
+.tl-changebar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:11px;font-size:13px;color:var(--ink)}
+.diff-card{background:#fff;border:1.5px solid var(--line);border-radius:12px;margin-bottom:11px;overflow:hidden;transition:opacity .2s}
+.diff-card.rejected{opacity:.45}
+.diff-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 14px;background:#FBFBFA;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.diff-head .where{font-size:12px;font-weight:700;color:var(--ink)}
+.diff-head .why{font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:99px;padding:3px 10px}
+.diff-head .why.warn{color:#B45309;background:#FEF3C7}
+.diff-body{padding:12px 14px}
+.d-old{background:#FEE2E2;border-left:3px solid #B91C1C;padding:8px 12px;border-radius:0 7px 7px 0;font-size:12.5px;color:#7F1D1D;margin-bottom:7px;text-decoration:line-through;text-decoration-color:rgba(127,29,29,.4)}
+.d-new{background:#DCFCE7;border-left:3px solid #15803D;padding:8px 12px;border-radius:0 7px 7px 0;font-size:12.5px;color:#14532D;white-space:pre-wrap}
+.d-warn{font-size:11px;color:#B45309;font-weight:700;margin-top:6px}
+.tl-savebox{text-align:center;padding:14px}
+.tl-savebox h4{font-family:'Fraunces',serif;font-size:18px;margin:8px 0 4px;color:var(--ink)}
+.tl-savebox p{font-size:13px;color:var(--ink-soft);margin-bottom:12px}
+.tl-savename{display:inline-block;background:var(--accent-soft);color:#0F5B7E;font-weight:700;font-size:13px;border-radius:8px;padding:8px 16px;margin-bottom:14px}
+
 /* ---------- Header: user pill turns into a button ---------- */
 .user-btn{background:rgba(91,200,245,.08);border:1px solid rgba(91,200,245,.35);
   color:var(--dc-text);font-family:inherit;font-size:13px;font-weight:600;
@@ -560,6 +620,7 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
     <span class="mbtns">
       <button class="btn-dline js-upload" type="button" title="Upload a new CV anytime — replaces the current one in the builder">⬆ Upload CV</button>
       <button class="btn-dline js-refresh" type="button" title="Clear the current resume data">↻ Refresh</button>
+      <button class="btn-gold js-tailor" type="button" title="Tailor this resume for a specific job description">🎯 Tailor for Job</button>
       <button class="btn-dline js-save" type="button">💾 Save</button>
       <button class="btn-dline js-preview" type="button">👁 Preview</button>
       <button class="btn-dline js-switch" data-to="fresher" type="button">Switch to Freshers →</button>
@@ -679,6 +740,79 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
   </div>
 </div>
 
+<!-- ===== Tailor-for-Job modal ===== -->
+<div class="modal" id="tailorModal" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:860px">
+    <button class="modal-close" data-close type="button">&times;</button>
+    <div class="tl-head">
+      <h2>🎯 Tailor for Job <span class="pro-chip">★ PRO</span></h2>
+      <span class="tl-steps">
+        <span class="tl-stp on" data-tstep="1">1 · Paste job</span>
+        <span class="tl-stp" data-tstep="2">2 · Review changes</span>
+        <span class="tl-stp" data-tstep="3">3 · Saved</span>
+      </span>
+    </div>
+
+    <!-- STEP 1: paste -->
+    <div class="tl-pane on" id="tlPane1">
+      <div class="tl-grid">
+        <div class="tl-f"><label for="tlTitle">Job title</label><input id="tlTitle" placeholder="e.g. Senior GRC Manager"></div>
+        <div class="tl-f"><label for="tlCompany">Company (optional)</label><input id="tlCompany" placeholder="e.g. Barclays"></div>
+      </div>
+      <div class="tl-f"><label for="tlJD">Paste the job description</label>
+        <textarea id="tlJD" rows="9" placeholder="Paste the whole listing — requirements, responsibilities, everything. More text = better tailoring."></textarea></div>
+      <div class="tl-tip">💡 GetCV never invents experience you don't have — it re-frames and reorders what's already true. Anything it can't verify from your resume is flagged and left for you to decide.</div>
+      <div class="tl-err" id="tlErr"></div>
+      <div class="tl-actions">
+        <button class="btn btn-ghost" data-close type="button">Cancel</button>
+        <button class="btn btn-primary" id="tlAnalyse" type="button">Analyse &amp; tailor →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: review -->
+    <div class="tl-pane" id="tlPane2">
+      <div class="tl-loading" id="tlLoading">
+        <span class="spin"></span> Analysing your match against this job — takes 15–30 seconds…
+      </div>
+      <div id="tlResults" class="hidden">
+        <div class="match-band">
+          <div class="score-ring" id="tlRing"><div><b id="tlScore">0%</b><span>match</span></div></div>
+          <div class="match-info">
+            <h4 id="tlMatchTitle">Your resume vs. this job</h4>
+            <p id="tlMatchSummary"></p>
+            <div class="skill-cover" id="tlCoverage"></div>
+          </div>
+        </div>
+        <div class="tl-changebar">
+          <b id="tlChangeCount">0 proposed changes</b>
+          <span style="display:flex;gap:7px">
+            <button class="btn btn-ghost" id="tlAcceptAll" type="button">Accept all verified</button>
+            <button class="btn btn-ghost" id="tlRejectAll" type="button">Reject all</button>
+          </span>
+        </div>
+        <div id="tlChanges"></div>
+        <div class="tl-err" id="tlErr2"></div>
+        <div class="tl-actions">
+          <button class="btn btn-ghost" id="tlBack" type="button">← Back</button>
+          <button class="btn btn-primary" id="tlApply" type="button">✓ Apply 0 changes &amp; save as new resume</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: saved -->
+    <div class="tl-pane" id="tlPane3">
+      <div class="tl-savebox">
+        <div style="font-size:34px">✅</div>
+        <h4 id="tlSavedTitle">Changes applied</h4>
+        <p>Saved as a new resume — your original is untouched. It's now loaded in the builder with the live preview updated, ready to download.</p>
+        <div class="tl-savename" id="tlSavedName">📄 —</div>
+        <p style="font-size:12px;color:var(--ink-soft)">Find it anytime in 📁 Saved Resumes. Tailor the same base resume for as many jobs as you like.</p>
+        <button class="btn btn-primary" data-close type="button">Done — back to builder</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== Refresh save-prompt modal ===== -->
 <div class="modal" id="refreshModal" role="dialog" aria-modal="true">
   <div class="modal-box" style="max-width:460px;text-align:center">
@@ -744,7 +878,7 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
   <a href="/privacy-policy" target="_blank" rel="noopener">Privacy Policy</a> <span class="sep">·</span>
   <a href="/terms-of-use" target="_blank" rel="noopener">Terms of Use</a>
 </footer>
-<script>document.getElementById('ftYear').textContent = new Date().getFullYear();</script>
+<script>var _fy=document.getElementById('footYear')||document.getElementById('ftYear');if(_fy)_fy.textContent=new Date().getFullYear();</script>
 
 <div id="toast"></div>
 
