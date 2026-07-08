@@ -187,6 +187,12 @@ const aiLimiter = rateLimit({
   standardHeaders: true, legacyHeaders: false,
   message: { error: 'AI rate limit reached — please wait an hour and try again' }
 });
+// Tailoring: the most expensive AI call in the app — tighter cap
+const tailorLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, max: 10,
+  standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Tailoring limit reached (10 per hour) — please wait a while and try again' }
+});
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const SESS_FILE = path.join(DATA_DIR, 'sessions.json');
@@ -354,6 +360,123 @@ app.delete('/api/resumes/:id', requireAuth, (req, res) => {
   list.splice(idx, 1);
   saveResumes(req.user.email, list);
   res.json({ success: true });
+});
+
+// ============================================================
+// JOB-DESCRIPTION TAILORING — the flagship feature.
+// Analyses a pasted JD against the user's resume and returns
+// structured, individually-acceptable changes. NEVER fabricates:
+// anything not verifiable from the resume is returned with
+// verified:false so the client defaults it OFF.
+// ============================================================
+app.post('/api/tailor', tailorLimiter, requireAuth, async (req, res) => {
+  try {
+    if (!requireKey(res)) return;
+    const { jobTitle, company, jobDescription, resume } = req.body || {};
+    if (!jobDescription || String(jobDescription).trim().length < 80) {
+      return res.status(400).json({ error: 'Please paste the full job description (at least a few sentences).' });
+    }
+    if (String(jobDescription).length > 15000) {
+      return res.status(400).json({ error: 'Job description is too long — please paste up to ~15,000 characters.' });
+    }
+    if (!resume || typeof resume !== 'object' || !Array.isArray(resume.experience)) {
+      return res.status(400).json({ error: 'No resume loaded — import or open a resume first.' });
+    }
+
+    // Send only what the model needs (keeps cost + surface area down)
+    const slim = {
+      headline: resume.personal?.headline || '',
+      summary: resume.summary || '',
+      skills: resume.skills || [],
+      certifications: (resume.certifications || []).map(c => c.name),
+      accomplishments: resume.accomplishments || [],
+      projects: (resume.projects || []).map(p => ({ name: p.name, desc: p.desc })),
+      experience: (resume.experience || []).map((j, i) => ({
+        index: i, company: j.company, title: j.title, start: j.start, end: j.end, desc: j.desc
+      }))
+    };
+
+    const prompt = `You are a truthful resume-tailoring engine. A candidate wants to tailor their resume for a specific job. Analyse the match and propose changes.
+
+ABSOLUTE RULES:
+1. NEVER fabricate experience, skills, employers, dates or achievements. You may only REWORD, REORDER, or EMPHASISE what is already evidenced in the resume.
+2. If the job description asks for something NOT evidenced in the resume, you may propose it ONLY as a separate change with "verified": false — these will be shown to the candidate with a warning and default to OFF.
+3. Each change must carry an "apply" payload with the COMPLETE new value for its target field. Never touch the same field in two different changes.
+4. Maximum 8 changes. Quality over quantity. Do not propose trivial changes.
+5. Respond with ONLY valid JSON, no markdown, no preamble.
+
+TARGET JOB:
+Title: ${String(jobTitle || 'Not specified').slice(0, 200)}
+Company: ${String(company || 'Not specified').slice(0, 200)}
+Description:
+${String(jobDescription).slice(0, 15000)}
+
+CANDIDATE'S CURRENT RESUME (JSON):
+${JSON.stringify(slim)}
+
+Return JSON with EXACTLY this shape:
+{
+  "match_score": <integer 0-100, honest assessment of current resume vs this JD>,
+  "match_summary": "<2-3 sentences: where the resume is strong for this job, and what tailoring will fix>",
+  "skills_coverage": [
+    { "skill": "<requirement from the JD>", "status": "have" | "partial" | "missing", "note": "<short note, e.g. 'present but buried in older role'>" }
+  ],
+  "changes": [
+    {
+      "id": "c1",
+      "where_label": "<human label, e.g. 'Profile summary — rewritten' or 'Matillion Ltd — bullets reordered'>",
+      "reason": "<why, tied to the JD, max 8 words, e.g. 'JD leads with TPRM'>",
+      "old_text": "<the current text being changed, verbatim or summarised>",
+      "new_text": "<the proposed replacement, human readable>",
+      "verified": true | false,
+      "apply": {
+        "field": "summary" | "skills" | "experience_desc" | "skills_add" | "accomplishments_add" | "summary_append",
+        "exp_index": <integer, ONLY for experience_desc, else null>,
+        "new_value": <string for summary/experience_desc/summary_append; array of strings for skills/skills_add/accomplishments_add>
+      }
+    }
+  ]
+}
+
+Field semantics:
+- "summary": replaces the whole professional summary. new_value = full new summary string.
+- "skills": replaces the whole skills list (use for reordering to put JD-relevant skills first). new_value = full array.
+- "experience_desc": replaces one job's description. new_value = the full new description with one bullet per line. exp_index = that job's index from the resume JSON.
+- "skills_add": APPENDS new skills not currently on the resume. ALWAYS verified:false. new_value = array of skills to add.
+- "accomplishments_add": APPENDS accomplishment lines. verified:false unless directly evidenced. new_value = array of lines.
+- "summary_append": APPENDS a sentence to the summary. Use for unverified positioning claims. ALWAYS verified:false.
+
+skills_coverage: max 8 entries, focused on the JD's most important requirements.`;
+
+    const out = await claudeJSON(prompt, 6000);
+
+    // Defensive validation so a malformed model response can't break the client
+    if (typeof out.match_score !== 'number') out.match_score = 0;
+    out.match_score = Math.max(0, Math.min(100, Math.round(out.match_score)));
+    if (!Array.isArray(out.skills_coverage)) out.skills_coverage = [];
+    if (!Array.isArray(out.changes)) out.changes = [];
+    const VALID_FIELDS = ['summary','skills','experience_desc','skills_add','accomplishments_add','summary_append'];
+    out.changes = out.changes.filter(c =>
+      c && c.apply && VALID_FIELDS.includes(c.apply.field) &&
+      c.new_text && typeof c.verified === 'boolean'
+    ).slice(0, 8);
+    // Enforce the safety rule server-side too: additive fields are never "verified"
+    out.changes.forEach(c => {
+      if (['skills_add','accomplishments_add','summary_append'].includes(c.apply.field)) c.verified = false;
+    });
+
+    res.json({ success: true, result: out });
+  } catch (err) {
+    console.error('tailor error:', err.message);
+    const msg = String(err.message || '');
+    if (/overloaded|rate|429|529/i.test(msg)) {
+      return res.status(503).json({ error: 'The AI service is busy right now. Please wait a minute and try again.' });
+    }
+    if (/did not return JSON|JSON/i.test(msg)) {
+      return res.status(502).json({ error: 'The AI returned an unexpected response. Please try again — this usually works on a second attempt.' });
+    }
+    res.status(500).json({ error: 'Tailoring failed. Please try again in a moment.' });
+  }
 });
 
 // Legal pages: clean URLs
