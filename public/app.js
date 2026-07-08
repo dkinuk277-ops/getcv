@@ -1420,7 +1420,7 @@ function renderTemplateGrid(){
         // apply instantly to the right-side live preview — user sees it before Apply
         renderLivePreview();
         if($('#previewModal').classList.contains('open'))
-          $('#previewBody').innerHTML = resumeHTML(false);
+          injectResumeInto([$('#previewBody')]);
       });
       grid.appendChild(b);
     });
@@ -1430,7 +1430,7 @@ function renderTemplateGrid(){
 
 // ---- Preview: review → then download PDF / Word ----
 function openPreview(){
-  $('#previewBody').innerHTML = resumeHTML(false);
+  injectResumeInto([$('#previewBody')]);
   $('#previewModal').classList.add('open');
 }
 // Templates picker window — select, watch the live preview apply, then Apply
@@ -1459,12 +1459,24 @@ function safeFileName(){
 function downloadPDF(){
   const pw = window.open('', '_blank');
   if(!pw) return toast('Please allow pop-ups for this site, then click PDF again', 5000);
+  const t = getTemplate();
+  const frameBorder = (t.border === 'double')
+    ? `border:3px double ${t.main}`
+    : `border:1.5px solid ${t.main}`;
   const printCSS = `<style>
-    @page{ size: A4; margin: 10mm 8mm; }
+    /* margin:0 removes the browser's own header/footer (date, about:blank, page N) */
+    @page{ size: A4; margin: 0; }
     html,body{ margin:0; padding:0; background:#fff; }
-    .gcv-page{ max-width:none; box-shadow:none; }
+    /* our own page padding replaces the browser margin, inside the printable area */
+    body{ padding: 13mm 11mm; }
+    .gcv-page{ max-width:none; box-shadow:none; border:none !important; outline:none !important; padding-top:4mm; }
+    /* border frame on EVERY page: position:fixed repeats per printed page */
+    .gcv-print-frame{ position:fixed; top:5mm; left:5mm; right:5mm; bottom:5mm;
+      ${frameBorder}; pointer-events:none; z-index:9999; }
+    /* keep sections whole: a block that doesn't fit moves to the next page */
     .gcv-page h2{ break-after: avoid; page-break-after: avoid; }
-    .gcv-job, .gcv-trends, .gcv-trend-col, .gcv-credline, .gcv-chips{ break-inside: avoid; page-break-inside: avoid; }
+    .gcv-page h3, .gcv-page h4{ break-after: avoid; page-break-after: avoid; }
+    .gcv-job, .gcv-trends, .gcv-trend-col, .gcv-credline, .gcv-chips, .gcv-page li, .gcv-page ul{ break-inside: avoid; page-break-inside: avoid; }
     *{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   </style>`;
   const auto = `<script>
@@ -1475,6 +1487,7 @@ function downloadPDF(){
   const html = resumeHTML(true)
     .replace('</head>', printCSS + '</head>')
     .replace('<style>body{margin:24px;background:#f2f3f5}', '<style>body{margin:0;background:#fff}')
+    .replace('<body>', '<body><div class="gcv-print-frame"></div>')
     .replace('</body>', auto + '</body>');
   pw.document.write(html);
   pw.document.close();
@@ -1543,9 +1556,36 @@ function renderLivePreview(){
       p.innerHTML = '<div class="pv-live-empty">Your resume preview appears here as you build — upload a CV or start fresh.</div>');
     return;
   }
-  const html = resumeHTML(false);
-  document.querySelectorAll('[data-livepane]').forEach(p => p.innerHTML = html);
+  injectResumeInto(document.querySelectorAll('[data-livepane]'));
   document.querySelectorAll('[data-livetpl]').forEach(s => s.textContent = getTemplate().name);
+}
+
+// Render the resume into container(s) WITHOUT tearing down styles each time.
+// resumeHTML returns a full document; we split style from body, keep the style
+// in a persistent <style> node (updating text only when it changes — no flash),
+// and put just the body fragment into the pane. Full structural templates
+// (banner, sidebar, duo-column...) render completely, with zero flicker.
+function injectResumeInto(containers){
+  const doc = resumeHTML(false);
+  // Collect ALL style blocks (head + any inside the body, e.g. chart styles)
+  let css = '';
+  const styleRe = /<style>([\s\S]*?)<\/style>/g;
+  let m;
+  while((m = styleRe.exec(doc)) !== null) css += m[1] + '\n';
+  // strip the export doc's global body rule so it can't leak into the app page
+  css = css.replace(/(^|\})\s*body\s*\{[^}]*\}/, '$1');
+  const bodyMatch = doc.match(/<body[^>]*>([\s\S]*?)<\/body>/);
+  let frag = bodyMatch ? bodyMatch[1] : doc;
+  // pane holds pure markup; styles live in the persistent node below
+  frag = frag.replace(/<style>[\s\S]*?<\/style>/g, '');
+  let styleEl = document.getElementById('gcvLiveStyle');
+  if(!styleEl){
+    styleEl = document.createElement('style');
+    styleEl.id = 'gcvLiveStyle';
+    document.head.appendChild(styleEl);
+  }
+  if(styleEl.textContent !== css) styleEl.textContent = css;
+  containers.forEach(p => p.innerHTML = frag);
 }
 function schedulePreview(){
   clearTimeout(_lpTimer);
@@ -1888,7 +1928,7 @@ $('#btnConfirmDelete').addEventListener('click', async ()=>{
 let tailorResult = null;
 
 function tlStep(n){
-  for(let i=1;i<=3;i++){
+  for(let i=1;i<=4;i++){
     $('#tlPane'+i).classList.toggle('on', i===n);
     const s = document.querySelector('[data-tstep="'+i+'"]');
     s.classList.toggle('on', i===n);
@@ -1970,6 +2010,7 @@ function renderTailorResults(){
         <span class="where">${esc(c.where_label || 'Change')}</span>
         <span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <span class="${whyClass}">${whyText}</span>
+          <button class="tl-edit-btn" type="button">✎ Edit</button>
           <label class="switch"><input type="checkbox" ${c.verified ? 'checked' : ''}><span class="slider"></span><span class="sw-lbl">Apply</span></label>
         </span>
       </div>
@@ -1982,6 +2023,38 @@ function renderTailorResults(){
       card.classList.toggle('rejected', !e.target.checked);
       updateTailorCount();
     });
+    // ✎ Edit: swap the proposed text for a textarea; save writes back into the
+    // change so the user's wording is what gets applied and previewed.
+    // Array fields (skills, additions) edit as one item per line.
+    card.querySelector('.tl-edit-btn').addEventListener('click', (e)=>{
+      const btn = e.target;
+      const body = card.querySelector('.diff-body');
+      const dnew = body.querySelector('.d-new');
+      const isArray = Array.isArray(c.apply.new_value);
+      if(btn.textContent.includes('Edit')){
+        const ta = el('textarea', {class:'tl-edit-ta'});
+        ta.value = isArray ? c.apply.new_value.join('\n') : String(c.apply.new_value);
+        dnew.style.display = 'none';
+        dnew.after(ta);
+        ta.focus();
+        btn.textContent = '💾 Save edit';
+      } else {
+        const ta = body.querySelector('.tl-edit-ta');
+        if(ta){
+          if(isArray){
+            const items = ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+            if(items.length){ c.apply.new_value = items; c.new_text = items.join(' · '); }
+          } else {
+            const v = ta.value.trim();
+            if(v){ c.apply.new_value = v; c.new_text = v; }
+          }
+          ta.remove();
+        }
+        dnew.textContent = c.new_text;
+        dnew.style.display = '';
+        btn.textContent = '✎ Edit';
+      }
+    });
     list.appendChild(card);
   });
 
@@ -1991,7 +2064,7 @@ function renderTailorResults(){
 
 function updateTailorCount(){
   const n = document.querySelectorAll('#tlChanges .diff-card input:checked').length;
-  $('#tlApply').textContent = `✓ Apply ${n} change${n===1?'':'s'} & save as new resume`;
+  $('#tlApply').textContent = `Preview ${n} change${n===1?'':'s'} →`;
   $('#tlApply').disabled = n === 0;
 }
 
@@ -2038,14 +2111,71 @@ function applyTailorChanges(base, changes, acceptedIdx){
   return r;
 }
 
-$('#tlApply').addEventListener('click', async ()=>{
+// Collect indexes of currently accepted change cards
+function tlAcceptedIdx(){
   const accepted = [];
   document.querySelectorAll('#tlChanges .diff-card').forEach((card, i)=>{
     if(card.querySelector('input').checked) accepted.push(i);
   });
-  if(!accepted.length) return;
+  return accepted;
+}
 
-  const btn = $('#tlApply');
+// HL tokens survive esc() untouched (unicode, not HTML) and are swapped for
+// <mark> AFTER rendering — the underlying data stays clean.
+const HL_OPEN = '\u27E6HL\u27E7', HL_CLOSE = '\u27E6/HL\u27E7';
+
+// Clone the accepted changes with highlight tokens wrapped around what changed:
+// whole strings for rewrites, per-item for arrays; for full skills replacement
+// only items that moved or are new get wrapped.
+function tlHighlightChanges(changes, acceptedIdx, base){
+  return changes.map((c, i)=>{
+    if(!acceptedIdx.includes(i)) return c;
+    const cc = JSON.parse(JSON.stringify(c));
+    const a = cc.apply;
+    if(typeof a.new_value === 'string'){
+      a.new_value = HL_OPEN + a.new_value + HL_CLOSE;
+    } else if(Array.isArray(a.new_value)){
+      if(a.field === 'skills'){
+        const baseSkills = base.skills || [];
+        a.new_value = a.new_value.map((s, idx)=>
+          (s !== baseSkills[idx]) ? HL_OPEN + s + HL_CLOSE : s);
+      } else {
+        a.new_value = a.new_value.map(s => HL_OPEN + s + HL_CLOSE);
+      }
+    }
+    return cc;
+  });
+}
+
+// STEP 2 → STEP 3: render the full tailored resume with highlights in an iframe
+$('#tlApply').addEventListener('click', ()=>{
+  const accepted = tlAcceptedIdx();
+  if(!accepted.length) return;
+  const hlChanges = tlHighlightChanges(tailorResult.changes, accepted, R);
+  const hlR = applyTailorChanges(R, hlChanges, accepted);
+  // temporarily point the renderer at the highlighted copy
+  const saved = R;
+  R = hlR;
+  let html;
+  try { html = resumeHTML(false); } finally { R = saved; }
+  const markCSS = `mark.tl-hl{background:#FEF3C7;border-bottom:2px solid #E3B341;border-radius:2px;padding:0 2px;color:inherit}
+mark.tl-hl::after{content:"\\25CF tailored";font-size:8px;font-weight:800;color:#B45309;margin-left:4px;vertical-align:2px}
+body{zoom:.82}`;
+  html = html
+    .replace('</style>', markCSS + '</style>')
+    .split(HL_OPEN).join('<mark class="tl-hl">')
+    .split(HL_CLOSE).join('</mark>');
+  $('#tlPreviewFrame').srcdoc = html;
+  tlStep(3);
+});
+
+$('#tlPrevBack').addEventListener('click', ()=> tlStep(2));
+
+// STEP 3 → STEP 4: save the CLEAN tailored resume (no tokens, no marks)
+$('#tlPrevSave').addEventListener('click', async ()=>{
+  const accepted = tlAcceptedIdx();
+  if(!accepted.length) return;
+  const btn = $('#tlPrevSave');
   btn.disabled = true;
   const orig = btn.textContent;
   btn.textContent = 'Saving…';
@@ -2057,7 +2187,6 @@ $('#tlApply').addEventListener('click', async ()=>{
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ name, template: selectedTemplate, data: tailored })
     });
-    // Load the tailored version into the builder — original stays saved/untouched
     R = normalize(tailored);
     currentResumeId = out.id;
     currentResumeName = name;
@@ -2066,10 +2195,10 @@ $('#tlApply').addEventListener('click', async ()=>{
     loadSavedList();
     $('#tlSavedTitle').textContent = accepted.length + ' change' + (accepted.length===1?'':'s') + ' applied';
     $('#tlSavedName').textContent = '📄 ' + name;
-    tlStep(3);
+    tlStep(4);
     toast('Tailored resume saved and loaded — ready to download');
   }catch(err){
-    tlError('#tlErr2', 'Could not save: ' + (err.message || 'unknown error'));
+    tlError('#tlErr3', 'Could not save: ' + (err.message || 'unknown error'));
   }
   btn.disabled = false;
   btn.textContent = orig;
