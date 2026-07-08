@@ -402,8 +402,9 @@ ABSOLUTE RULES:
 1. NEVER fabricate experience, skills, employers, dates or achievements. You may only REWORD, REORDER, or EMPHASISE what is already evidenced in the resume.
 2. If the job description asks for something NOT evidenced in the resume, you may propose it ONLY as a separate change with "verified": false — these will be shown to the candidate with a warning and default to OFF.
 3. Each change must carry an "apply" payload with the COMPLETE new value for its target field. Never touch the same field in two different changes.
-4. Maximum 8 changes. Quality over quantity. Do not propose trivial changes.
-5. Respond with ONLY valid JSON, no markdown, no preamble.
+4. Maximum 6 changes. Quality over quantity. Do not propose trivial changes.
+5. Keep each new_value CONCISE — under 180 words. For long job descriptions, rewrite tightly rather than reproducing every bullet. Your entire response must be complete, valid JSON — never let it be cut off.
+6. Respond with ONLY valid JSON, no markdown, no preamble.
 
 TARGET JOB:
 Title: ${String(jobTitle || 'Not specified').slice(0, 200)}
@@ -448,7 +449,19 @@ Field semantics:
 
 skills_coverage: max 8 entries, focused on the JD's most important requirements.`;
 
-    const out = await claudeJSON(prompt, 6000);
+    let out;
+    try {
+      out = await claudeJSON(prompt, 16000);
+    } catch (firstErr) {
+      // If the response was truncated mid-JSON, retry once demanding brevity
+      if (/Unexpected end|JSON/i.test(String(firstErr.message))) {
+        console.log('tailor: first attempt truncated — retrying with brevity instruction');
+        const retryPrompt = prompt + '\n\nCRITICAL: Your previous response was cut off. Return AT MOST 4 changes. Keep every new_value under 100 words. The response MUST be complete valid JSON.';
+        out = await claudeJSON(retryPrompt, 16000);
+      } else {
+        throw firstErr;
+      }
+    }
 
     // Defensive validation so a malformed model response can't break the client
     if (typeof out.match_score !== 'number') out.match_score = 0;
@@ -472,8 +485,8 @@ skills_coverage: max 8 entries, focused on the JD's most important requirements.
     if (/overloaded|rate|429|529/i.test(msg)) {
       return res.status(503).json({ error: 'The AI service is busy right now. Please wait a minute and try again.' });
     }
-    if (/did not return JSON|JSON/i.test(msg)) {
-      return res.status(502).json({ error: 'The AI returned an unexpected response. Please try again — this usually works on a second attempt.' });
+    if (/Unexpected end|did not return JSON|JSON/i.test(msg)) {
+      return res.status(502).json({ error: 'The AI response was cut short — this can happen with very detailed resumes. Please try again; it usually works on the next attempt.' });
     }
     res.status(500).json({ error: 'Tailoring failed. Please try again in a moment.' });
   }
