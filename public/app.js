@@ -1151,6 +1151,8 @@ ${headCSS}
 .gcv-job-title{font-size:12.5px;font-weight:700;color:${t.main};margin:1px 0 2px}
 .gcv-dates{color:#666;font-size:11.5px;white-space:nowrap;font-weight:600}
 .gcv-sub{font-size:11.5px;font-weight:700;color:${t.dark};text-transform:uppercase;letter-spacing:.04em;margin:7px 0 2px}
+.gcv-ul-head{margin-bottom:0;padding-bottom:0}
+.gcv-ul-cont{margin-top:0;padding-top:0}
 .gcv-page p,.gcv-page li{font-size:12.5px}
 .gcv-page ul{padding-left:17px;margin:3px 0}
 .gcv-page li{margin-bottom:1.5px}
@@ -1206,9 +1208,27 @@ function stripBullets(s){
 function renderDesc(desc){
   if(!desc) return '';
   const lines = desc.split('\n').map(l=>l.trim()).filter(Boolean);
-  let html = '', bullets = [];
+  let html = '', bullets = [], pendingSub = null;
+  // A subhead is glued to its first 2 bullets inside a keep-together block so a
+  // page break can never orphan the header; remaining bullets flow freely in a
+  // continuation list that visually joins the first (print-safe pagination).
   const flush = ()=>{
-    if(bullets.length){ html += `<ul>${bullets.map(b=>`<li>${esc(stripBullets(b))}</li>`).join('')}</ul>`; bullets = []; }
+    const items = bullets.map(b=>`<li>${esc(stripBullets(b))}</li>`);
+    if(pendingSub !== null){
+      const head = `<div class="gcv-sub">${pendingSub}</div>`;
+      if(items.length){
+        const first = items.slice(0, 2).join('');
+        const rest = items.slice(2).join('');
+        html += `<div class="gcv-keep">${head}<ul${rest ? ' class="gcv-ul-head"' : ''}>${first}</ul></div>`;
+        if(rest) html += `<ul class="gcv-ul-cont">${rest}</ul>`;
+      } else {
+        html += `<div class="gcv-keep">${head}</div>`;
+      }
+      pendingSub = null;
+    } else if(items.length){
+      html += `<ul>${items.join('')}</ul>`;
+    }
+    bullets = [];
   };
   const ACTION_VERBS = new Set(('led,managed,built,created,delivered,developed,implemented,designed,conducted,performed,'+
     'established,coordinated,drove,supported,owned,launched,reduced,improved,increased,achieved,ensured,defined,'+
@@ -1236,7 +1256,7 @@ function renderDesc(desc){
       || isTitleCaseHeading(clean);
     if(isSub){
       flush();
-      html += `<div class="gcv-sub">${esc(clean.replace(/:$/,''))}</div>`;
+      pendingSub = esc(clean.replace(/:$/,''));
     } else {
       bullets.push(clean);
     }
@@ -1480,11 +1500,19 @@ function downloadPDF(){
     .gcv-ptbl > thead .sp{ height: 12mm; }
     .gcv-ptbl > tfoot .sp{ height: 11mm; }
     .gcv-ptbl > tbody > tr > td{ padding:0; border:none; }
-    /* keep sections whole: a block that doesn't fit moves to the next page */
+    /* pagination rules: fill every page, never orphan a header
+       — lists and paragraphs BREAK FREELY (no half-empty pages)
+       — individual bullets stay whole
+       — a subhead + its first two bullets always travel together */
     .gcv-page h2{ break-after: avoid; page-break-after: avoid; }
-    .gcv-page h3, .gcv-page h4{ break-after: avoid; page-break-after: avoid; }
-    .gcv-page p{ break-inside: avoid; page-break-inside: avoid; orphans:3; widows:3; }
-    .gcv-job, .gcv-trends, .gcv-trend-col, .gcv-credline, .gcv-chips, .gcv-page li, .gcv-page ul{ break-inside: avoid; page-break-inside: avoid; }
+    .gcv-page h2 + *{ break-before: avoid; page-break-before: avoid; }
+    .gcv-keep{ break-inside: avoid; page-break-inside: avoid; }
+    .gcv-page p{ orphans:3; widows:3; }
+    .gcv-page li{ break-inside: avoid; page-break-inside: avoid; }
+    .gcv-trends, .gcv-trend-col, .gcv-credline, .gcv-chips{ break-inside: avoid; page-break-inside: avoid; }
+    /* seam the split lists so head+continuation read as one list */
+    .gcv-ul-head{ margin-bottom: 0 !important; padding-bottom: 0 !important; }
+    .gcv-ul-cont{ margin-top: 0 !important; padding-top: 0 !important; }
     *{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   </style>`;
   const auto = `<script>
