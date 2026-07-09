@@ -1642,6 +1642,18 @@ function showView(id){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
   const t = document.getElementById('view-'+id);
   if(t) t.classList.add('on');
+  // Builder views: the footer rides at the END of the centre scroll column so
+  // the workspace extends to the bottom of the screen. Everywhere else it
+  // returns to its normal place at the bottom of the page.
+  const foot = document.querySelector('.app-footer');
+  if(foot){
+    if(id === 'pro' || id === 'fresher'){
+      const main = document.querySelector('#view-' + id + ' main');
+      if(main && foot.parentElement !== main) main.appendChild(foot);
+    } else if(foot.parentElement !== document.body){
+      document.body.appendChild(foot);
+    }
+  }
   window.scrollTo({top:0});
 }
 

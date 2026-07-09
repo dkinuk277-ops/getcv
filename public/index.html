@@ -318,6 +318,12 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 #view-pro.on .pv-live, #view-fresher.on .pv-live{
   position:static; align-self:stretch; height:100%; max-height:100%; min-height:0;
 }
+/* workspace runs to the very bottom edge; footer rides inside the centre scroll */
+#view-pro.on .workspace, #view-fresher.on .workspace{ padding-bottom:0; }
+#view-pro.on main .app-footer, #view-fresher.on main .app-footer{
+  margin:18px 0 14px; padding:16px 20px; border-radius:10px;
+  border:1px solid rgba(91,200,245,.25);
+}
 
 /* ---------- Live split-screen preview ---------- */
 #view-pro,#view-fresher{max-width:1560px}
@@ -747,7 +753,7 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
       <button class="rail-folder js-tplopen" type="button">🎨 Templates</button>
       <button class="rail-folder js-savedopen" type="button">📁 Saved Resumes</button>
     </nav>
-    <div>
+    <main>
     <div id="fresherStart">
       <div class="card" style="max-width:640px;margin:0 auto">
         <h2>Tell us about yourself</h2>
@@ -762,7 +768,7 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
     </div>
     <!-- Shared editor slot -->
     <div id="editorSlotFresher"></div>
-    </div>
+    </main>
     <aside class="pv-live">
         <div class="pv-live-head">
           <span><b>Live Preview</b> <span class="pv-live-tpl" data-livetpl></span></span>
