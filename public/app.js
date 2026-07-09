@@ -1467,15 +1467,23 @@ function downloadPDF(){
     /* margin:0 removes the browser's own header/footer (date, about:blank, page N) */
     @page{ size: A4; margin: 0; }
     html,body{ margin:0; padding:0; background:#fff; }
-    /* our own page padding replaces the browser margin, inside the printable area */
-    body{ padding: 13mm 11mm; }
-    .gcv-page{ max-width:none; box-shadow:none; border:none !important; outline:none !important; padding-top:4mm; }
+    /* horizontal padding is safe on body (pages never break sideways) */
+    body{ padding: 0 12mm; }
+    .gcv-page{ max-width:none; box-shadow:none; border:none !important; outline:none !important; }
     /* border frame on EVERY page: position:fixed repeats per printed page */
     .gcv-print-frame{ position:fixed; top:5mm; left:5mm; right:5mm; bottom:5mm;
       ${frameBorder}; pointer-events:none; z-index:9999; }
+    /* per-page top/bottom breathing room: thead+tfoot repeat on every printed
+       page, reserving space so content NEVER touches the border frame */
+    .gcv-ptbl{ width:100%; border-collapse:collapse; }
+    .gcv-ptbl > thead td, .gcv-ptbl > tfoot td{ padding:0; border:none; }
+    .gcv-ptbl > thead .sp{ height: 12mm; }
+    .gcv-ptbl > tfoot .sp{ height: 11mm; }
+    .gcv-ptbl > tbody > tr > td{ padding:0; border:none; }
     /* keep sections whole: a block that doesn't fit moves to the next page */
     .gcv-page h2{ break-after: avoid; page-break-after: avoid; }
     .gcv-page h3, .gcv-page h4{ break-after: avoid; page-break-after: avoid; }
+    .gcv-page p{ break-inside: avoid; page-break-inside: avoid; orphans:3; widows:3; }
     .gcv-job, .gcv-trends, .gcv-trend-col, .gcv-credline, .gcv-chips, .gcv-page li, .gcv-page ul{ break-inside: avoid; page-break-inside: avoid; }
     *{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   </style>`;
@@ -1487,8 +1495,8 @@ function downloadPDF(){
   const html = resumeHTML(true)
     .replace('</head>', printCSS + '</head>')
     .replace('<style>body{margin:24px;background:#f2f3f5}', '<style>body{margin:0;background:#fff}')
-    .replace('<body>', '<body><div class="gcv-print-frame"></div>')
-    .replace('</body>', auto + '</body>');
+    .replace('<body>', '<body><div class="gcv-print-frame"></div><table class="gcv-ptbl"><thead><tr><td><div class="sp"></div></td></tr></thead><tbody><tr><td>')
+    .replace('</body>', '</td></tr></tbody><tfoot><tr><td><div class="sp"></div></td></tr></tfoot></table>' + auto + '</body>');
   pw.document.write(html);
   pw.document.close();
   toast('In the dialog choose "Save as PDF" — the file matches your preview exactly');
