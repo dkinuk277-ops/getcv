@@ -280,29 +280,43 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
 .switch .sw-lbl{font-size:11.5px;font-weight:600;color:var(--ink-soft)}
 .switch input:checked ~ .sw-lbl{color:var(--accent)}
 
-/* ---------- App shell: builder views lock the page; only the centre scrolls ---------- */
+/* ---------- App shell v2: page locked, full-bleed workspace, three independent scroll zones ---------- */
 body:has(#view-pro.on), body:has(#view-fresher.on){
   height:100vh; overflow:hidden; display:flex; flex-direction:column;
 }
 body:has(#view-pro.on) header, body:has(#view-fresher.on) header,
 body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:0; }
+/* builder view: edge-to-edge, no width cap, no outer padding */
 #view-pro.on, #view-fresher.on{
   flex:1; min-height:0; display:flex; flex-direction:column;
-  width:100%; margin:0 auto; padding:14px 24px 16px;
+  width:100%; max-width:none; margin:0; padding:0;
 }
+/* workspace: full-bleed white panel, tight padding = maximum working area */
 #view-pro.on .workspace, #view-fresher.on .workspace{
   flex:1; min-height:0; display:flex; flex-direction:column;
+  border-radius:0; padding:12px 14px;
 }
 #view-pro.on .module-bar, #view-fresher.on .module-bar{ flex-shrink:0; }
+/* three-column zone fills the rest; slimmer rail = wider centre */
 #view-pro.on .container, #view-fresher.on .fr-grid, #view-fresher.on .container{
-  flex:1; min-height:0; margin-top:16px;
+  flex:1; min-height:0; margin-top:12px; gap:14px;
 }
+#view-pro.on .container{ grid-template-columns:180px minmax(0,1fr) 470px; }
+#view-fresher.on .fr-grid{ grid-template-columns:180px minmax(0,1fr) 470px; }
+@media(max-width:1280px){
+  #view-pro.on .container{ grid-template-columns:180px 1fr; }
+  #view-fresher.on .fr-grid{ grid-template-columns:180px 1fr; }
+}
+/* zone 1: centre editor scrolls */
 #view-pro.on .container > main, #view-fresher.on .fr-grid > main, #view-fresher.on .container > main{
-  overflow-y:auto; min-height:0; padding-right:6px; scrollbar-width:thin;
+  overflow-y:auto; min-height:0; padding-right:5px; scrollbar-width:thin;
 }
+/* zone 2: rail scrolls only if its own content overflows */
 #view-pro.on .rail, #view-fresher.on .rail{ overflow-y:auto; min-height:0; }
+/* zone 3: live preview fills column height; its BODY scrolls independently
+   (.pv-live-body already has overflow:auto + flex:1) */
 #view-pro.on .pv-live, #view-fresher.on .pv-live{
-  position:static; max-height:none; min-height:0;
+  position:static; align-self:stretch; height:100%; max-height:100%; min-height:0;
 }
 
 /* ---------- Live split-screen preview ---------- */
