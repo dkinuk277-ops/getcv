@@ -31,7 +31,7 @@ label{font-size:12px;font-weight:600;color:var(--ink-soft);display:block;margin-
 /* ---------- Layout: dark Decompliance chrome ---------- */
 header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px solid var(--dc-line);
   padding:13px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;
-  position:sticky;top:0;z-index:50;flex-wrap:wrap}
+  position:sticky;top:0;z-index:200;flex-wrap:wrap}
 .brand{cursor:pointer;user-select:none}
 .brand h1{font-size:22px;font-weight:700;letter-spacing:.01em}
 .brand h1 .get{color:#FFFFFF}
@@ -89,7 +89,7 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
 .tile p{font-size:13px;color:var(--dc-muted);line-height:1.55}
 .tile .go{display:inline-block;margin-top:14px;font-size:13px;font-weight:600;color:var(--dc-blue)}
 /* module bar + workspace */
-.module-bar{position:sticky;top:0;z-index:100;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 -22px 12px -22px;padding-left:22px !important;padding-right:22px !important;padding-top:12px;padding-bottom:12px;box-shadow:0 6px 14px -8px rgba(0,0,0,.6);border-radius:0 !important;
+.module-bar{position:fixed;top:60px;left:0;right:0;z-index:150;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 26px;box-shadow:0 6px 14px -8px rgba(0,0,0,.6);border-radius:0;
   background:var(--dc-panel);border:1.5px solid var(--dc-blue);border-radius:12px;padding:11px 15px;margin-bottom:16px;
   position:sticky;top:66px;z-index:45;
   box-shadow:0 0 0 1px rgba(91,200,245,.15), inset 0 1px 0 rgba(91,200,245,.12), 0 6px 18px rgba(0,0,0,.35)}
@@ -97,13 +97,12 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
 .module-bar .tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
   background:rgba(91,200,245,.15);color:var(--dc-blue);border-radius:99px;padding:3px 10px;margin-left:8px}
 .mbtns{display:flex;gap:8px;flex-wrap:wrap}
-.workspace{background:var(--paper);color:var(--ink);border-radius:14px;padding:0 22px 22px 22px;position:relative}
-.workspace::before{content:"";position:sticky;top:0;display:block;height:0;background:var(--dc-ink);z-index:99}
+.workspace{background:var(--paper);color:var(--ink);border-radius:14px;padding:88px 22px 22px 22px;position:relative}
 .container{display:grid;grid-template-columns:210px 1fr;gap:22px}
 @media(max-width:860px){.container{grid-template-columns:1fr}}
 
 /* ---------- Section rail (signature) ---------- */
-.rail{position:sticky;top:76px;align-self:start;z-index:40}
+.rail{position:sticky;top:140px;align-self:start;z-index:40}
 .rail h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);margin-bottom:10px;font-family:'Inter'}
 /* ---------- Section rail: button boxes ---------- */
 .rail-item{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;font-size:13px;
