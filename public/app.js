@@ -1,5 +1,5 @@
 // ============================================================
-// GetCV frontend — powered by Decompliance · AI GRC Intelligence
+// Reeve frontend — powered by Decompliance · AI GRC Intelligence
 // ============================================================
 const API = ''; // same origin; set to full URL if frontend hosted separately
 
@@ -1362,7 +1362,7 @@ function resumeHTML(forExport=false){
 
   const extrasBlock = R.extra_sections.map(s=>`<h2>${esc(s.heading)}</h2><ul>${(s.items||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`).join('');
 
-  const foot = `<div class="gcv-foot">Built with GetCV · <a href="https://www.decompliance.uk">www.decompliance.uk</a> · AI GRC Intelligence by DeCompliance</div>`;
+  const foot = `<div class="gcv-foot">Built with Reeve · <a href="https://www.decompliance.uk">www.decompliance.uk</a> · AI GRC Intelligence by DeCompliance</div>`;
 
   // ---- LAYOUT COMPOSER: same locked content order, different structures
   let body;
@@ -1634,7 +1634,7 @@ document.querySelectorAll('.js-tplopen').forEach(b =>
   b.addEventListener('click', openTemplatesModal));
 
 // ============================================================
-// Views, routing, auth — GetCV shell
+// Views, routing, auth — Reeve shell
 // ============================================================
 let currentUser = null;
 
@@ -2065,7 +2065,7 @@ function renderTailorResults(){
       <div class="diff-body">
         ${c.old_text ? `<div class="d-old">${esc(c.old_text)}</div>` : ''}
         <div class="d-new">${esc(c.new_text)}</div>
-        ${!c.verified ? `<div class="d-warn">⚠ GetCV can't verify this from your resume — it defaults to OFF. Only enable it if it's true.</div>` : ''}
+        ${!c.verified ? `<div class="d-warn">⚠ Reeve can't verify this from your resume — it defaults to OFF. Only enable it if it's true.</div>` : ''}
       </div>`;
     card.querySelector('input').addEventListener('change', e=>{
       card.classList.toggle('rejected', !e.target.checked);
