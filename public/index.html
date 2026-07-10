@@ -535,24 +535,24 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 /* ================================================================
-   REEVE — Ocean Teal rebrand (glossy teal chrome · teal-wash workspace
+   REEVE — Emerald rebrand (glossy teal chrome · teal-wash workspace
    · white cards · gold Tailor kept). Appended last: wins the cascade.
    ================================================================ */
 :root{
-  --rv-bright:#2BC8D9; --rv-main:#0E9FB5; --rv-deep:#066B80;
-  --rv-ws-top:#DCF3F7; --rv-ws-bot:#C8EBF2; --rv-tint:#E6F7FA; --rv-cardline:#B7E3EC;
+  --rv-bright:#34C98A; --rv-main:#0FA968; --rv-deep:#067A4B;
+  --rv-ws-top:#DDF5EA; --rv-ws-bot:#C9EEDD; --rv-tint:#E7F8F0; --rv-cardline:#B9E6D2;
   --rv-ink:#12233F; --rv-ink-soft:#4A5B76;
   --rv-sheen:linear-gradient(180deg,rgba(255,255,255,.28) 0%,rgba(255,255,255,.08) 48%,rgba(255,255,255,0) 52%);
-  --rv-glossy:linear-gradient(180deg,#2BC8D9 0%,#0E9FB5 45%,#066B80 100%);
+  --rv-glossy:linear-gradient(180deg,#34C98A 0%,#0FA968 45%,#067A4B 100%);
 }
 body{background:linear-gradient(180deg,var(--rv-ws-top),var(--rv-ws-bot)) fixed}
 /* logo mark */
 .rv-logo{display:inline-flex;width:34px;height:34px;border-radius:9px;position:relative;vertical-align:-8px;margin-right:8px;
-  background-image:var(--rv-sheen),var(--rv-glossy);box-shadow:0 4px 12px rgba(6,107,128,.45), inset 0 1px 0 rgba(255,255,255,.45)}
+  background-image:var(--rv-sheen),var(--rv-glossy);box-shadow:0 4px 12px rgba(6,122,75,.45), inset 0 1px 0 rgba(255,255,255,.45)}
 .rv-logo .doc{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:18px;height:21px;background:#fff;border-radius:3px}
 .rv-logo .doc::before{content:"";position:absolute;left:3px;top:3.5px;width:3.6px;height:3.6px;border-radius:50%;background:var(--rv-deep)}
 .rv-logo .doc::after{content:"";position:absolute;left:8.5px;top:4.2px;width:6.5px;height:1.7px;border-radius:1px;background:var(--rv-deep);box-shadow:0 2.8px 0 0 var(--rv-deep)}
-.rv-logo .doc i{position:absolute;left:3px;right:3px;height:1.8px;border-radius:1px;background:#8ED4E2}
+.rv-logo .doc i{position:absolute;left:3px;right:3px;height:1.8px;border-radius:1px;background:#93DDBB}
 .rv-logo .doc i:nth-child(1){top:11px}.rv-logo .doc i:nth-child(2){top:14px;right:5px}.rv-logo .doc i:nth-child(3){top:17px;right:7px}
 .rv-logo.lg{width:64px;height:64px;border-radius:16px;margin:0 auto 12px;display:flex;vertical-align:0}
 .rv-logo.lg .doc{width:34px;height:39px;border-radius:5px}
@@ -566,50 +566,50 @@ body{background:linear-gradient(180deg,var(--rv-ws-top),var(--rv-ws-bot)) fixed}
 .brand h1{display:flex;align-items:center;gap:2px;color:#fff}
 /* chrome */
 header{background-image:var(--rv-sheen),var(--rv-glossy);border-bottom:1px solid rgba(255,255,255,.25)}
-.brand-sub, .brand-sub a{color:#D5F2F7}
+.brand-sub, .brand-sub a{color:#D9F5E8}
 .brand-sub a, .brand-sub b{color:#fff}
 .ticker{background:var(--rv-deep);border-bottom:1px solid rgba(255,255,255,.18)}
-.ticker span{color:#C4E9F0}
+.ticker span{color:#C6F0DC}
 .ticker b{color:#FFD070}
-.hdr-right{color:#D5F2F7}
+.hdr-right{color:#D9F5E8}
 .user-btn{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.45);color:#fff}
 .user-btn:hover{background:rgba(255,255,255,.26)}
 .user-avatar{background:#fff;color:var(--rv-deep)}
 #btnLogout{background:#fff;color:var(--rv-deep);border:none;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 /* console bar: white with teal actions */
 .module-bar{background:#fff;border:none;border-bottom:1.5px solid var(--rv-cardline);
-  box-shadow:0 6px 14px -8px rgba(6,107,128,.35)}
+  box-shadow:0 6px 14px -8px rgba(6,122,75,.35)}
 .mtitle{color:var(--rv-ink)}
 .tag{background:var(--rv-tint);color:var(--rv-deep)}
 .btn-dline{background:#fff;border:1.5px solid var(--rv-main);color:var(--rv-main)}
 .btn-dline:hover{background:var(--rv-tint)}
 .module-bar .js-save{background-image:var(--rv-sheen),var(--rv-glossy);color:#fff;border:none;
-  box-shadow:0 3px 10px rgba(14,159,181,.4)}
+  box-shadow:0 3px 10px rgba(15,169,104,.4)}
 /* rail */
 .rail-group, .rail-folder{background-image:var(--rv-sheen),var(--rv-glossy);color:#fff;border:none;
-  box-shadow:0 4px 12px rgba(14,159,181,.35)}
+  box-shadow:0 4px 12px rgba(15,169,104,.35)}
 .rail-group:hover, .rail-folder:hover{filter:brightness(1.07)}
 [data-rail] button{background:#fff;color:var(--rv-ink);border:1px solid var(--rv-cardline)}
 [data-rail] button:hover{background:var(--rv-tint)}
 /* workspace: teal wash, white cards */
 .workspace{background:linear-gradient(180deg,var(--rv-ws-top),var(--rv-ws-bot))}
-.workspace .card, .card{border-color:var(--rv-cardline);box-shadow:0 3px 14px rgba(14,159,181,.14)}
+.workspace .card, .card{border-color:var(--rv-cardline);box-shadow:0 3px 14px rgba(15,169,104,.14)}
 /* auth (login/signup): white card floating on the wash */
-.auth-card{background:#fff;border:1px solid var(--rv-cardline);box-shadow:0 22px 60px rgba(6,107,128,.30);text-align:center}
+.auth-card{background:#fff;border:1px solid var(--rv-cardline);box-shadow:0 22px 60px rgba(6,122,75,.30);text-align:center}
 .auth-card h2{color:var(--rv-ink);display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
 .auth-card>p{color:var(--rv-ink-soft)}
 .auth-card label{color:var(--rv-ink-soft)}
 .auth-card input{background:#F5FBFD;border:1.5px solid var(--rv-cardline);color:var(--rv-ink)}
 .auth-card input:focus{border-color:var(--rv-main)}
 .auth-card .btn-dblue{background-image:var(--rv-sheen),var(--rv-glossy);color:#fff;border:none;font-weight:800;
-  box-shadow:0 6px 18px rgba(14,159,181,.45)}
+  box-shadow:0 6px 18px rgba(15,169,104,.45)}
 .auth-card a{color:var(--rv-main)}
 .auth-err{background:#FEF2F2}
 /* home tiles: white cards on the wash */
 .kicker{color:var(--rv-deep)}
 #view-home h2, .home-title{color:var(--rv-ink)}
-.tile{background:#fff;border:1.5px solid var(--rv-cardline);box-shadow:0 6px 20px rgba(14,159,181,.15)}
-.tile:hover{border-color:var(--rv-main);box-shadow:0 14px 40px rgba(14,159,181,.28)}
+.tile{background:#fff;border:1.5px solid var(--rv-cardline);box-shadow:0 6px 20px rgba(15,169,104,.15)}
+.tile:hover{border-color:var(--rv-main);box-shadow:0 14px 40px rgba(15,169,104,.28)}
 .tile h3{color:var(--rv-ink)}
 .tile h3 span{color:var(--rv-main)}
 .tile p{color:var(--rv-ink-soft)}
@@ -625,8 +625,8 @@ header{background-image:var(--rv-sheen),var(--rv-glossy);border-bottom:1px solid
 .pv-live-head{background:#fff;border-bottom:1px solid var(--rv-cardline)}
 .pv-live-body{background:var(--rv-ws-bot)}
 /* footer */
-.app-footer{background-image:var(--rv-sheen),linear-gradient(180deg,#0E8DA1 0%,#066B80 60%,#054E5D 100%);
-  border-top:1px solid rgba(255,255,255,.22);color:#C4E9F0}
+.app-footer{background-image:var(--rv-sheen),linear-gradient(180deg,#0C9560 0%,#067A4B 60%,#045A37 100%);
+  border-top:1px solid rgba(255,255,255,.22);color:#C6F0DC}
 .app-footer a{color:#fff}
 #view-pro.on main .app-footer, #view-fresher.on main .app-footer{border:1px solid rgba(255,255,255,.2)}
 /* toasts + tailor gold untouched; modals already white */
