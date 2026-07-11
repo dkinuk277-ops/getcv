@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reeve — AI Resume Builder by DeCompliance</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='%2334C98A'/><stop offset='.45' stop-color='%230FA968'/><stop offset='1' stop-color='%23067A4B'/></linearGradient></defs><rect width='64' height='64' rx='14' fill='url(%23g)'/><rect x='12' y='16' width='40' height='32' rx='5' fill='white'/><rect x='17' y='21' width='11' height='11' rx='2.5' fill='%230FA968'/><circle cx='22.5' cy='24.7' r='2.1' fill='white'/><path d='M18.6 32a3.9 3.9 0 0 1 7.8 0z' fill='white'/><rect x='31' y='22' width='16' height='3' rx='1.5' fill='%230FA968'/><rect x='31' y='27.5' width='16' height='3' rx='1.5' fill='%230FA968'/><rect x='17' y='36' width='14' height='3' rx='1.5' fill='%230FA968'/><rect x='17' y='41.5' width='30' height='3' rx='1.5' fill='%230FA968'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -540,29 +541,33 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
    ================================================================ */
 :root{
   --rv-bright:#34C98A; --rv-main:#0FA968; --rv-deep:#067A4B;
-  --rv-ws-top:#DDF5EA; --rv-ws-bot:#C9EEDD; --rv-tint:#E7F8F0; --rv-cardline:#B9E6D2;
+  --rv-ws-top:#C6EBD8; --rv-ws-bot:#A9DFC3; --rv-tint:#D9F2E4; --rv-cardline:#9BD8B9;
   --rv-ink:#12233F; --rv-ink-soft:#4A5B76;
   --rv-sheen:linear-gradient(180deg,rgba(255,255,255,.28) 0%,rgba(255,255,255,.08) 48%,rgba(255,255,255,0) 52%);
   --rv-glossy:linear-gradient(180deg,#34C98A 0%,#0FA968 45%,#067A4B 100%);
 }
 body{background:linear-gradient(180deg,var(--rv-ws-top),var(--rv-ws-bot)) fixed}
-/* logo mark */
-.rv-logo{display:inline-flex;width:34px;height:34px;border-radius:9px;position:relative;vertical-align:-8px;margin-right:8px;
-  background-image:var(--rv-sheen),var(--rv-glossy);box-shadow:0 4px 12px rgba(6,122,75,.45), inset 0 1px 0 rgba(255,255,255,.45)}
-.rv-logo .doc{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:18px;height:21px;background:#fff;border-radius:3px}
-.rv-logo .doc::before{content:"";position:absolute;left:3px;top:3.5px;width:3.6px;height:3.6px;border-radius:50%;background:var(--rv-deep)}
-.rv-logo .doc::after{content:"";position:absolute;left:8.5px;top:4.2px;width:6.5px;height:1.7px;border-radius:1px;background:var(--rv-deep);box-shadow:0 2.8px 0 0 var(--rv-deep)}
-.rv-logo .doc i{position:absolute;left:3px;right:3px;height:1.8px;border-radius:1px;background:#93DDBB}
-.rv-logo .doc i:nth-child(1){top:11px}.rv-logo .doc i:nth-child(2){top:14px;right:5px}.rv-logo .doc i:nth-child(3){top:17px;right:7px}
-.rv-logo.lg{width:64px;height:64px;border-radius:16px;margin:0 auto 12px;display:flex;vertical-align:0}
-.rv-logo.lg .doc{width:34px;height:39px;border-radius:5px}
-.rv-logo.lg .doc::before{left:5px;top:6px;width:6.5px;height:6.5px}
-.rv-logo.lg .doc::after{left:15px;top:7.5px;width:12px;height:2.8px;box-shadow:0 5px 0 0 var(--rv-deep)}
-.rv-logo.lg .doc i{left:5px;right:5px;height:3px}
-.rv-logo.lg .doc i:nth-child(1){top:20px}.rv-logo.lg .doc i:nth-child(2){top:25px;right:8px}.rv-logo.lg .doc i:nth-child(3){top:30px;right:11px}
-.rbox{display:inline-flex;align-items:center;justify-content:center;background:#fff;color:var(--rv-deep);
-  border-radius:7px;width:1.04em;height:1.04em;font-size:.92em;line-height:1;font-weight:800;box-shadow:0 2px 6px rgba(0,0,0,.22)}
-.rwrap{display:inline-flex;align-items:center;gap:2px}
+/* logo mark — ID card with photo silhouette */
+.rv-mark{display:inline-block;width:38px;height:29px;border-radius:5px;position:relative;background:#fff;
+  box-shadow:0 2px 8px rgba(0,0,0,.22);margin-right:9px;flex-shrink:0}
+.rv-mark .ph{position:absolute;left:5px;top:5px;width:9.5px;height:9.5px;border-radius:2.2px;background:var(--rv-main);overflow:hidden}
+.rv-mark .ph::before{content:"";position:absolute;left:50%;top:1.8px;transform:translateX(-50%);width:3.2px;height:3.2px;border-radius:50%;background:#fff}
+.rv-mark .ph::after{content:"";position:absolute;left:50%;bottom:-1.6px;transform:translateX(-50%);width:6.4px;height:4.2px;border-radius:3.2px 3.2px 0 0;background:#fff}
+.rv-mark .b1{position:absolute;left:5px;top:17px;width:11px;height:2.6px;border-radius:99px;background:var(--rv-main)}
+.rv-mark .b2{position:absolute;left:19px;top:6px;width:14px;height:2.6px;border-radius:99px;background:var(--rv-main)}
+.rv-mark .b3{position:absolute;left:19px;top:11px;width:14px;height:2.6px;border-radius:99px;background:var(--rv-main)}
+.rv-mark .b4{position:absolute;left:5px;top:22px;width:28px;height:2.6px;border-radius:99px;background:var(--rv-main)}
+/* inverted large (login/signup): green glossy card, white glyph */
+.rv-mark.inv.lg{width:66px;height:50px;border-radius:8px;margin:0 auto 12px;display:block;
+  background-image:var(--rv-sheen),var(--rv-glossy);box-shadow:0 6px 18px rgba(6,122,75,.4)}
+.rv-mark.inv.lg .ph{left:9px;top:9px;width:16px;height:16px;border-radius:3.5px;background:#fff}
+.rv-mark.inv.lg .ph::before{top:3px;width:5.4px;height:5.4px;background:var(--rv-main)}
+.rv-mark.inv.lg .ph::after{bottom:-2.6px;width:10.6px;height:7px;border-radius:5.3px 5.3px 0 0;background:var(--rv-main)}
+.rv-mark.inv.lg .b1{left:9px;top:30px;width:19px;height:4.4px;background:#fff}
+.rv-mark.inv.lg .b2{left:31px;top:12px;width:24px;height:4.4px;background:#fff}
+.rv-mark.inv.lg .b3{left:31px;top:21px;width:24px;height:4.4px;background:#fff}
+.rv-mark.inv.lg .b4{left:9px;top:38px;width:48px;height:4.4px;background:#fff}
+.rv-name{color:var(--rv-main)}
 .brand h1{display:flex;align-items:center;gap:2px;color:#fff}
 /* chrome */
 header{background-image:var(--rv-sheen),var(--rv-glossy);border-bottom:1px solid rgba(255,255,255,.25)}
@@ -636,7 +641,7 @@ header{background-image:var(--rv-sheen),var(--rv-glossy);border-bottom:1px solid
 
 <header>
   <div class="brand" id="brandHome" title="Back to Home">
-    <h1><span class="rv-logo" aria-hidden="true"><span class="doc"><i></i><i></i><i></i></span></span><span class="rbox">R</span>eeve</h1>
+    <h1><span class="rv-mark" aria-hidden="true"><span class="ph"></span><span class="b1"></span><span class="b2"></span><span class="b3"></span><span class="b4"></span></span>Reeve</h1>
     <div class="brand-sub">Powered by <a href="https://www.decompliance.uk" target="_blank" rel="noopener">DeCompliance</a> · AI GRC Intelligence</div>
   </div>
   <div class="hdr-right" id="hdrRight" style="display:none">
@@ -653,8 +658,8 @@ header{background-image:var(--rv-sheen),var(--rv-glossy);border-bottom:1px solid
 <!-- ============ LOGIN ============ -->
 <div class="view on" id="view-login">
   <div class="auth-card">
-    <div class="rv-logo lg" aria-hidden="true"><span class="doc"><i></i><i></i><i></i></span></div>
-    <h2>Welcome to <span class="rwrap"><span class="rbox">R</span>eeve</span></h2>
+    <div class="rv-mark inv lg" aria-hidden="true"><span class="ph"></span><span class="b1"></span><span class="b2"></span><span class="b3"></span><span class="b4"></span></div>
+    <h2>Welcome to <span class="rv-name">Reeve</span></h2>
     <p>Sign in to build your professional resume</p>
     <div class="auth-err" id="loginErr"></div>
     <label class="dlabel" for="liEmail">Email address</label>
@@ -669,8 +674,8 @@ header{background-image:var(--rv-sheen),var(--rv-glossy);border-bottom:1px solid
 <!-- ============ SIGN-UP ============ -->
 <div class="view" id="view-signup">
   <div class="auth-card">
-    <div class="rv-logo lg" aria-hidden="true"><span class="doc"><i></i><i></i><i></i></span></div>
-    <h2>Create your <span class="rwrap"><span class="rbox">R</span>eeve</span> account</h2>
+    <div class="rv-mark inv lg" aria-hidden="true"><span class="ph"></span><span class="b1"></span><span class="b2"></span><span class="b3"></span><span class="b4"></span></div>
+    <h2>Create your <span class="rv-name">Reeve</span> account</h2>
     <p>Free to start — build and download your first CV</p>
     <div class="auth-err" id="signupErr"></div>
     <label class="dlabel" for="suName">Full name</label>
