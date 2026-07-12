@@ -2306,6 +2306,126 @@ function initLanding(){
     }, 34);
   });
 
+  // Rolling template formats (duplicated for a seamless loop)
+  const FORMATS = [
+    {f:'classic', n:'Classic', c:'#1E3A8A'},
+    {f:'banner',  n:'Banner',  c:'#0FA968'},
+    {f:'sidebar', n:'Sidebar', c:'#6D3A6E'},
+    {f:'duo',     n:'Duo Column', c:'#0284C7'},
+    {f:'exec',    n:'Executive Serif', c:'#8E1F38'},
+    {f:'mono',    n:'Monoline', c:'#3A4756'},
+    {f:'banner',  n:'Banner Slate', c:'#334155'},
+    {f:'sidebar', n:'Sidebar Forest', c:'#2F6B4F'}
+  ];
+  const rollEl = document.getElementById('ldtRoll');
+  if(rollEl){
+    const L = (w)=>`<div class="ldt-l"${w?` style="width:${w}"`:''}></div>`;
+    const H = (c,w)=>`<div class="ldt-h" style="background:${c};width:${w}"></div>`;
+    const card = (t)=>{
+      const d = document.createElement('div');
+      d.className = 'ldt-tpl ' + t.f;
+      d.style.setProperty('--tc', t.c);
+      let inner = '';
+      if(t.f === 'banner'){
+        inner = `<div class="bhead"><div class="ldt-nm"></div>${L('46%')}</div>
+          <div class="body">${H(t.c,'36%')}${L()}${L('86%')}${L('70%')}${H(t.c,'30%')}${L('90%')}${L('74%')}${L('60%')}</div>`;
+      } else if(t.f === 'sidebar'){
+        inner = `<div class="side"><div class="ldt-nm"></div>${L('80%')}${L('64%')}${L('72%')}${L('58%')}</div>
+          <div class="body">${H(t.c,'46%')}${L()}${L('84%')}${L('68%')}${H(t.c,'38%')}${L('88%')}${L('72%')}</div>`;
+      } else if(t.f === 'duo'){
+        inner = `<div class="body"><div class="ldt-nm" style="background:${t.c}"></div>${L('42%')}
+          <div class="ldt-duo" style="margin-top:9px">
+            <div>${H(t.c,'100%')}${L()}${L('84%')}${L('66%')}</div>
+            <div>${H(t.c,'100%')}${L()}${L('78%')}${L('88%')}</div>
+          </div>${H(t.c,'32%')}${L('92%')}${L('70%')}</div>`;
+      } else if(t.f === 'exec'){
+        inner = `<div class="body"><div class="ldt-nm" style="background:${t.c};width:52%"></div><div class="rule"></div>
+          ${L('64%')}${L('52%')}<div class="rule"></div>${L('82%')}${L('88%')}${L('70%')}<div class="rule"></div>${L('78%')}${L('60%')}</div>`;
+      } else if(t.f === 'mono'){
+        inner = `<div class="toprule"></div><div class="body"><div class="ldt-nm" style="background:#1A2434"></div>${L('44%')}
+          ${H(t.c,'34%')}${L()}${L('82%')}${H(t.c,'28%')}${L('88%')}${L('72%')}${L('58%')}</div>`;
+      } else {
+        inner = `<div class="body"><div class="ldt-nm" style="background:${t.c}"></div>${L('46%')}
+          ${H(t.c,'40%')}${L()}${L('86%')}${L('70%')}${H(t.c,'34%')}${L('90%')}${L('76%')}${L('62%')}</div>`;
+      }
+      d.innerHTML = inner + `<div class="ldt-lbl">${t.n}</div>`;
+      return d;
+    };
+    [...FORMATS, ...FORMATS].forEach(t => rollEl.appendChild(card(t)));
+  }
+
+  // Builder-peek demo: cursor timeline with live centre→preview sync.
+  // Starts on first visibility and loops forever.
+  const ldpApp = document.getElementById('ldpApp');
+  if(ldpApp){
+    const sleep = ms => new Promise(r=>setTimeout(r, ms));
+    const cur = document.getElementById('ldpCur');
+    const moveCur = (el, dx=0, dy=4)=>{
+      if(!el || !cur) return;
+      const a = ldpApp.getBoundingClientRect(), b = el.getBoundingClientRect();
+      cur.style.left = (b.left - a.left + b.width/2 + dx) + 'px';
+      cur.style.top  = (b.top - a.top + b.height/2 + dy) + 'px';
+    };
+    const clickFx = ()=>{ if(!cur) return; cur.classList.remove('click'); void cur.offsetWidth; cur.classList.add('click'); };
+    const setScene = (n)=>{
+      document.querySelectorAll('.ldp-scene').forEach(s=>s.classList.toggle('on', +s.dataset.s === n));
+      document.querySelectorAll('.ldp-step').forEach(s=>s.classList.toggle('on', +s.dataset.s === n));
+    };
+    const LDP_TEXT = 'Led a major platform migration, delivered two weeks early.';
+    async function typeSync(){
+      const t = document.getElementById('ldpType'), p = document.getElementById('ldpPrevType');
+      if(!t || !p) return;
+      t.innerHTML = '<span class="tc"></span>'; p.textContent = '';
+      for(let i=0;i<LDP_TEXT.length;i++){
+        t.innerHTML = LDP_TEXT.slice(0,i+1) + '<span class="tc"></span>';
+        p.textContent = LDP_TEXT.slice(0,i+1);
+        if(i % 9 === 0 && p.parentElement){
+          p.parentElement.classList.remove('ldp-flash'); void p.offsetWidth; p.parentElement.classList.add('ldp-flash');
+        }
+        await sleep(34);
+      }
+    }
+    let ldpStarted = false;
+    async function demoLoop(){
+      const doc = document.getElementById('ldpDoc'), mark = document.getElementById('ldpMark');
+      const up = document.getElementById('ldpUp'), tailor = document.getElementById('ldpTailor'), dl = document.getElementById('ldpDl');
+      const tog = document.getElementById('ldpTog'), pExp = document.getElementById('ldpPrevExp'), pType = document.getElementById('ldpPrevType');
+      while(true){
+        doc.classList.remove('fill'); mark.classList.remove('on');
+        tailor.classList.remove('glow'); dl.classList.remove('glow');
+        tog.classList.add('on'); pExp.classList.remove('off');
+        setScene(1);
+        moveCur(up); await sleep(1100); clickFx(); await sleep(2600);
+        setScene(2); doc.classList.add('fill'); await sleep(300);
+        moveCur(document.getElementById('ldpType'), -30, 0); await sleep(1100); clickFx(); await sleep(400);
+        await typeSync(); await sleep(700);
+        moveCur(tog, 0, 2); await sleep(1100); clickFx();
+        tog.classList.remove('on'); pExp.classList.add('off'); await sleep(1300);
+        clickFx(); tog.classList.add('on'); pExp.classList.remove('off'); await sleep(1100);
+        moveCur(tailor); await sleep(1100); clickFx(); tailor.classList.add('glow');
+        setScene(3); await sleep(1500);
+        pType.innerHTML = 'Led a major platform migration, <span class="hl">delivered two weeks early</span>.';
+        mark.classList.add('on'); await sleep(2200);
+        tailor.classList.remove('glow');
+        moveCur(dl); await sleep(1100); clickFx(); dl.classList.add('glow');
+        setScene(4); await sleep(2600);
+      }
+    }
+    const startDemo = ()=>{
+      if(ldpStarted) return;
+      ldpStarted = true;
+      setScene(1);
+      moveCur(document.getElementById('ldpUp'));
+      demoLoop();
+    };
+    if(typeof IntersectionObserver !== 'undefined'){
+      const dio = new IntersectionObserver(es=>{
+        es.forEach(e=>{ if(e.isIntersecting){ startDemo(); dio.unobserve(e.target); } });
+      }, {threshold:.25});
+      dio.observe(ldpApp);
+    } else startDemo();
+  }
+
   // Options D+E+G: scroll-triggered reveal, timeline line, tailor demo
   if(typeof IntersectionObserver !== 'undefined'){
     const io = new IntersectionObserver(entries=>{

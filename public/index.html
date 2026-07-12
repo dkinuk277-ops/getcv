@@ -767,6 +767,144 @@ body:has(#view-landing.on) .app-footer{ display:none; }
 .ld-ftr{background:#053D28;color:#B9E6D2;text-align:center;font-size:12px;padding:22px}
 .ld-ftr a{color:#7CF0BE;text-decoration:none;font-weight:700}
 
+
+/* ============ LANDING ADDITIONS: content hero · template roll · builder peek ============ */
+/* -- 1. hero resume with placeholder content -- */
+.ld-build{font-size:10.5px}
+.ld-bd{opacity:0;animation:ldLineIn .45s ease-out forwards}
+.ld-build .nm{font-size:16px;font-weight:900;color:var(--rv-deep);animation-delay:.5s}
+.ld-build .role{font-size:9.5px;font-weight:700;color:var(--rv-ink-soft);letter-spacing:.05em;animation-delay:.8s}
+.ld-build h6{font-size:8.5px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:var(--rv-main);border-bottom:1.5px solid var(--rv-tint);padding-bottom:3px;margin-top:12px}
+.ld-blur{filter:blur(2.1px);user-select:none}
+.ld-build .h1x{animation-delay:1.2s}
+.ld-build p{color:#3C4A61;line-height:1.55;margin-top:5px;animation-delay:1.5s}
+.ld-build .h2x{animation-delay:2s}
+.ld-chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.ld-chip{font-size:8px;font-weight:800;background:var(--rv-tint);color:var(--rv-deep);border-radius:99px;padding:2.5px 8px;opacity:0;animation:ldChipPop .35s ease-out forwards}
+.ld-chip:nth-child(1){animation-delay:2.3s}.ld-chip:nth-child(2){animation-delay:2.45s}.ld-chip:nth-child(3){animation-delay:2.6s}
+.ld-chip:nth-child(4){animation-delay:2.75s}.ld-chip:nth-child(5){animation-delay:2.9s}
+@keyframes ldChipPop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+.ld-build .h3x{animation-delay:3.2s}
+.ld-build .job{margin-top:5px;animation-delay:3.5s}
+.ld-build .job b{font-size:9.5px;color:var(--rv-ink)}
+.ld-build .job span{font-size:8px;color:var(--rv-ink-soft);float:right}
+.ld-build .job li{font-size:9px;color:#3C4A61;margin-left:12px;margin-top:3px}
+.ld-samplebadge{position:absolute;bottom:-11px;left:50%;transform:translateX(-50%);background:#12233F;color:#9FEFCB;font-size:8.5px;
+font-weight:900;letter-spacing:.08em;border-radius:99px;padding:4px 12px;text-transform:uppercase;white-space:nowrap}
+/* -- 2. rolling templates -- */
+.ldt-sec{background:linear-gradient(180deg,var(--rv-ws-top),var(--rv-ws-bot));padding:56px 0;overflow:hidden}
+.ldt-sec h2{font-size:30px;font-weight:900;text-align:center;letter-spacing:-.015em}
+.ldt-roll{display:flex;gap:20px;width:max-content;animation:ldtRoll 34s linear infinite;padding:8px 0 14px;margin-top:30px}
+.ldt-roll:hover{animation-play-state:paused}
+@keyframes ldtRoll{to{transform:translateX(-50%)}}
+.ldt-tpl{width:218px;height:284px;background:#fff;border-radius:10px;box-shadow:0 10px 28px rgba(6,122,75,.2);flex-shrink:0;
+overflow:hidden;position:relative;transition:transform .25s;display:flex;flex-direction:column}
+.ldt-tpl:hover{transform:translateY(-9px) scale(1.04)}
+.ldt-tpl .body{flex:1;padding:13px;font-size:7px}
+.ldt-l{height:4px;border-radius:2px;background:#E4E9F0;margin-bottom:4px}
+.ldt-h{height:5.5px;border-radius:2px;margin:8px 0 5px}
+.ldt-nm{height:11px;border-radius:3px;width:62%;margin-bottom:4px}
+.ldt-lbl{position:absolute;bottom:0;left:0;right:0;background:rgba(18,35,63,.85);color:#fff;font-size:10px;font-weight:800;text-align:center;padding:6px}
+.ldt-tpl.banner .bhead{background:var(--tc);padding:12px}
+.ldt-tpl.banner .bhead .ldt-nm{background:rgba(255,255,255,.92)}
+.ldt-tpl.banner .bhead .ldt-l{background:rgba(255,255,255,.5);width:46%}
+.ldt-tpl.sidebar{flex-direction:row}
+.ldt-tpl.sidebar .side{width:36%;background:var(--tc);padding:11px 8px}
+.ldt-tpl.sidebar .side .ldt-l{background:rgba(255,255,255,.55)}
+.ldt-tpl.sidebar .side .ldt-nm{background:#fff;width:86%;height:9px}
+.ldt-duo{display:flex;gap:8px}
+.ldt-duo>div{flex:1}
+.ldt-tpl.exec .body{text-align:center}
+.ldt-tpl.exec .ldt-nm{margin:2px auto 4px}
+.ldt-tpl.exec .rule{height:2px;background:var(--tc);width:44%;margin:6px auto}
+.ldt-tpl.exec .ldt-l{margin-left:auto;margin-right:auto}
+.ldt-tpl.mono .toprule{height:6px;background:var(--tc)}
+/* -- 3. builder peek demo -- */
+.ldp-sec{background:linear-gradient(165deg,#0B4A31,#067A4B);color:#fff;padding:60px 26px}
+.ldp-sec h2{font-size:30px;font-weight:900;text-align:center;letter-spacing:-.015em;color:#fff}
+.ldp-sub{text-align:center;font-size:13px;color:#CFF3E1;margin:10px 0 20px}
+.ldp-cap{display:flex;justify-content:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.ldp-step{font-size:10.5px;font-weight:800;border-radius:99px;padding:5px 13px;background:rgba(255,255,255,.12);color:#BFE9D6;border:1px solid rgba(255,255,255,.2);transition:all .35s}
+.ldp-step.on{background:linear-gradient(180deg,#FFD070,#F2B63C);color:#4A3403;border-color:transparent;transform:scale(1.06)}
+.ldp-app{max-width:780px;margin:0 auto;background:#EAF6EF;border-radius:12px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.4);position:relative}
+.ldp-bar{background:#fff;padding:7px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--rv-cardline)}
+.ldp-bar b{font-size:10px;color:var(--rv-ink)}
+.ldp-btns{display:flex;gap:4px}
+.ldp-btn{font-size:8px;font-weight:800;border-radius:5px;padding:3px 8px;border:1.2px solid var(--rv-main);color:var(--rv-main);background:#fff;transition:all .3s}
+.ldp-btn.gold{background:linear-gradient(180deg,#FFD070,#F2B63C);color:#4A3403;border:none}
+.ldp-btn.glow{box-shadow:0 0 0 3px rgba(242,182,60,.5);transform:scale(1.12)}
+.ldp-body{display:flex;gap:8px;padding:10px;background:linear-gradient(180deg,var(--rv-ws-top),var(--rv-ws-bot));min-height:286px}
+.ldp-rail{width:74px;display:flex;flex-direction:column;gap:5px;flex-shrink:0}
+.ldp-r{background-image:var(--rv-sheen),var(--rv-glossy);color:#fff;font-size:7px;font-weight:800;border-radius:6px;padding:6px 7px}
+.ldp-center{flex:1;position:relative}
+.ldp-scene{position:absolute;inset:0;opacity:0;transition:opacity .45s;display:flex;flex-direction:column;gap:7px}
+.ldp-scene.on{opacity:1}
+.ldp-drop{flex:1;border:2px dashed var(--rv-main);border-radius:9px;background:rgba(255,255,255,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:9px;font-weight:800;color:var(--rv-deep)}
+.ldp-file{width:34px;height:42px;background:#fff;border:1.4px solid var(--rv-cardline);border-radius:5px;position:relative;box-shadow:0 6px 14px rgba(6,122,75,.25);opacity:0}
+.ldp-scene.on .ldp-file{animation:ldpDrag 3s ease-in-out infinite}
+.ldp-file::before{content:"PDF";position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:6.5px;font-weight:900;color:#C0392B}
+@keyframes ldpDrag{0%{transform:translate(-80px,-50px) rotate(-9deg);opacity:0}22%{opacity:1}55%{transform:translate(0,0) rotate(0);opacity:1}70%{transform:scale(.86)}84%{transform:scale(1);opacity:1}100%{opacity:0}}
+.ldp-card{background:#fff;border:1px solid var(--rv-cardline);border-radius:7px;padding:7px 9px;position:relative}
+.ldp-card h6{font-size:7.5px;font-weight:900;color:var(--rv-ink);margin-bottom:4px}
+.ldp-cl{height:3.5px;border-radius:2px;background:var(--rv-tint);margin-bottom:3px}
+.ldp-type{font-size:8.5px;color:#14532D;background:#F2FBF6;border:1.2px solid var(--rv-cardline);border-radius:5px;padding:5px 7px;min-height:24px;line-height:1.5}
+.ldp-type .tc{display:inline-block;width:1.5px;height:9px;background:var(--rv-main);vertical-align:-1px;animation:ldpBlink .7s step-end infinite}
+@keyframes ldpBlink{50%{opacity:0}}
+.ldp-spark{position:absolute;top:-7px;right:8px;font-size:13px;animation:ldpSparkle 1.2s ease-in-out infinite}
+@keyframes ldpSparkle{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.35) rotate(18deg)}}
+.ldp-togcard{display:flex;align-items:center;justify-content:space-between;padding:6px 9px}
+.ldp-togrow{font-size:7.5px;font-weight:800;color:var(--rv-ink);display:inline-flex;align-items:center;gap:6px}
+.ldp-tog{width:22px;height:12px;border-radius:99px;background:#CBD5E1;position:relative;display:inline-block;transition:background .3s;flex-shrink:0}
+.ldp-tog i{position:absolute;top:1.5px;left:1.5px;width:9px;height:9px;border-radius:50%;background:#fff;transition:left .3s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.ldp-tog.on{background:var(--rv-main)}
+.ldp-tog.on i{left:11.5px}
+.ldp-hintcard{position:relative;overflow:hidden;padding-bottom:14px}
+.ldp-tline{display:flex;gap:2px;margin:4px 0 7px}
+.ldp-tseg{height:11px;border-radius:3px;color:#fff;font-size:5.5px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;transform-origin:left;transform:scaleX(0)}
+.ldp-scene.on .ldp-tseg{animation:ldpSeg .6s ease-out forwards}
+@keyframes ldpSeg{to{transform:scaleX(1)}}
+.ldp-sk{display:flex;align-items:center;gap:6px;margin-top:4px}
+.ldp-sk i{font-style:normal;font-size:6.5px;font-weight:800;color:var(--rv-ink-soft);width:52px;flex-shrink:0}
+.ldp-sk b{height:5px;border-radius:3px;background:linear-gradient(90deg,#34C98A,#0FA968);flex:1;max-width:var(--w);transform-origin:left;transform:scaleX(0)}
+.ldp-scene.on .ldp-sk b{animation:ldpSeg .7s ease-out forwards}
+.ldp-fade{position:absolute;left:0;right:0;bottom:0;height:34px;background:linear-gradient(180deg,transparent,#fff 82%);pointer-events:none}
+.ldp-more{position:absolute;bottom:3px;right:9px;font-size:6.5px;font-weight:900;color:var(--rv-main);z-index:2}
+.ldp-dl{font-size:8px;padding:5px 8px;border-radius:5px;line-height:1.4}
+.ldp-dl.o{background:#FBF1F1;color:#8A4444;text-decoration:line-through}
+.ldp-dl.n{background:#EAF9F1;color:#14532D;border-left:2.5px solid var(--rv-main)}
+.ldp-ring{width:36px;height:36px;position:relative;margin-left:auto}
+.ldp-ring svg{transform:rotate(-90deg)}
+.ldp-ring .rb{fill:none;stroke:var(--rv-tint);stroke-width:4.5}
+.ldp-ring .ra{fill:none;stroke:var(--rv-main);stroke-width:4.5;stroke-linecap:round;stroke-dasharray:88;stroke-dashoffset:88}
+.ldp-scene.s3.on .ra{animation:ldpRing 1.4s ease-out forwards .8s}
+@keyframes ldpRing{to{stroke-dashoffset:20}}
+.ldp-ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:900;color:var(--rv-deep)}
+.ldp-dlbtn{background-image:var(--rv-sheen),var(--rv-glossy);color:#fff;font-size:9px;font-weight:900;border:none;border-radius:7px;padding:8px 0;width:100%;font-family:inherit;animation:ldPulse 1.6s ease-in-out infinite}
+.ldp-tick{font-size:26px;text-align:center;animation:ldpPop .5s cubic-bezier(.6,1.6,.5,1) both .3s}
+@keyframes ldpPop{from{transform:scale(0)}to{transform:scale(1)}}
+.ldp-prev{width:180px;background:#fff;border-radius:8px;border:1px solid var(--rv-cardline);flex-shrink:0;overflow:hidden;display:flex;flex-direction:column}
+.ldp-prev .ph2{font-size:7.5px;font-weight:800;color:var(--rv-ink);padding:5px 8px;border-bottom:1px solid var(--rv-cardline);background:#FBFDFC;display:flex;justify-content:space-between}
+.ldp-prev .pb{flex:1;background:#DFF0E7;padding:7px}
+.ldp-doc{background:#fff;border:1.4px solid var(--rv-main);border-radius:4px;padding:7px;height:100%;font-size:6.5px}
+.ldp-doc .pn{font-size:8px;font-weight:900;color:var(--rv-deep);opacity:0;transition:opacity .4s}
+.ldp-doc .pr{font-size:5.5px;color:var(--rv-ink-soft);opacity:0;transition:opacity .4s}
+.ldp-doc.fill .pn,.ldp-doc.fill .pr{opacity:1}
+.ldp-doc h6{font-size:5.5px;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:var(--rv-main);margin-top:6px;opacity:0;transition:opacity .4s}
+.ldp-doc.fill h6{opacity:1}
+#ldpPrevType{font-size:6.5px;color:#14532D;line-height:1.5;min-height:18px}
+#ldpPrevType .hl{background:#FEF3C7;border-bottom:1px solid var(--gold, #F2B63C)}
+.ldp-flash{animation:ldpFlash .7s ease}
+@keyframes ldpFlash{0%{box-shadow:0 0 0 0 rgba(52,201,138,.7)}100%{box-shadow:0 0 0 9px rgba(52,201,138,0)}}
+.ldp-doc .pl{height:3px;border-radius:2px;background:#D6EFE2;margin-top:3px;opacity:0;transition:opacity .4s}
+.ldp-doc.fill .pl{opacity:1}
+.ldp-mark{font-size:6px;font-weight:900;color:#B45309;background:#FEF3C7;border-radius:99px;padding:1px 5px;display:inline-block;margin-top:4px;opacity:0;transform:scale(.6);transition:all .4s}
+.ldp-mark.on{opacity:1;transform:scale(1)}
+#ldpPrevExp{overflow:hidden;max-height:40px;transition:max-height .5s ease, opacity .5s ease;opacity:1}
+#ldpPrevExp.off{max-height:0;opacity:0}
+.ldp-cur{position:absolute;z-index:50;width:15px;height:15px;transition:left 1s cubic-bezier(.5,.1,.3,1), top 1s cubic-bezier(.5,.1,.3,1);pointer-events:none;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
+.ldp-cur.click::after{content:"";position:absolute;left:-7px;top:-7px;width:28px;height:28px;border-radius:50%;border:2.5px solid #F2B63C;animation:ldpRipple .55s ease-out}
+@keyframes ldpRipple{from{transform:scale(.3);opacity:1}to{transform:scale(1.4);opacity:0}}
+
 </style>
 </head>
 <body>
@@ -810,11 +948,21 @@ body:has(#view-landing.on) .app-footer{ display:none; }
       </div>
       <div>
         <div class="ld-build">
-          <div class="bnm"></div>
-          <div class="bl"></div><div class="bl"></div><div class="bl"></div>
-          <div class="bh"></div>
-          <div class="bl"></div><div class="bl"></div><div class="bl"></div>
+          <div class="ld-bd nm">First Name Last Name</div>
+          <div class="ld-bd role">YOUR PROFESSIONAL TITLE &middot; YOUR INDUSTRY</div>
+          <h6 class="ld-bd h1x">Professional Summary</h6>
+          <p class="ld-bd ld-blur">Accomplished professional with 10+ years leading complex programmes, known for calm stakeholder management and reliable delivery&hellip;</p>
+          <h6 class="ld-bd h2x">Key Skills</h6>
+          <div class="ld-chips">
+            <span class="ld-chip">Leadership</span><span class="ld-chip">Delivery</span><span class="ld-chip">Stakeholders</span><span class="ld-chip">Strategy</span><span class="ld-chip">Risk</span>
+          </div>
+          <h6 class="ld-bd h3x">Experience</h6>
+          <div class="ld-bd job"><b>Job Title &mdash; Company Name Ltd</b><span>2021 &ndash; Present</span>
+            <li class="ld-blur">Delivered a major platform migration two weeks early</li>
+            <li class="ld-blur">Managed a cross-functional team across three sites</li>
+          </div>
           <div class="done">&#10003; Ready in 15:00</div>
+          <div class="ld-samplebadge">Sample resume &middot; illustrative</div>
         </div>
       </div>
     </div>
@@ -838,6 +986,12 @@ body:has(#view-landing.on) .app-footer{ display:none; }
       <div class="ld-tstep"><div class="dot">&#128196;</div><h4>Download &amp; apply</h4><p>Pick a template, watch the live preview, export a clean PDF or Word file.</p><span class="t">~4 min</span></div>
     </div>
   </section>
+
+  <section class="ldt-sec" id="ld-templates">
+    <h2>20 professional templates</h2>
+    <p class="ld-lead" style="margin-bottom:0">Classic &middot; Banner &middot; Sidebar &middot; Duo-column &middot; Executive &middot; Monoline &mdash; hover to pause &amp; inspect. One click restyles your whole resume.</p>
+    <div class="ldt-roll" id="ldtRoll"></div>
+  </section>
   <section class="ld-feat" id="ld-features">
     <h2>Everything a serious application needs</h2>
     <p class="ld-lead">Built by a GRC professional who reads CVs for a living &mdash; every feature exists because recruiters actually care about it.</p>
@@ -848,6 +1002,78 @@ body:has(#view-landing.on) .app-footer{ display:none; }
       <div class="ld-fcard"><div class="ic">&#128065;</div><h4>Live split-screen preview</h4><p>Watch your resume take shape as you type. What you see is exactly what downloads.</p></div>
       <div class="ld-fcard"><div class="ic">&#127912;</div><h4>20 professional templates</h4><p>Executive, modern, compact &mdash; one click restyles the whole document instantly.</p></div>
       <div class="ld-fcard"><div class="ic">&#128196;</div><h4>Clean PDF &amp; Word export</h4><p>Per-page borders, no orphaned headings, recruiter-ready pagination. Files that look hand-finished.</p></div>
+    </div>
+  </section>
+
+  <section class="ldp-sec" id="ld-peek">
+    <h2>A peek inside the builder</h2>
+    <p class="ldp-sub">Left folders &middot; centre editor &middot; live preview on the right &mdash; watch the cursor work</p>
+    <div class="ldp-cap">
+      <span class="ldp-step" data-s="1">1 &middot; Drag &amp; drop your CV</span>
+      <span class="ldp-step" data-s="2">2 &middot; Edit &mdash; preview updates live</span>
+      <span class="ldp-step" data-s="3">3 &middot; Tailor to the job</span>
+      <span class="ldp-step" data-s="4">4 &middot; Download PDF</span>
+    </div>
+    <div class="ldp-app" id="ldpApp">
+      <div class="ldp-bar">
+        <b>&#128188; Professional CV Builder Console</b>
+        <span class="ldp-btns"><span class="ldp-btn" id="ldpUp">&#11014; Upload</span><span class="ldp-btn gold" id="ldpTailor">&#127919; Tailor</span><span class="ldp-btn">&#128190; Save</span><span class="ldp-btn" id="ldpDl">&#11015; PDF</span></span>
+      </div>
+      <div class="ldp-body">
+        <div class="ldp-rail"><div class="ldp-r">&#128209; Sections</div><div class="ldp-r">&#127912; Templates</div><div class="ldp-r">&#128193; Saved</div></div>
+        <div class="ldp-center">
+          <div class="ldp-scene s1" data-s="1">
+            <div class="ldp-drop"><div class="ldp-file"></div>Drop your CV here &mdash; PDF or Word</div>
+          </div>
+          <div class="ldp-scene s2" data-s="2">
+            <div class="ldp-card"><span class="ldp-spark">&#10024;</span><h6>Professional Summary &mdash; type &amp; watch the right panel</h6>
+              <div class="ldp-type" id="ldpType"><span class="tc"></span></div>
+            </div>
+            <div class="ldp-card ldp-togcard">
+              <h6 style="margin:0">Sections</h6>
+              <span class="ldp-togrow">Experience <span class="ldp-tog on" id="ldpTog"><i></i></span></span>
+            </div>
+            <div class="ldp-card ldp-hintcard">
+              <h6>Career Timeline &amp; Domain Analytics</h6>
+              <div class="ldp-tline">
+                <span class="ldp-tseg" style="width:30%;background:#9BD8B9;animation-delay:.2s">2012</span><span class="ldp-tseg" style="width:20%;background:#5CC79A;animation-delay:.5s">2019</span><span class="ldp-tseg" style="width:26%;background:#0FA968;animation-delay:.8s">2021</span><span class="ldp-tseg" style="width:24%;background:#067A4B;animation-delay:1.1s">2024</span>
+              </div>
+              <div class="ldp-sk"><i>Delivery</i><b style="--w:88%;animation-delay:1.4s"></b></div>
+              <div class="ldp-sk"><i>Stakeholders</i><b style="--w:74%;animation-delay:1.7s"></b></div>
+              <div class="ldp-sk"><i>Risk</i><b style="--w:60%;animation-delay:2s"></b></div>
+              <div class="ldp-fade"></div>
+              <span class="ldp-more">&hellip;full analytics inside</span>
+            </div>
+          </div>
+          <div class="ldp-scene s3" data-s="3">
+            <div class="ldp-card"><h6>&#127919; Tailoring to: Senior Project Manager</h6>
+              <div class="ldp-dl o">Responsible for various project tasks.</div>
+              <div class="ldp-dl n">Delivered a major migration early, leading a team of 14.</div>
+            </div>
+            <div class="ldp-card" style="display:flex;align-items:center;gap:8px"><h6 style="margin:0">Match score</h6>
+              <div class="ldp-ring"><svg width="36" height="36" viewBox="0 0 36 36"><circle class="rb" cx="18" cy="18" r="14"/><circle class="ra" cx="18" cy="18" r="14"/></svg><b>82%</b></div>
+            </div>
+          </div>
+          <div class="ldp-scene s4" data-s="4">
+            <div class="ldp-card"><div class="ldp-tick">&#128196;&#10003;</div><h6 style="text-align:center">Recruiter-ready PDF</h6></div>
+            <button class="ldp-dlbtn" type="button">&#11015; Download PDF</button>
+          </div>
+        </div>
+        <div class="ldp-prev">
+          <div class="ph2">Live Preview <span style="color:var(--rv-main)">&#11015; PDF</span></div>
+          <div class="pb"><div class="ldp-doc" id="ldpDoc">
+            <div class="pn">First Name Last Name</div>
+            <div class="pr">YOUR PROFESSIONAL TITLE</div>
+            <h6>Summary</h6>
+            <div id="ldpPrevType"></div>
+            <div id="ldpPrevExp"><h6>Experience</h6>
+            <div class="pl"></div><div class="pl" style="width:82%"></div></div>
+            <span class="ldp-mark" id="ldpMark">&#9679; tailored</span>
+            <div class="pl" style="width:64%"></div>
+          </div></div>
+        </div>
+      </div>
+      <div class="ldp-cur" id="ldpCur"><svg width="15" height="15" viewBox="0 0 15 15"><path d="M1 1 L1 12 L4.2 9.4 L6.2 14 L8.4 13 L6.4 8.6 L10.5 8.3 Z" fill="#12233F" stroke="#fff" stroke-width="1"/></svg></div>
     </div>
   </section>
   <section class="ld-tailor" id="ld-tailor">
