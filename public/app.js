@@ -1711,7 +1711,8 @@ async function doLogout(){
   try{ await api('/api/auth/logout', {method:'POST'}); }catch{}
   currentUser = null;
   $('#hdrRight').style.display = 'none';
-  showView('login');
+  showView('landing');
+  initLanding();
 }
 
 function setUser(user){
@@ -1953,7 +1954,8 @@ $('#btnConfirmDelete').addEventListener('click', async ()=>{
     if($('#editor')) $('#editor').classList.add('hidden');
     if($('#startArea')) $('#startArea').classList.remove('hidden');
     if($('#fresherStart')) $('#fresherStart').classList.remove('hidden');
-    showView('login');
+    showView('landing');
+    initLanding();
     toast('Your account has been permanently deleted.', 6000);
   }catch(err){
     btn.disabled = false;
@@ -2252,12 +2254,95 @@ $('#tlPrevSave').addEventListener('click', async ()=>{
   btn.textContent = orig;
 });
 
+// ============================================================
+// Landing page — wiring + animations (typewriter, count-up,
+// scroll-reveal, timeline line, tailor demo). Runs once.
+// ============================================================
+let _ldDone = false;
+function initLanding(){
+  if(_ldDone) return;
+  _ldDone = true;
+
+  // nav + CTAs
+  const go = (v)=>{ showView(v); };
+  const si = document.getElementById('ldSignin');
+  if(si) si.addEventListener('click', ()=> go('login'));
+  document.querySelectorAll('[data-ldgo]').forEach(b =>
+    b.addEventListener('click', ()=> go(b.dataset.ldgo)));
+  const hb = document.getElementById('ldHowBtn');
+  if(hb) hb.addEventListener('click', ()=>{
+    const t = document.getElementById('ld-how');
+    if(t && t.scrollIntoView) t.scrollIntoView({behavior:'smooth'});
+  });
+
+  // Option B: typewriter rotating pitches
+  const LD_LINES = [
+    'Upload your old CV — AI does the rest.',
+    'Tailored to every job you apply for.',
+    'Truth-first: AI never invents your experience.',
+    'Recruiter-ready PDF in one sitting.'
+  ];
+  const typer = document.getElementById('ldTyper');
+  if(typer){
+    let li=0, ci=0, del=false;
+    (function type(){
+      const line = LD_LINES[li];
+      typer.textContent = line.slice(0, ci);
+      if(!del && ci < line.length){ ci++; setTimeout(type, 42); }
+      else if(!del){ del=true; setTimeout(type, 1600); }
+      else if(ci > 0){ ci--; setTimeout(type, 16); }
+      else { del=false; li=(li+1)%LD_LINES.length; setTimeout(type, 350); }
+    })();
+  }
+
+  // Option C: count-up stats
+  document.querySelectorAll('[data-ldcount]').forEach(el=>{
+    const target = +el.dataset.ldcount, suf = el.dataset.ldsuffix || '';
+    let cur = 0; const step = Math.max(1, Math.round(target/40));
+    const iv = setInterval(()=>{
+      cur = Math.min(target, cur + step);
+      el.textContent = cur + suf;
+      if(cur >= target) clearInterval(iv);
+    }, 34);
+  });
+
+  // Options D+E+G: scroll-triggered reveal, timeline line, tailor demo
+  if(typeof IntersectionObserver !== 'undefined'){
+    const io = new IntersectionObserver(entries=>{
+      entries.forEach(e=>{
+        if(!e.isIntersecting) return;
+        const el = e.target;
+        if(el.id === 'ldTimeline'){
+          el.classList.add('play');
+          [...el.querySelectorAll('.ld-tstep')].forEach((k,i)=>
+            setTimeout(()=> k.classList.add('reveal'), i*160));
+        } else if(el.id === 'ldTdemo'){
+          el.classList.add('play');
+        } else if(el.classList.contains('ld-fgrid')){
+          [...el.querySelectorAll('.ld-fcard')].forEach((k,i)=>
+            setTimeout(()=> k.classList.add('reveal'), i*120));
+        }
+        io.unobserve(el);
+      });
+    }, {threshold:.2});
+    ['ldTimeline','ldTdemo'].forEach(id=>{
+      const el = document.getElementById(id); if(el) io.observe(el);
+    });
+    const fg = document.querySelector('.ld-fgrid'); if(fg) io.observe(fg);
+  } else {
+    // very old browsers: just show everything
+    document.querySelectorAll('.ld-tstep,.ld-fcard').forEach(el=>el.classList.add('reveal'));
+    const tl = document.getElementById('ldTimeline'); if(tl) tl.classList.add('play');
+    const td = document.getElementById('ldTdemo'); if(td) td.classList.add('play');
+  }
+}
+
 // ---- session check on load ----
 (async ()=>{
   try{
     const out = await api('/api/auth/me');
     setUser(out.user);
-  }catch{ showView('login'); }
+  }catch{ showView('landing'); initLanding(); }
 })();
 
 // Initial rail (nothing detected yet)
