@@ -925,6 +925,42 @@ overflow:hidden;position:relative;transition:transform .25s;display:flex;flex-di
 .tile .go{color:#7CF0BE}
 .tile .tile-ic, .tile .ic{background:rgba(242,182,60,.15);border-radius:11px;padding:8px 10px;display:inline-block}
 
+
+/* ================================================================
+   TOP FRAME — Forest header + Gold ticker (variant 1) + wordmark
+   ================================================================ */
+/* header: deep forest glossy */
+header{background-image:var(--rv-sheen),linear-gradient(180deg,#12724C 0%,#0B4A31 55%,#053D28 100%);
+  border-bottom:1px solid rgba(255,255,255,.12)}
+.brand-sub{color:#BFDCCB}
+.brand-sub a, .brand-sub b{color:#FFD070}
+/* wordmark: shiny green letters with a gold letter-border */
+.brand h1{background:linear-gradient(110deg,#34C98A 0%,#7CF0BE 35%,#E9FFF4 48%,#7CF0BE 61%,#34C98A 100%);
+  background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:ldShine 4s linear infinite;-webkit-text-stroke:.6px rgba(255,208,112,.8)}
+/* logo mark: gold border, forest glyph */
+header .rv-mark{border:2px solid #F2B63C;box-shadow:0 3px 10px rgba(0,0,0,.3)}
+header .rv-mark .ph, header .rv-mark .b1, header .rv-mark .b2, header .rv-mark .b3, header .rv-mark .b4{background:#0B4A31}
+header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
+/* header controls: gold accents */
+.user-avatar{background:#F2B63C;color:#4A3403}
+#btnLogout{background:linear-gradient(180deg,#FFD070,#F2B63C);color:#4A3403;border:none;font-weight:800;
+  box-shadow:0 3px 10px rgba(0,0,0,.25)}
+/* ticker: glossy gold, forest diamonds */
+.ticker{background:linear-gradient(180deg,#FFD070 0%,#F2B63C 60%,#D99A22 100%);
+  border-bottom:1px solid rgba(0,0,0,.12)}
+.ticker span{color:#3C2A02}
+.ticker b{color:#0B4A31}
+/* console bar actions join the forest family */
+.btn-dline{border-color:#0B4A31;color:#0B4A31}
+.btn-dline:hover{background:#EDF6F1}
+.module-bar .js-save{background-image:var(--rv-sheen),linear-gradient(180deg,#12724C,#053D28);
+  box-shadow:0 3px 10px rgba(5,61,40,.4)}
+.tag{background:#F6E9C8;color:#8A5E08}
+/* home kicker: forest pill with gold text — clearly visible on the wash */
+#view-home .kicker{background:#0B4A31;color:#FFD070;display:inline-block;padding:5px 16px;
+  border-radius:99px;letter-spacing:.14em;text-shadow:none;box-shadow:0 4px 12px rgba(5,61,40,.3)}
+
 </style>
 </head>
 <body>
