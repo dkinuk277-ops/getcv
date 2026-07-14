@@ -961,6 +961,28 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 #view-home .kicker{background:#0B4A31;color:#FFD070;display:inline-block;padding:5px 16px;
   border-radius:99px;letter-spacing:.14em;text-shadow:none;box-shadow:0 4px 12px rgba(5,61,40,.3)}
 
+
+/* ================================================================
+   CONSOLE POLISH — visible title, themed preview buttons, white wordmark
+   ================================================================ */
+.module-bar .mtitle{color:#0B4A31 !important;font-weight:800}
+.brand h1{background:none;-webkit-background-clip:initial;background-clip:initial;
+  color:#fff;-webkit-text-stroke:0;animation:none;text-shadow:none}
+.pv-live-head{background:#FBFDFC}
+.pv-live-head > span > b{color:#0B4A31}
+.pv-live-btns .btn-ghost{border:1.4px solid #0B4A31;color:#0B4A31;background:#fff;font-weight:800}
+.pv-live-btns .btn-ghost:hover{background:#EDF6F1}
+.pv-live-btns .js-pdf{background-image:var(--rv-sheen),linear-gradient(180deg,#12724C,#053D28);
+  color:#fff;border:none;box-shadow:0 3px 8px rgba(5,61,40,.35)}
+#previewModal .pv-toolbar > span{color:#0B4A31}
+#previewModal .btn-ghost{border:1.4px solid #0B4A31;color:#0B4A31;background:#fff;font-weight:800}
+#previewModal .btn-ghost:hover{background:#EDF6F1}
+#previewModal .js-word{background:#fff;border:1.4px solid #0B4A31;color:#0B4A31;box-shadow:none;font-weight:800}
+#previewModal .js-word:hover{background:#EDF6F1}
+#previewModal .js-pdf{background-image:var(--rv-sheen),linear-gradient(180deg,#12724C,#053D28);
+  color:#fff;border:none;box-shadow:0 3px 8px rgba(5,61,40,.35)}
+#previewModal .modal-close{border:1.5px solid #0B4A31;color:#0B4A31;background:#fff}
+
 </style>
 </head>
 <body>
@@ -1273,24 +1295,24 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   <div class="module-bar">
     <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <button class="btn-dline js-home" type="button">🏠 Home</button>
-      <span class="mtitle">💼 Professional CV Builder Console<span class="tag">Module</span></span>
+      <span class="mtitle">Professional CV Builder Console<span class="tag">Module</span></span>
     </span>
     <span class="mbtns">
-      <button class="btn-dline js-upload" type="button" title="Upload a new CV anytime — replaces the current one in the builder">⬆ Upload CV</button>
-      <button class="btn-dline js-refresh" type="button" title="Clear the current resume data">↻ Refresh</button>
+      <button class="btn-dline js-upload" type="button" title="Upload a new CV anytime — replaces the current one in the builder">Upload CV</button>
+      <button class="btn-dline js-refresh" type="button" title="Clear the current resume data">Refresh</button>
       <button class="btn-gold js-tailor" type="button" title="Tailor this resume for a specific job description">🎯 Tailor for Job</button>
-      <button class="btn-dline js-save" type="button">💾 Save</button>
-      <button class="btn-dline js-preview" type="button">👁 Preview</button>
+      <button class="btn-dline js-save" type="button">Save</button>
+      <button class="btn-dline js-preview" type="button">Preview</button>
       <button class="btn-dline js-switch" data-to="fresher" type="button">Switch to Freshers →</button>
     </span>
   </div>
   <div class="workspace">
     <div class="container">
       <nav class="rail" aria-label="Builder sidebar">
-        <button class="rail-group js-railtoggle" type="button">📑 Sections <span>▾</span></button>
+        <button class="rail-group js-railtoggle" type="button">Resume Sections <span>▾</span></button>
         <div data-rail></div>
-        <button class="rail-folder js-tplopen" type="button">🎨 Templates</button>
-        <button class="rail-folder js-savedopen" type="button">📁 Saved Resumes</button>
+        <button class="rail-folder js-tplopen" type="button">Templates</button>
+        <button class="rail-folder js-savedopen" type="button">Saved Resumes</button>
       </nav>
       <main>
         <!-- Import progress -->
@@ -1321,7 +1343,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <div class="pv-live-head">
           <span><b>Live Preview</b> <span class="pv-live-tpl" data-livetpl></span></span>
           <span class="pv-live-btns">
-            <button class="btn btn-ghost js-tplopen" type="button" title="Change template">🎨</button>
+            <button class="btn btn-ghost js-tplopen" type="button" title="Change template">Template</button>
             <button class="btn btn-ghost js-word" type="button">⬇ Word</button>
             <button class="btn btn-primary js-pdf" type="button">⬇ PDF</button>
           </span>
@@ -1339,22 +1361,22 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   <div class="module-bar">
     <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <button class="btn-dline js-home" type="button">🏠 Home</button>
-      <span class="mtitle">🎓 Fresher CV Builder Console<span class="tag">Module</span></span>
+      <span class="mtitle">Fresher CV Builder Console<span class="tag">Module</span></span>
     </span>
     <span class="mbtns">
-      <button class="btn-dline js-refresh" type="button" title="Clear the current resume data">↻ Refresh</button>
-      <button class="btn-dline js-save" type="button">💾 Save</button>
-      <button class="btn-dline js-preview" type="button">👁 Preview</button>
+      <button class="btn-dline js-refresh" type="button" title="Clear the current resume data">Refresh</button>
+      <button class="btn-dline js-save" type="button">Save</button>
+      <button class="btn-dline js-preview" type="button">Preview</button>
       <button class="btn-dline js-switch" data-to="pro" type="button">Switch to Professionals →</button>
     </span>
   </div>
   <div class="workspace">
     <div class="fr-grid">
     <nav class="rail" aria-label="Builder sidebar">
-      <button class="rail-group js-railtoggle" type="button">📑 Sections <span>▾</span></button>
+      <button class="rail-group js-railtoggle" type="button">Resume Sections <span>▾</span></button>
       <div data-rail></div>
-      <button class="rail-folder js-tplopen" type="button">🎨 Templates</button>
-      <button class="rail-folder js-savedopen" type="button">📁 Saved Resumes</button>
+      <button class="rail-folder js-tplopen" type="button">Templates</button>
+      <button class="rail-folder js-savedopen" type="button">Saved Resumes</button>
     </nav>
     <main>
     <div id="fresherStart">
@@ -1376,7 +1398,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <div class="pv-live-head">
           <span><b>Live Preview</b> <span class="pv-live-tpl" data-livetpl></span></span>
           <span class="pv-live-btns">
-            <button class="btn btn-ghost js-tplopen" type="button" title="Change template">🎨</button>
+            <button class="btn btn-ghost js-tplopen" type="button" title="Change template">Template</button>
             <button class="btn btn-ghost js-word" type="button">⬇ Word</button>
             <button class="btn btn-primary js-pdf" type="button">⬇ PDF</button>
           </span>
@@ -1480,7 +1502,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <h4 id="tlSavedTitle">Changes applied</h4>
         <p>Saved as a new resume — your original is untouched. It's now loaded in the builder with the live preview updated, ready to download.</p>
         <div class="tl-savename" id="tlSavedName">📄 —</div>
-        <p style="font-size:12px;color:var(--ink-soft)">Find it anytime in 📁 Saved Resumes. Tailor the same base resume for as many jobs as you like.</p>
+        <p style="font-size:12px;color:var(--ink-soft)">Find it anytime in Saved Resumes. Tailor the same base resume for as many jobs as you like.</p>
         <button class="btn btn-primary" data-close type="button">Done — back to builder</button>
       </div>
     </div>
@@ -1490,7 +1512,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 <!-- ===== Refresh save-prompt modal ===== -->
 <div class="modal" id="refreshModal" role="dialog" aria-modal="true">
   <div class="modal-box" style="max-width:460px;text-align:center">
-    <h2 style="margin-bottom:6px">💾 Save before clearing?</h2>
+    <h2 style="margin-bottom:6px">Save before clearing?</h2>
     <p style="font-size:13px;color:var(--ink-soft);margin-bottom:18px">You have a resume in the builder. Save it to your Saved Resumes folder, or clear it and start from the beginning with a new import.</p>
     <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap">
       <button class="btn btn-primary" id="refSave" type="button">💾 Save &amp; clear</button>
@@ -1504,7 +1526,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 <div class="modal tpl-dock" id="templatesModal" role="dialog" aria-modal="true">
   <div class="modal-box">
     <button class="modal-close" data-close>&times;</button>
-    <h2 style="margin-bottom:4px">🎨 Choose your template</h2>
+    <h2 style="margin-bottom:4px">Choose your template</h2>
     <p style="font-size:12.5px;color:var(--ink-soft);margin-bottom:12px">Click any template — the live preview on the right applies it instantly so you can compare. Hit Apply when you're happy.</p>
     <div class="tpl-grid" data-templategrid></div>
     <div class="tplm-foot">
