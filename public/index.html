@@ -983,6 +983,33 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   color:#fff;border:none;box-shadow:0 3px 8px rgba(5,61,40,.35)}
 #previewModal .modal-close{border:1.5px solid #0B4A31;color:#0B4A31;background:#fff}
 
+
+/* ================================================================
+   SECTION DRAG & DROP — handles, arrows, drop indicators
+   ================================================================ */
+.sec-order{display:inline-flex;align-items:center;gap:3px;margin-right:9px;vertical-align:middle}
+.sec-grip{cursor:grab;color:#9AA8BC;font-size:15px;letter-spacing:1px;user-select:none;
+  padding:1px 5px;border-radius:6px;line-height:1}
+.sec-grip:hover{background:var(--rv-tint);color:#0B4A31}
+.sec-grip:active{cursor:grabbing}
+.sec-arrow{border:1px solid var(--rv-cardline);background:#fff;color:#0B4A31;font-size:8px;
+  width:18px;height:15px;border-radius:5px;cursor:pointer;padding:0;line-height:1}
+.sec-arrow:hover{background:var(--rv-tint)}
+.sec-note{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+  background:#F6E9C8;color:#8A5E08;border-radius:99px;padding:2.5px 9px;margin-left:8px;vertical-align:middle}
+.card.dragging{opacity:.45;transform:scale(.99)}
+.card.dropbefore{box-shadow:0 -3px 0 0 #F2B63C, 0 3px 12px rgba(5,61,40,.10) !important}
+.card.dropafter{box-shadow:0 3px 0 0 #F2B63C, 0 3px 12px rgba(5,61,40,.10) !important}
+.entry-grip{cursor:grab;color:#9AA8BC;font-size:12px;user-select:none;padding:0 4px;border-radius:5px;margin-right:2px}
+.entry-grip:hover{background:var(--rv-tint);color:#0B4A31}
+.entry-grip:active{cursor:grabbing}
+.entry-arrow{border:1px solid var(--rv-cardline);background:#fff;color:#0B4A31;font-size:7.5px;
+  width:16px;height:14px;border-radius:4px;cursor:pointer;padding:0;line-height:1;margin-right:2px}
+.entry-arrow:hover{background:var(--rv-tint)}
+.entry.dragging{opacity:.4}
+.entry.dropbefore{box-shadow:0 -2.5px 0 0 #F2B63C}
+.entry.dropafter{box-shadow:0 2.5px 0 0 #F2B63C}
+
 </style>
 </head>
 <body>

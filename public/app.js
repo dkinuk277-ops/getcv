@@ -4,6 +4,8 @@
 const API = ''; // same origin; set to full URL if frontend hosted separately
 
 // ---------- State ----------
+const DEFAULT_SECTION_ORDER = ['skills','certifications','languages','projects','accomplishments','courses','summary','experience','education'];
+
 let R = emptyResume();
 
 // ---------- 15 Resume templates ----------
@@ -38,6 +40,7 @@ const getTemplate = () => TEMPLATES.find(t => t.id === selectedTemplate) || TEMP
 function emptyResume(){
   return {
     personal:{name:'',email:'',phone:'',location:'',linkedin:'',website:'',headline:''},
+    section_order: DEFAULT_SECTION_ORDER.slice(),
     summary:'',
     experience:[], education:[], skills:[],
     certifications:[], languages:[], projects:[], accomplishments:[], courses:[],
@@ -287,6 +290,11 @@ function normalize(d){
   out.section_prefs = {summary:true, skills:true, certifications:true, languages:true,
     projects:true, accomplishments:true, courses:true, experience:true, education:true,
     ...(d.section_prefs||{})};
+  // section_order: keep only known keys, then append any missing (older saves)
+  const known = DEFAULT_SECTION_ORDER;
+  const so = Array.isArray(d.section_order) ? d.section_order.filter(k=>known.includes(k)) : [];
+  known.forEach(k=>{ if(!so.includes(k)) so.push(k); });
+  out.section_order = so;
   return out;
 }
 
@@ -739,14 +747,18 @@ function buildEditor(){
   // Career insights at the very top (only if we have experience)
   if(R.experience.length) ed.appendChild(insightsCard());
 
-  // Always show every section — empty ones get an "add first" hint
-  EDITOR_ORDER.forEach(key => {
-    if(key === 'personal') ed.appendChild(personalCard());
-    else if(key === 'summary') ed.appendChild(summaryCard());
-    else if(key === 'skills') ed.appendChild(skillsCard());
-    else if(key === 'languages') ed.appendChild(simpleListCard('languages','Languages'));
-    else if(key === 'accomplishments') ed.appendChild(linesCard('accomplishments','Accomplishments','e.g. Reduced audit findings by 40% year-on-year'));
-    else ed.appendChild(listCard(key));
+  // Always show every section — user-arranged order, personal pinned first
+  if(!Array.isArray(R.section_order) || !R.section_order.length) R.section_order = DEFAULT_SECTION_ORDER.slice();
+  ed.appendChild(personalCard());
+  R.section_order.forEach(key => {
+    let card;
+    if(key === 'summary') card = summaryCard();
+    else if(key === 'skills') card = skillsCard();
+    else if(key === 'languages') card = simpleListCard('languages','Languages');
+    else if(key === 'accomplishments') card = linesCard('accomplishments','Accomplishments','e.g. Reduced audit findings by 40% year-on-year');
+    else card = listCard(key);
+    card.setAttribute('data-seckey', key);
+    ed.appendChild(card);
   });
   R.extra_sections.forEach((sec,i)=> ed.appendChild(extraCard(sec,i)));
 
@@ -769,10 +781,82 @@ function buildEditor(){
     });
   });
 
+  // ---- drag handles + up/down arrows on every arrangeable section card ----
+  ed.querySelectorAll('.card[data-seckey]').forEach(card=>{
+    const key = card.dataset.seckey;
+    const h2 = card.querySelector('h2');
+    if(!h2) return;
+    const ctl = el('span',{class:'sec-order'});
+    ctl.innerHTML = `<span class="sec-grip" draggable="true" title="Drag to rearrange sections">⠿</span>`+
+      `<button class="sec-arrow" type="button" data-dir="-1" title="Move section up">▲</button>`+
+      `<button class="sec-arrow" type="button" data-dir="1" title="Move section down">▼</button>`;
+    h2.insertBefore(ctl, h2.firstChild);
+    if(key==='certifications' || key==='education'){
+      const note = el('span',{class:'sec-note',title:'This section prints in the credentials area under your name — items reorder there'},'header credentials');
+      h2.appendChild(note);
+    }
+    ctl.querySelectorAll('.sec-arrow').forEach(b=> b.addEventListener('click', ()=>{
+      const i = R.section_order.indexOf(key), j = i + (+b.dataset.dir);
+      if(j < 0 || j >= R.section_order.length) return;
+      R.section_order.splice(j, 0, R.section_order.splice(i,1)[0]);
+      buildEditor(); flashPreviewSection(key);
+      const nc = $('#editor .card[data-seckey="'+key+'"]'); if(nc && typeof nc.scrollIntoView === 'function') nc.scrollIntoView({block:'nearest'});
+    }));
+    const grip = ctl.querySelector('.sec-grip');
+    grip.addEventListener('dragstart', e=>{
+      _secDrag = key; card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try{ e.dataTransfer.setDragImage(card, 24, 20); }catch(_){/* jsdom */}
+    });
+    grip.addEventListener('dragend', ()=>{ _secDrag = null; ed.querySelectorAll('.card').forEach(c=>c.classList.remove('dragging','dropbefore','dropafter')); });
+    card.addEventListener('dragover', e=>{
+      if(!_secDrag || _secDrag === key) return;
+      e.preventDefault();
+      const r = card.getBoundingClientRect(), before = (e.clientY - r.top) < r.height/2;
+      card.classList.toggle('dropbefore', before);
+      card.classList.toggle('dropafter', !before);
+    });
+    card.addEventListener('dragleave', ()=> card.classList.remove('dropbefore','dropafter'));
+    card.addEventListener('drop', e=>{
+      if(!_secDrag || _secDrag === key) return;
+      e.preventDefault();
+      const r = card.getBoundingClientRect(), before = (e.clientY - r.top) < r.height/2;
+      const moved = _secDrag; _secDrag = null;
+      reorderSection(moved, key, before);
+    });
+  });
+
   renderRail();
   renderAddPanel();
   $('#addSectionCard').classList.remove('hidden');
   if(typeof renderLivePreview === 'function') renderLivePreview();
+}
+
+// ---- shared reorder logic: used by drag-drop AND arrows ----
+let _secDrag = null;
+function reorderSection(fromKey, toKey, before){
+  const so = R.section_order;
+  const fi = so.indexOf(fromKey); if(fi < 0) return;
+  so.splice(fi,1);
+  let ti = so.indexOf(toKey); if(ti < 0){ so.splice(fi,0,fromKey); return; }
+  if(!before) ti++;
+  so.splice(ti,0,fromKey);
+  buildEditor();
+  flashPreviewSection(fromKey);
+}
+
+// gold flash on the moved section inside the live preview
+const PREVIEW_HEADINGS = {skills:'Key Skills', summary:'Areas of Practice', accomplishments:'Accomplishments',
+  courses:'Courses', projects:'Projects', experience:'Work Experience'};
+function flashPreviewSection(key){
+  const head = PREVIEW_HEADINGS[key]; if(!head) return;
+  const pane = document.querySelector('.view.on [data-livepane]') || document.querySelector('[data-livepane]');
+  if(!pane) return;
+  const h2 = [...pane.querySelectorAll('h2')].find(h=> h.textContent.trim().startsWith(head));
+  if(!h2) return;
+  h2.style.transition = 'background .5s'; h2.style.background = '#FEF3C7';
+  setTimeout(()=>{ h2.style.background = ''; }, 900);
+  if(typeof h2.scrollIntoView === 'function') h2.scrollIntoView({block:'nearest'});
 }
 
 function renderRail(){
@@ -890,11 +974,50 @@ function listCard(key){
       return;
     }
     R[key].forEach((item,i)=>{
-      const en = el('div',{class:'entry'});
+      const en = el('div',{class:'entry','data-ix':i});
       const head = el('div',{class:'entry-head'});
-      head.innerHTML = `<strong>${esc(item[def.fields[0][0]]||def.title+' '+(i+1))}</strong>
+      head.innerHTML = `<strong><span class="entry-grip" draggable="true" title="Drag to reorder">⠿</span>`+
+        `<button class="entry-arrow" type="button" data-dir="-1" title="Move up">▲</button>`+
+        `<button class="entry-arrow" type="button" data-dir="1" title="Move down">▼</button> `+
+        `${esc(item[def.fields[0][0]]||def.title+' '+(i+1))}</strong>
         <span><button class="btn btn-danger" type="button">Remove</button></span>`;
       en.appendChild(head);
+      head.querySelectorAll('.entry-arrow').forEach(b=> b.addEventListener('click', ()=>{
+        const j = i + (+b.dataset.dir);
+        if(j < 0 || j >= R[key].length) return;
+        R[key].splice(j, 0, R[key].splice(i,1)[0]);
+        renderEntries(); renderRail();
+        if(typeof renderLivePreview === 'function') renderLivePreview();
+        flashPreviewSection(key);
+      }));
+      const g = head.querySelector('.entry-grip');
+      g.addEventListener('dragstart', e=>{
+        wrap._drag = i; en.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        try{ e.dataTransfer.setDragImage(en, 24, 14); }catch(_){/* jsdom */}
+      });
+      g.addEventListener('dragend', ()=>{ wrap._drag = null; wrap.querySelectorAll('.entry').forEach(x=>x.classList.remove('dragging','dropbefore','dropafter')); });
+      en.addEventListener('dragover', e=>{
+        if(wrap._drag == null || wrap._drag === i) return;
+        e.preventDefault();
+        const r = en.getBoundingClientRect(), before = (e.clientY - r.top) < r.height/2;
+        en.classList.toggle('dropbefore', before);
+        en.classList.toggle('dropafter', !before);
+      });
+      en.addEventListener('dragleave', ()=> en.classList.remove('dropbefore','dropafter'));
+      en.addEventListener('drop', e=>{
+        if(wrap._drag == null || wrap._drag === i) return;
+        e.preventDefault();
+        const r = en.getBoundingClientRect(), before = (e.clientY - r.top) < r.height/2;
+        let from = wrap._drag, to = i; wrap._drag = null;
+        const moved = R[key].splice(from,1)[0];
+        if(from < to) to--;
+        if(!before) to++;
+        R[key].splice(to,0,moved);
+        renderEntries(); renderRail();
+        if(typeof renderLivePreview === 'function') renderLivePreview();
+        flashPreviewSection(key);
+      });
 
       const grid = el('div',{class:'grid2'});
       def.fields.forEach(([f,lab])=>{
@@ -1364,7 +1487,17 @@ function resumeHTML(forExport=false){
 
   const foot = `<div class="gcv-foot">Built with Reeve · <a href="https://www.decompliance.uk">www.decompliance.uk</a> · AI GRC Intelligence by DeCompliance</div>`;
 
-  // ---- LAYOUT COMPOSER: same locked content order, different structures
+  // ---- LAYOUT COMPOSER: user-arranged section order feeds every layout
+  const blockMap = {summary:aopBlock, skills:skillsBlock, accomplishments:accomplishmentsBlock,
+    courses:coursesBlock, projects:projectsBlock, experience:expBlock};
+  const orderKeys = (Array.isArray(R.section_order) && R.section_order.length ? R.section_order : DEFAULT_SECTION_ORDER)
+    .filter(k => blockMap[k] !== undefined);
+  const orderedAll = orderKeys.map(k=>blockMap[k]).join('');
+  const orderedNoSkills = orderKeys.filter(k=>k!=='skills').map(k=>blockMap[k]).join('');
+  const orderedCols = orderKeys.filter(k=>k!=='skills' && k!=='experience').map(k=>blockMap[k]).join('');
+  const classicFlow = orderKeys[0]==='skills'
+    ? skillsBlock + trendsBlock + orderKeys.slice(1).map(k=>blockMap[k]).join('')
+    : trendsBlock + orderedAll;
   let body;
   if(layout === 'sidebar'){
     body = `<div class="gcv-page">
@@ -1376,20 +1509,20 @@ function resumeHTML(forExport=false){
           ${skillsBlock}
         </div>
         <div class="gcv-main">
-          ${trendsBlock}${aopBlock}${accomplishmentsBlock}${coursesBlock}${projectsBlock}${expBlock}${extrasBlock}
+          ${trendsBlock}${orderedNoSkills}${extrasBlock}
         </div>
       </div>${foot}</div>`;
   } else if(layout === 'twocol'){
     body = `<div class="gcv-page">
       <div class="gcv-head"><div>${identity}${credLine}</div>${contactBlock}</div>
       ${skillsBlock}${trendsBlock}
-      <div class="gcv-cols">${aopBlock}${accomplishmentsBlock}${coursesBlock}${projectsBlock}</div>
+      <div class="gcv-cols">${orderedCols}</div>
       ${expBlock}${extrasBlock}${foot}</div>`;
   } else {
     // classic / banner / compact / mono share the classic structure (CSS restyles them)
     body = `<div class="gcv-page">
       <div class="gcv-head"><div>${identity}${credLine}</div>${contactBlock}</div>
-      ${skillsBlock}${trendsBlock}${aopBlock}${accomplishmentsBlock}${coursesBlock}${projectsBlock}${expBlock}${extrasBlock}${foot}</div>`;
+      ${classicFlow}${extrasBlock}${foot}</div>`;
   }
 
   if(!forExport) return `<style>${templateCSS(t)}</style>${body}`;
