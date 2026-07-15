@@ -43,8 +43,9 @@ const upload = multer({
       return cb(e, false);
     }
     const ok = ['application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(file.mimetype)
-      || /\.(pdf|docx)$/i.test(name);
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain'].includes(file.mimetype)
+      || /\.(pdf|docx|txt)$/i.test(name);
     if (!ok) return cb(new Error('UNSUPPORTED_TYPE'), false);
     cb(null, true);
   }
@@ -61,7 +62,9 @@ function handleUploadErrors(err, req, res, next) {
     });
   }
   if (err.message === 'UNSUPPORTED_TYPE') {
-    return res.status(415).json({ error: 'Only PDF and .docx files are supported.' });
+    return res.status(415).json({
+      error: 'That file type is not supported. Please upload a PDF (.pdf), Word (.docx) or plain text (.txt) resume. If you have an old .doc file, open it in Word and Save As .docx first; if you have an image or photo of a resume, convert it to a text PDF using an OCR tool first.'
+    });
   }
   return res.status(400).json({ error: err.message || 'Upload failed' });
 }
@@ -102,6 +105,7 @@ async function extractText(buffer, filename) {
     const result = await mammoth.extractRawText({ buffer });
     return result.value;
   }
+  if (/\.txt$/i.test(filename)) return buffer.toString('utf8');
   throw new Error('Unsupported file type');
 }
 
@@ -131,6 +135,64 @@ async function claudeJSON(prompt, maxTokens = 4000) {
   const end = clean.lastIndexOf('}');
   if (start === -1 || end === -1) throw new Error('Model did not return JSON');
   return JSON.parse(clean.slice(start, end + 1));
+}
+
+// Large-output JSON call with full recovery ladder:
+//   attempt 1: generous 16k output budget
+//   if truncated (stop_reason max_tokens): attempt 2 with a compactness
+//     instruction so very detailed resumes still fit
+//   if the JSON is malformed: strip trailing commas; if still broken,
+//     one repair round-trip asking the model to fix its own JSON
+// Throws Error with .code = PARSE_TRUNCATED | PARSE_BADJSON for the route
+// to translate into honest, actionable user messages.
+function cleanJSONText(raw) {
+  const noFences = raw.replace(/```json|```/g, '').trim();
+  const start = noFences.indexOf('{');
+  const end = noFences.lastIndexOf('}');
+  if (start === -1 || end === -1) return null;
+  // remove trailing commas before } or ] — the most common model slip
+  return noFences.slice(start, end + 1).replace(/,\s*([}\]])/g, '$1');
+}
+
+async function claudeJSONBig(prompt, maxTokens = 16000) {
+  const call = async (p) => {
+    const msg = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: p }]
+    });
+    const raw = msg.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+    return { raw, truncated: msg.stop_reason === 'max_tokens' };
+  };
+
+  let { raw, truncated } = await call(prompt);
+
+  if (truncated) {
+    // Retry in compact mode — keep every role, trim the prose
+    const compact = prompt + '\n\nIMPORTANT — COMPACT MODE: your previous attempt exceeded the output limit. Keep EVERY job role and EVERY section, but be economical: keep at most the 10 most important bullet lines per role in "desc", shorten wording where possible, and omit optional empty fields. The complete JSON MUST fit in the response.';
+    ({ raw, truncated } = await call(compact));
+    if (truncated) {
+      const e = new Error('parse output truncated twice');
+      e.code = 'PARSE_TRUNCATED';
+      throw e;
+    }
+  }
+
+  let cleaned = cleanJSONText(raw);
+  if (cleaned) {
+    try { return JSON.parse(cleaned); } catch (_) { /* fall through to repair */ }
+  }
+
+  // One repair round-trip: the model fixes its own JSON
+  const repairPrompt = 'The following JSON is invalid or incomplete. Return ONLY the corrected, complete, valid JSON object — no commentary, no markdown fences.\n\n' + raw.slice(0, 50000);
+  const repair = await call(repairPrompt);
+  cleaned = cleanJSONText(repair.raw);
+  if (cleaned) {
+    try { return JSON.parse(cleaned); } catch (_) { /* fall through */ }
+  }
+  const e = new Error('model returned unparseable JSON after repair');
+  e.code = 'PARSE_BADJSON';
+  throw e;
 }
 
 async function claudeText(prompt, maxTokens = 1500) {
@@ -509,7 +571,7 @@ app.post('/api/parse-resume', aiLimiter, requireAuth, upload.single('resume'), h
     const text = await extractText(req.file.buffer, req.file.originalname);
     if (!text || text.trim().length < 50) {
       return res.status(422).json({
-        error: 'Could not extract readable text. If this is a scanned/image PDF, OCR is needed.'
+        error: 'This looks like a scanned or image-only PDF — we could not find selectable text in it. Quick fix: open the PDF and try to highlight a sentence; if you cannot, run it through a free OCR tool (e.g. Adobe\u2019s free online OCR or opening it in Google Docs) and upload the result, or upload the original Word (.docx) version instead.'
       });
     }
 
@@ -568,7 +630,7 @@ JSON schema:
 RESUME TEXT:
 ${resumeText}`;
 
-    let parsed = await claudeJSON(prompt, 8000);
+    let parsed = await claudeJSONBig(prompt, 16000);
     parsed = fixDurations(parsed);
     res.json({ success: true, data: parsed });
   } catch (err) {
@@ -592,7 +654,17 @@ ${resumeText}`;
     if (/timeout|timed out|ETIMEDOUT/i.test(msg)) {
       return res.status(504).json({ error: 'The request timed out. Very long resumes can take a while — please try again, or upload a shorter version.' });
     }
-    res.status(500).json({ error: 'We could not read this file. Please try a different format (PDF works best) or a shorter version.' });
+    if (err.code === 'PARSE_TRUNCATED') {
+      return res.status(422).json({
+        error: 'Your file was read successfully, but this resume is exceptionally detailed and exceeded our AI\u2019s output limit even in compact mode. Please trim the oldest roles (or split the document) and upload again — everything from your recent roles will be preserved, and you can add older entries by hand inside the builder.'
+      });
+    }
+    if (err.code === 'PARSE_BADJSON') {
+      return res.status(502).json({
+        error: 'The AI returned an unexpected format while structuring your resume. This is usually a one-off — please click "Choose a different file" and upload the same file again; the second attempt almost always succeeds.'
+      });
+    }
+    res.status(500).json({ error: 'Something went wrong while processing this file. Please try uploading it again; if it keeps failing, export it as a PDF from Word or Google Docs and upload that version.' });
   }
 });
 
@@ -686,7 +758,9 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
+module.exports = { app, _internals: { cleanJSONText, extractText } };
+
+if (require.main === module) app.listen(PORT, () => {
   console.log(`✅ AI Resume Builder running at http://localhost:${PORT}`);
   console.log(`   Model: ${MODEL} | API key configured: ${!!process.env.ANTHROPIC_API_KEY}`);
 });
