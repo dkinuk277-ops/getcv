@@ -985,21 +985,59 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 
 /* ================================================================
-   SECTION DRAG & DROP — handles, arrows, drop indicators
+   SECTION HEADER — 3-zone layout, collapse, DnD
    ================================================================ */
-.sec-order{display:inline-flex;align-items:center;gap:3px;margin-right:9px;vertical-align:middle}
-.sec-grip{cursor:grab;color:#9AA8BC;font-size:15px;letter-spacing:1px;user-select:none;
-  padding:1px 5px;border-radius:6px;line-height:1}
-.sec-grip:hover{background:var(--rv-tint);color:#0B4A31}
+.card[data-seckey] > h2{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:14px;
+  cursor:pointer;
+  transition:background .18s;
+  padding-left:6px;
+}
+.card[data-seckey] > h2::before{display:none}  /* drop the tiny accent square; the left border serves */
+.card[data-seckey] > h2:hover{background:linear-gradient(90deg,rgba(15,169,104,.05),transparent 30%)}
+.sec-title-zone{display:inline-flex;align-items:center;gap:12px;justify-content:center;text-align:center;flex-wrap:wrap;min-width:0}
+/* LEFT tools */
+.sec-tools-left{display:inline-flex;align-items:center;gap:6px}
+.sec-grip{cursor:grab;color:#5F7085;font-size:20px;letter-spacing:1px;user-select:none;
+  padding:4px 8px;border-radius:7px;line-height:1;background:#F1F5F0;border:1.5px solid #D5E1D8;transition:all .18s}
+.sec-grip:hover{background:var(--rv-tint);color:#0B4A31;border-color:#0FA968;transform:scale(1.08)}
 .sec-grip:active{cursor:grabbing}
-.sec-arrow{border:1px solid var(--rv-cardline);background:#fff;color:#0B4A31;font-size:8px;
-  width:18px;height:15px;border-radius:5px;cursor:pointer;padding:0;line-height:1}
-.sec-arrow:hover{background:var(--rv-tint)}
-.sec-note{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
-  background:#F6E9C8;color:#8A5E08;border-radius:99px;padding:2.5px 9px;margin-left:8px;vertical-align:middle}
-.card.dragging{opacity:.45;transform:scale(.99)}
+.sec-arrow{border:1.5px solid #0B4A31;background:#fff;color:#0B4A31;font-size:10px;font-weight:900;
+  width:26px;height:24px;border-radius:6px;cursor:pointer;padding:0;line-height:1;transition:all .18s;font-family:inherit}
+.sec-arrow:hover{background:var(--rv-tint);transform:scale(1.06)}
+.sec-arrow:disabled{opacity:.32;cursor:not-allowed}
+.sec-arrow:disabled:hover{background:#fff;transform:none}
+/* RIGHT tools — bigger toggle + chevron per user request */
+.sec-tools-right{display:inline-flex;align-items:center;gap:14px}
+.card[data-seckey] .sec-switch .slider{width:44px;height:24px}
+.card[data-seckey] .sec-switch .slider::before{width:20px;height:20px}
+.card[data-seckey] .sec-switch input:checked + .slider::before{transform:translateX(20px)}
+.card[data-seckey] .sec-switch .sw-lbl{font-size:11.5px;font-weight:800;color:#0B4A31;text-transform:uppercase;letter-spacing:.06em}
+/* Collapsed (default) — light glossy mint calling for action */
+.sec-chev{background-image:var(--rv-sheen),linear-gradient(180deg,#34C98A,#0FA968);
+  border:1.5px solid #0FA968;color:#fff;font-size:15px;font-weight:900;
+  width:34px;height:30px;border-radius:8px;cursor:pointer;padding:0;line-height:1;
+  transition:all .25s;font-family:inherit;box-shadow:0 3px 8px rgba(15,169,104,.35)}
+.sec-chev:hover{transform:scale(1.06);box-shadow:0 5px 12px rgba(15,169,104,.4)}
+/* Expanded — white, forest text, quietly recessed */
+.card[data-seckey]:not(.collapsed) .sec-chev{background-image:none;background:#fff;color:#0B4A31;
+  border-color:#0B4A31;box-shadow:0 2px 6px rgba(5,61,40,.15) inset, 0 1px 3px rgba(5,61,40,.10);
+  transform:rotate(180deg)}
+.card[data-seckey]:not(.collapsed) .sec-chev:hover{background:var(--rv-tint);transform:rotate(180deg) scale(1.06)}
+/* header-credentials note */
+.sec-note{font-size:9.5px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;
+  background:#F6E9C8;color:#8A5E08;border-radius:99px;padding:3px 10px}
+/* collapse: hide everything after the header */
+.card[data-seckey].collapsed > h2{margin-bottom:0}
+.card[data-seckey].collapsed > *:not(h2){display:none}
+/* drop indicators */
+.card.dragging{opacity:.5}
 .card.dropbefore{box-shadow:0 -3px 0 0 #F2B63C, 0 3px 12px rgba(5,61,40,.10) !important}
 .card.dropafter{box-shadow:0 3px 0 0 #F2B63C, 0 3px 12px rgba(5,61,40,.10) !important}
+/* entry-level (item) grip + arrows */
 .entry-grip{cursor:grab;color:#9AA8BC;font-size:12px;user-select:none;padding:0 4px;border-radius:5px;margin-right:2px}
 .entry-grip:hover{background:var(--rv-tint);color:#0B4A31}
 .entry-grip:active{cursor:grabbing}
