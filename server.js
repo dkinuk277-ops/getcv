@@ -544,6 +544,21 @@ skills_coverage: max 8 entries, focused on the JD's most important requirements.
   } catch (err) {
     console.error('tailor error:', err.message);
     const msg = String(err.message || '');
+    if (/invalid x-api-key|authentication_error|401/i.test(msg)) {
+      return res.status(503).json({
+        error: 'AI service configuration issue: the server\u2019s Anthropic API key is missing or invalid. This is a site setup problem, not a problem with your file \u2014 the administrator needs to restore ANTHROPIC_API_KEY in the hosting environment.'
+      });
+    }
+    if (/credit balance is too low|Plans & Billing/i.test(msg)) {
+      return res.status(503).json({
+        error: 'The AI service is temporarily unavailable: this site\u2019s AI usage credits have run out. This is not a problem with your file \u2014 the site administrator needs to top up credits, after which uploads work immediately. Please try again later or contact the help email below.'
+      });
+    }
+    if (/invalid_request_error|max_tokens/i.test(msg)) {
+      return res.status(502).json({
+        error: 'AI service rejected the request due to a configuration mismatch. This is a site setup problem, not a problem with your file \u2014 please report it via the help email below.'
+      });
+    }
     if (/overloaded|rate|429|529/i.test(msg)) {
       return res.status(503).json({ error: 'The AI service is busy right now. Please wait a minute and try again.' });
     }
@@ -647,6 +662,21 @@ ${resumeText}`;
     }
     if (/scanned|OCR/i.test(msg)) {
       return res.status(422).json({ error: 'This looks like a scanned or image-only PDF. Please upload a text-based PDF or a .docx.' });
+    }
+    if (/invalid x-api-key|authentication_error|401/i.test(msg)) {
+      return res.status(503).json({
+        error: 'AI service configuration issue: the server\u2019s Anthropic API key is missing or invalid. This is a site setup problem, not a problem with your file \u2014 the administrator needs to restore ANTHROPIC_API_KEY in the hosting environment.'
+      });
+    }
+    if (/credit balance is too low|Plans & Billing/i.test(msg)) {
+      return res.status(503).json({
+        error: 'The AI service is temporarily unavailable: this site\u2019s AI usage credits have run out. This is not a problem with your file \u2014 the site administrator needs to top up credits, after which uploads work immediately. Please try again later or contact the help email below.'
+      });
+    }
+    if (/invalid_request_error|max_tokens/i.test(msg)) {
+      return res.status(502).json({
+        error: 'AI service rejected the request due to a configuration mismatch. This is a site setup problem, not a problem with your file \u2014 please report it via the help email below.'
+      });
     }
     if (/overloaded|rate|429|529/i.test(msg)) {
       return res.status(503).json({ error: 'The AI service is busy right now. Please wait a minute and try again.' });
