@@ -212,6 +212,15 @@ async function handleFile(file){
     } else if(/scanned|OCR|image-only/i.test(raw)){
       title = 'This looks like a scanned or image-only PDF.';
       hint = 'Please upload a <b>text-based PDF</b> or a <b>.docx</b> — resumes typed in Word or exported from LinkedIn work best.';
+    } else if(/exceptionally detailed|exceeded our AI/i.test(raw)){
+      title = 'Your resume was read — but it\'s too detailed to structure in one go.';
+      hint = 'Please trim the <b>oldest roles</b> (or split the document) and upload again. Your recent roles keep every bullet — older entries can be added by hand inside the builder.';
+    } else if(/unexpected format while structuring/i.test(raw)){
+      title = 'One-off AI formatting hiccup.';
+      hint = 'Please upload the <b>same file</b> again — the second attempt almost always succeeds.';
+    } else if(/scanned or image-only PDF|could not find selectable text/i.test(raw)){
+      title = 'This looks like a scanned or image-only PDF.';
+      hint = 'Open the PDF and try to <b>highlight a sentence</b>. If you can\'t, run it through a free OCR tool (Adobe\'s free online OCR, or open it in Google Docs) and upload the result — or upload the original <b>.docx</b>.';
     } else if(/AI service is busy|overloaded/i.test(raw)){
       title = 'The AI service is busy right now.';
       hint = 'Please wait a minute and try again — this usually clears quickly.';
