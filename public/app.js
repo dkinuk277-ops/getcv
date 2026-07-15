@@ -41,6 +41,7 @@ function emptyResume(){
   return {
     personal:{name:'',email:'',phone:'',location:'',linkedin:'',website:'',headline:''},
     section_order: DEFAULT_SECTION_ORDER.slice(),
+    section_collapsed: {},
     summary:'',
     experience:[], education:[], skills:[],
     certifications:[], languages:[], projects:[], accomplishments:[], courses:[],
@@ -295,6 +296,7 @@ function normalize(d){
   const so = Array.isArray(d.section_order) ? d.section_order.filter(k=>known.includes(k)) : [];
   known.forEach(k=>{ if(!so.includes(k)) so.push(k); });
   out.section_order = so;
+  out.section_collapsed = (d.section_collapsed && typeof d.section_collapsed === 'object') ? {...d.section_collapsed} : {};
   return out;
 }
 
@@ -766,43 +768,86 @@ function buildEditor(){
   ed.querySelectorAll('.card').forEach((c,i)=>
     c.style.setProperty('--sec', SEC_COLOURS[i % SEC_COLOURS.length]));
 
-  // "In resume" slide switch on every section card
-  const TOGGLABLE = ['summary','skills','certifications','languages','projects','accomplishments','courses','experience','education'];
-  TOGGLABLE.forEach(k=>{
-    const h2 = ed.querySelector('#sec-'+k+' h2');
-    if(!h2) return;
-    const sw = el('label',{class:'switch sec-switch',title:'Slide on/off — show or hide this section in your exported resume'});
-    sw.innerHTML = `<input type="checkbox" data-sec="${k}" ${R.section_prefs[k]!==false?'checked':''}><span class="slider"></span><span class="sw-lbl">In resume</span>`;
-    h2.appendChild(sw);
-    sw.querySelector('input').addEventListener('change', e=>{
-      R.section_prefs[k] = e.target.checked;
-      toast(e.target.checked ? 'Section will appear in your resume' : 'Section hidden from your resume (still editable here)');
-      renderLivePreview();
-    });
+  // start collapsed per persisted state (default: collapsed for a calm workspace)
+  if(!R.section_collapsed || typeof R.section_collapsed !== 'object') R.section_collapsed = {};
+  ed.querySelectorAll('.card[data-seckey]').forEach(c=>{
+    const k = c.dataset.seckey;
+    if(!(k in R.section_collapsed)) R.section_collapsed[k] = true; // default collapsed
+    if(R.section_collapsed[k]) c.classList.add('collapsed');
   });
 
-  // ---- drag handles + up/down arrows on every arrangeable section card ----
+  // ---- restructure every arrangeable section header into: [left tools][centre title][right tools] ----
+  const TOGGLABLE = new Set(['summary','skills','certifications','languages','projects','accomplishments','courses','experience','education']);
+  const order = R.section_order || [];
   ed.querySelectorAll('.card[data-seckey]').forEach(card=>{
     const key = card.dataset.seckey;
     const h2 = card.querySelector('h2');
     if(!h2) return;
-    const ctl = el('span',{class:'sec-order'});
-    ctl.innerHTML = `<span class="sec-grip" draggable="true" title="Drag to rearrange sections">⠿</span>`+
+
+    // wrap all existing children (title text, +Add button, etc.) into a centred title zone
+    const titleZone = el('span',{class:'sec-title-zone'});
+    while(h2.firstChild) titleZone.appendChild(h2.firstChild);
+
+    // LEFT: grip + arrows
+    const left = el('span',{class:'sec-tools-left'});
+    left.innerHTML = `<span class="sec-grip" draggable="true" title="Drag to rearrange sections">⬜⬜</span>`+
       `<button class="sec-arrow" type="button" data-dir="-1" title="Move section up">▲</button>`+
       `<button class="sec-arrow" type="button" data-dir="1" title="Move section down">▼</button>`;
-    h2.insertBefore(ctl, h2.firstChild);
+    // real grip glyph
+    left.querySelector('.sec-grip').textContent = '⣿';
+
+    // header-credentials note appended to the title zone
     if(key==='certifications' || key==='education'){
-      const note = el('span',{class:'sec-note',title:'This section prints in the credentials area under your name — items reorder there'},'header credentials');
-      h2.appendChild(note);
+      titleZone.appendChild(el('span',{class:'sec-note',title:'This section prints in the credentials area under your name — items reorder there'},'header credentials'));
     }
-    ctl.querySelectorAll('.sec-arrow').forEach(b=> b.addEventListener('click', ()=>{
-      const i = R.section_order.indexOf(key), j = i + (+b.dataset.dir);
-      if(j < 0 || j >= R.section_order.length) return;
-      R.section_order.splice(j, 0, R.section_order.splice(i,1)[0]);
+
+    // RIGHT: In-resume switch + chevron
+    const right = el('span',{class:'sec-tools-right'});
+    if(TOGGLABLE.has(key)){
+      const sw = el('label',{class:'switch sec-switch',title:'Show or hide this section in your exported resume'});
+      sw.innerHTML = `<input type="checkbox" data-sec="${key}" ${R.section_prefs[key]!==false?'checked':''}><span class="slider"></span><span class="sw-lbl">In resume</span>`;
+      right.appendChild(sw);
+      sw.querySelector('input').addEventListener('change', e=>{
+        R.section_prefs[key] = e.target.checked;
+        toast(e.target.checked ? 'Section will appear in your resume' : 'Section hidden from your resume (still editable here)');
+        renderLivePreview();
+      });
+    }
+    const chev = el('button',{class:'sec-chev',type:'button',title:'Expand / collapse this section'},'▾');
+    right.appendChild(chev);
+
+    // reassemble
+    h2.appendChild(left);
+    h2.appendChild(titleZone);
+    h2.appendChild(right);
+
+    // collapse behaviour: clicking the header (outside tools) toggles; chevron does the same
+    const toggleCollapse = ()=>{
+      const wasCollapsed = card.classList.contains('collapsed');
+      card.classList.toggle('collapsed', !wasCollapsed);
+      R.section_collapsed[key] = !wasCollapsed;
+    };
+    h2.style.cursor = 'pointer';
+    h2.addEventListener('click', e=>{
+      if(e.target.closest('.sec-tools-left, .sec-tools-right, button, label, input, .switch, .add-btn, .ai-btn')) return;
+      toggleCollapse();
+    });
+    chev.addEventListener('click', e=>{ e.stopPropagation(); toggleCollapse(); });
+
+    // arrows
+    left.querySelectorAll('.sec-arrow').forEach(b=> b.addEventListener('click', e=>{
+      e.stopPropagation();
+      const i = order.indexOf(key), j = i + (+b.dataset.dir);
+      if(j < 0 || j >= order.length) return;
+      order.splice(j, 0, order.splice(i,1)[0]);
       buildEditor(); flashPreviewSection(key);
       const nc = $('#editor .card[data-seckey="'+key+'"]'); if(nc && typeof nc.scrollIntoView === 'function') nc.scrollIntoView({block:'nearest'});
     }));
-    const grip = ctl.querySelector('.sec-grip');
+    // disable arrows at the edges
+    const idx = order.indexOf(key);
+    if(idx === 0) left.querySelector('.sec-arrow[data-dir="-1"]').disabled = true;
+    if(idx === order.length - 1) left.querySelector('.sec-arrow[data-dir="1"]').disabled = true;
+    const grip = left.querySelector('.sec-grip');
     grip.addEventListener('dragstart', e=>{
       _secDrag = key; card.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';

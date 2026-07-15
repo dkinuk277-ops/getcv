@@ -1048,6 +1048,14 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 .entry.dropbefore{box-shadow:0 -2.5px 0 0 #F2B63C}
 .entry.dropafter{box-shadow:0 2.5px 0 0 #F2B63C}
 
+
+/* ================================================================
+   Arrow visibility — desktop uses drag, mobile uses arrows
+   ================================================================ */
+@media (min-width: 768px){
+  .sec-arrow, .entry-arrow{ display:none !important; }
+}
+
 </style>
 </head>
 <body>
