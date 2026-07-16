@@ -985,59 +985,66 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 
 /* ================================================================
-   SECTION HEADER — 3-zone layout, collapse, DnD
+   SECTION BARS — slim grouped headers, centred titles, collapse, DnD
    ================================================================ */
+/* group captions */
+.sec-grpcap{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.11em;color:#0B4A31;
+  margin:16px 2px 7px;display:flex;align-items:center;gap:9px}
+.sec-grpcap::after{content:"";flex:1;height:1.5px;background:linear-gradient(90deg,var(--rv-cardline,#9BD8B9),transparent)}
+.sec-grpcap .gtag{font-size:8.5px;background:#F6E9C8;color:#8A5E08;border-radius:99px;padding:2px 8px;letter-spacing:.05em}
+/* slim card shell */
+.card[data-seckey]{padding:0;border-radius:10px;border-top:none;border-left:4px solid var(--sec,var(--accent));
+  margin-bottom:7px;box-shadow:0 2px 8px rgba(5,61,40,.09)}
+.card[data-seckey] > *:not(h2){margin-left:16px;margin-right:16px}
+.card[data-seckey] > *:last-child:not(h2){margin-bottom:16px}
+/* slim header: absolute-centred title, tools at edges */
 .card[data-seckey] > h2{
-  display:grid;
-  grid-template-columns:auto 1fr auto;
-  align-items:center;
-  gap:14px;
-  cursor:pointer;
-  transition:background .18s;
-  padding-left:6px;
+  position:relative;display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;margin:0;min-height:44px;font-size:16px;
+  cursor:pointer;transition:background .18s;
 }
-.card[data-seckey] > h2::before{display:none}  /* drop the tiny accent square; the left border serves */
-.card[data-seckey] > h2:hover{background:linear-gradient(90deg,rgba(15,169,104,.05),transparent 30%)}
-.sec-title-zone{display:inline-flex;align-items:center;gap:12px;justify-content:center;text-align:center;flex-wrap:wrap;min-width:0}
+.card[data-seckey] > h2::before{display:none}
+.card[data-seckey] > h2:hover{background:linear-gradient(90deg,rgba(15,169,104,.05),transparent 35%)}
+.sec-title-zone{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  display:inline-flex;align-items:center;gap:8px;white-space:nowrap;max-width:60%;overflow:hidden}
 /* LEFT tools */
-.sec-tools-left{display:inline-flex;align-items:center;gap:6px}
-.sec-grip{cursor:grab;color:#5F7085;font-size:20px;letter-spacing:1px;user-select:none;
-  padding:4px 8px;border-radius:7px;line-height:1;background:#F1F5F0;border:1.5px solid #D5E1D8;transition:all .18s}
-.sec-grip:hover{background:var(--rv-tint);color:#0B4A31;border-color:#0FA968;transform:scale(1.08)}
+.sec-tools-left{display:inline-flex;align-items:center;gap:5px;z-index:1}
+.sec-grip{cursor:grab;color:#5F7085;font-size:15px;letter-spacing:1px;user-select:none;
+  padding:3px 6px;border-radius:6px;line-height:1;background:#F1F5F0;border:1.5px solid #D5E1D8;transition:all .18s}
+.sec-grip:hover{background:var(--rv-tint);color:#0B4A31;border-color:#0FA968;transform:scale(1.07)}
 .sec-grip:active{cursor:grabbing}
-.sec-arrow{border:1.5px solid #0B4A31;background:#fff;color:#0B4A31;font-size:10px;font-weight:900;
-  width:26px;height:24px;border-radius:6px;cursor:pointer;padding:0;line-height:1;transition:all .18s;font-family:inherit}
+.sec-grip.ghost{visibility:hidden}
+.sec-arrow{border:1.5px solid #0B4A31;background:#fff;color:#0B4A31;font-size:9px;font-weight:900;
+  width:24px;height:22px;border-radius:6px;cursor:pointer;padding:0;line-height:1;transition:all .18s;font-family:inherit}
 .sec-arrow:hover{background:var(--rv-tint);transform:scale(1.06)}
 .sec-arrow:disabled{opacity:.32;cursor:not-allowed}
 .sec-arrow:disabled:hover{background:#fff;transform:none}
-/* RIGHT tools — bigger toggle + chevron per user request */
-.sec-tools-right{display:inline-flex;align-items:center;gap:14px}
-.card[data-seckey] .sec-switch .slider{width:44px;height:24px}
-.card[data-seckey] .sec-switch .slider::before{width:20px;height:20px}
-.card[data-seckey] .sec-switch input:checked + .slider::before{transform:translateX(20px)}
-.card[data-seckey] .sec-switch .sw-lbl{font-size:11.5px;font-weight:800;color:#0B4A31;text-transform:uppercase;letter-spacing:.06em}
-/* Collapsed (default) — light glossy mint calling for action */
+/* RIGHT tools */
+.sec-tools-right{display:inline-flex;align-items:center;gap:10px;z-index:1}
+.card[data-seckey] .sec-switch .slider{width:38px;height:21px}
+.card[data-seckey] .sec-switch .slider::before{width:17px;height:17px}
+.card[data-seckey] .sec-switch input:checked + .slider::before{transform:translateX(17px)}
+.card[data-seckey] .sec-switch .sw-lbl{font-size:10px;font-weight:800;color:#0B4A31;text-transform:uppercase;letter-spacing:.06em}
+/* chevron: light mint when collapsed, white when expanded */
 .sec-chev{background-image:var(--rv-sheen),linear-gradient(180deg,#34C98A,#0FA968);
-  border:1.5px solid #0FA968;color:#fff;font-size:15px;font-weight:900;
-  width:34px;height:30px;border-radius:8px;cursor:pointer;padding:0;line-height:1;
-  transition:all .25s;font-family:inherit;box-shadow:0 3px 8px rgba(15,169,104,.35)}
-.sec-chev:hover{transform:scale(1.06);box-shadow:0 5px 12px rgba(15,169,104,.4)}
-/* Expanded — white, forest text, quietly recessed */
+  border:1.5px solid #0FA968;color:#fff;font-size:13px;font-weight:900;
+  width:30px;height:26px;border-radius:7px;cursor:pointer;padding:0;line-height:1;
+  transition:all .25s;font-family:inherit;box-shadow:0 2px 6px rgba(15,169,104,.35)}
+.sec-chev:hover{transform:scale(1.07);box-shadow:0 4px 10px rgba(15,169,104,.4)}
 .card[data-seckey]:not(.collapsed) .sec-chev{background-image:none;background:#fff;color:#0B4A31;
-  border-color:#0B4A31;box-shadow:0 2px 6px rgba(5,61,40,.15) inset, 0 1px 3px rgba(5,61,40,.10);
-  transform:rotate(180deg)}
-.card[data-seckey]:not(.collapsed) .sec-chev:hover{background:var(--rv-tint);transform:rotate(180deg) scale(1.06)}
+  border-color:#0B4A31;box-shadow:0 2px 5px rgba(5,61,40,.13) inset;transform:rotate(180deg)}
+.card[data-seckey]:not(.collapsed) .sec-chev:hover{background:var(--rv-tint);transform:rotate(180deg) scale(1.07)}
 /* header-credentials note */
-.sec-note{font-size:9.5px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;
-  background:#F6E9C8;color:#8A5E08;border-radius:99px;padding:3px 10px}
-/* collapse: hide everything after the header */
+.sec-note{font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;
+  background:#F6E9C8;color:#8A5E08;border-radius:99px;padding:2px 8px}
+/* collapse */
 .card[data-seckey].collapsed > h2{margin-bottom:0}
 .card[data-seckey].collapsed > *:not(h2){display:none}
 /* drop indicators */
 .card.dragging{opacity:.5}
-.card.dropbefore{box-shadow:0 -3px 0 0 #F2B63C, 0 3px 12px rgba(5,61,40,.10) !important}
-.card.dropafter{box-shadow:0 3px 0 0 #F2B63C, 0 3px 12px rgba(5,61,40,.10) !important}
-/* entry-level (item) grip + arrows */
+.card.dropbefore{box-shadow:0 -3px 0 0 #F2B63C, 0 2px 8px rgba(5,61,40,.09) !important}
+.card.dropafter{box-shadow:0 3px 0 0 #F2B63C, 0 2px 8px rgba(5,61,40,.09) !important}
+/* entry-level grips + arrows */
 .entry-grip{cursor:grab;color:#9AA8BC;font-size:12px;user-select:none;padding:0 4px;border-radius:5px;margin-right:2px}
 .entry-grip:hover{background:var(--rv-tint);color:#0B4A31}
 .entry-grip:active{cursor:grabbing}
@@ -1055,6 +1062,67 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 @media (min-width: 768px){
   .sec-arrow, .entry-arrow{ display:none !important; }
 }
+
+
+/* ============ TAILOR PEEK DEMO (landing) ============ */
+.ldt2-stage{background:#fff;border-radius:16px;box-shadow:0 14px 40px rgba(5,61,40,.16);
+  padding:20px 22px 18px;position:relative;overflow:hidden;min-height:400px}
+.ldt2-tag{position:absolute;top:12px;right:14px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.09em;
+  background:var(--rv-tint);color:#0B4A31;border-radius:99px;padding:4px 12px;z-index:2}
+.ldt2-jdrow{display:flex;gap:10px;align-items:stretch;margin-bottom:12px}
+.ldt2-jd{flex:1;border:1.5px dashed var(--rv-cardline,#9BD8B9);border-radius:10px;background:#F8FBF9;padding:10px 13px;
+  font-size:12.5px;color:#4A5B76;min-height:54px;line-height:1.5;text-align:left}
+.ldt2-jd .ph{opacity:.55}
+.ldt2-jd .typed{color:#12233F;font-weight:600}
+.ldt2-jd .caret{display:inline-block;width:1.5px;height:13px;background:#0B4A31;vertical-align:-2px;animation:ldt2blink .8s infinite}
+@keyframes ldt2blink{50%{opacity:0}}
+.ldt2-btn{align-self:flex-end;background-image:var(--rv-sheen),linear-gradient(180deg,#34C98A,#0FA968);
+  color:#fff;font-weight:900;font-size:13px;border:none;border-radius:9px;padding:11px 18px;cursor:pointer;
+  box-shadow:0 4px 12px rgba(15,169,104,.4);white-space:nowrap;transition:transform .15s;font-family:inherit}
+.ldt2-btn.pressed{transform:scale(.94)}
+.ldt2-an{display:none;align-items:center;gap:10px;font-size:12.5px;font-weight:700;color:#0B4A31;margin:2px 0 10px;text-align:left}
+.ldt2-an.on{display:flex}
+.ldt2-spin{width:16px;height:16px;border-radius:50%;border:2.5px solid var(--rv-tint);border-top-color:#0FA968;animation:ldt2sp 1s linear infinite}
+@keyframes ldt2sp{to{transform:rotate(360deg)}}
+.ldt2-diffs{display:grid;gap:9px}
+.ldt2-chg{border-radius:10px;padding:10px 13px;font-size:12.5px;line-height:1.55;opacity:0;transform:translateY(8px);transition:all .45s;position:relative;text-align:left}
+.ldt2-chg.show{opacity:1;transform:none}
+.ldt2-chg.old{background:#FBE9E7;color:#B23A2A;text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:#D9534F;font-weight:600}
+.ldt2-chg.new{background:#E9F8F0;color:#053D28;border-left:3.5px solid #0FA968;font-weight:600}
+.ldt2-chg.new .newtext{filter:blur(2.2px);user-select:none;display:inline-block;transition:filter .3s}
+.ldt2-chg.old{transition:box-shadow .25s}
+/* selection sweep highlight as the cursor 'selects' the old line */
+.ldt2-chg.old.selecting{background:#FFF4CE;box-shadow:0 0 0 2px #F2B63C}
+.ldt2-chg.old.selecting::selection{background:#F7DA8A}
+.ldt2-chg .why{position:absolute;top:-9px;right:10px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.05em;
+  background:linear-gradient(180deg,#FFD070,#F2B63C);color:#3C2A02;border-radius:99px;padding:2.5px 9px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.ldt2-chg .kw{background:#CBF3DF;border-radius:4px;padding:0 3px;font-weight:800}
+.ldt2-rev{display:flex;gap:7px;margin-top:8px}
+.ldt2-rev button{font-size:10.5px;font-weight:900;border-radius:7px;padding:5px 12px;cursor:pointer;border:1.5px solid #0B4A31;background:#fff;color:#0B4A31;transition:all .2s;font-family:inherit}
+.ldt2-rev .acc{background-image:var(--rv-sheen),linear-gradient(180deg,#34C98A,#0FA968);color:#fff;border-color:#0FA968}
+.ldt2-rev button.pressed{transform:scale(.92)}
+.ldt2-chg.accepted{box-shadow:0 0 0 2px #0FA968}
+.ldt2-chg.accepted::after{content:"\2713 Accepted";position:absolute;bottom:-8px;right:10px;font-size:9px;font-weight:900;
+  background:#0B4A31;color:#fff;border-radius:99px;padding:2.5px 9px}
+.ldt2-score{display:flex;align-items:center;gap:16px;margin-top:16px;opacity:0;transition:opacity .5s;text-align:left}
+.ldt2-score.show{opacity:1}
+.ldt2-ring{width:74px;height:74px;position:relative;flex-shrink:0}
+.ldt2-ring svg{transform:rotate(-90deg)}
+.ldt2-ring .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px;color:#0B4A31}
+.ldt2-stxt{font-size:13px;color:#4A5B76;line-height:1.55}
+.ldt2-stxt b{color:#12233F}
+.ldt2-stxt .up{color:#0FA968;font-weight:900}
+.ldt2-applybar{margin-top:14px;display:flex;justify-content:flex-end;opacity:0;transition:opacity .4s}
+.ldt2-applybar.show{opacity:1}
+.ldt2-apply{background-image:var(--rv-sheen),linear-gradient(180deg,#FFD070,#F2B63C);color:#3C2A02;font-weight:900;font-size:13px;
+  border:none;border-radius:9px;padding:11px 20px;cursor:pointer;box-shadow:0 4px 12px rgba(242,182,60,.45);transition:transform .15s;font-family:inherit}
+.ldt2-apply.pressed{transform:scale(.94)}
+.ldt2-done{position:absolute;inset:0;background:rgba(255,255,255,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;opacity:0;pointer-events:none;transition:opacity .5s;z-index:3}
+.ldt2-done.show{opacity:1}
+.ldt2-done .big{font-size:44px}
+.ldt2-done .t{font-family:Fraunces,serif;font-size:22px;font-weight:900;color:#0B4A31}
+.ldt2-done .s{font-size:12.5px;color:#4A5B76}
 
 </style>
 </head>
@@ -1229,17 +1297,36 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   </section>
   <section class="ld-tailor" id="ld-tailor">
     <h2>Watch the <span style="color:var(--rv-main)">Tailor AI</span> work</h2>
-    <div class="ld-tdemo" id="ldTdemo">
-      <span class="ld-jd">&#128203; Job: Senior Risk &amp; Assurance Manager &mdash; requires TPRM, ISO 27001, C-level reporting</span>
-      <div class="ld-dline old">Responsible for various risk management tasks and vendor assessments across the organisation.</div>
-      <div class="ld-dline new">Led TPRM assessments for 40+ vendors and owned ISO 27001 end-to-end, presenting risk posture and remediation roadmaps to C-level stakeholders.</div>
-      <div class="ld-match">
-        <div class="ld-mring">
-          <svg width="60" height="60" viewBox="0 0 60 60"><circle class="b" cx="30" cy="30" r="24"/><circle class="a" cx="30" cy="30" r="24"/></svg>
-          <b>78%</b>
-        </div>
-        <p><b>Match score before you apply.</b> Reeve shows exactly what the job wants, what you have, and what changed &mdash; you approve every edit.</p>
+    <div class="ldt2-stage" id="ldt2Stage">
+      <div class="ldt2-tag" id="ldt2Tag">1 &middot; Paste the job</div>
+      <div class="ldt2-jdrow">
+        <div class="ldt2-jd" id="ldt2Jd"><span class="ph" id="ldt2Ph">Paste any job description&hellip;</span><span class="typed" id="ldt2Typed"></span><span class="caret" id="ldt2Caret" style="display:none"></span></div>
+        <button class="ldt2-btn" id="ldt2Btn" type="button">&#127919; Tailor with AI</button>
       </div>
+      <div class="ldt2-an" id="ldt2An"><span class="ldt2-spin"></span> Reading the JD&hellip; matching your experience&hellip;</div>
+      <div class="ldt2-diffs">
+        <div class="ldt2-chg old" id="ldt2Old1">Responsible for various risk management tasks and vendor assessments across the organisation.</div>
+        <div class="ldt2-chg new" id="ldt2New1"><span class="why">&#10022; tailored to the JD</span>
+          <span class="newtext">Led enterprise GRC transformation across 3 business units, owning ISO 27001 end-to-end and presenting risk posture to C-level stakeholders every quarter.</span>
+          <div class="ldt2-rev" id="ldt2Rev1"><button class="acc" id="ldt2Acc1" type="button">&#10003; Accept</button><button type="button">Keep original</button></div>
+        </div>
+        <div class="ldt2-chg new" id="ldt2New2"><span class="why">&#10022; keyword added</span>
+          <span class="newtext">Built the vendor risk assurance programme adopted org-wide, cutting assessment turnaround by 40%.</span>
+          <div class="ldt2-rev" id="ldt2Rev2"><button class="acc" id="ldt2Acc2" type="button">&#10003; Accept</button><button type="button">Keep original</button></div>
+        </div>
+      </div>
+      <div class="ldt2-score" id="ldt2Score">
+        <div class="ldt2-ring">
+          <svg width="74" height="74"><circle cx="37" cy="37" r="31" fill="none" stroke="#E3EFE7" stroke-width="7"/>
+          <circle id="ldt2Arc" cx="37" cy="37" r="31" fill="none" stroke="#0FA968" stroke-width="7" stroke-linecap="round" stroke-dasharray="195" stroke-dashoffset="195"/></svg>
+          <div class="val" id="ldt2Val">60%</div>
+        </div>
+        <div class="ldt2-stxt"><b>Match score: <span class="up">60% &rarr; 95%</span> after tailoring.</b><br>
+        Reeve shows what the job wants, what you have, and exactly what changed &mdash; <b>you approve every edit</b>.</div>
+      </div>
+      <div class="ldt2-applybar" id="ldt2ApplyBar"><button class="ldt2-apply" id="ldt2Apply" type="button">Apply to my resume &rarr;</button></div>
+      <div class="ldt2-done" id="ldt2Done"><div class="big">&#127919;</div><div class="t">Tailored &amp; ready to send</div><div class="s">Every change reviewed by you &mdash; nothing invented, nothing lost.</div></div>
+      <div class="ldp-cur" id="ldt2Cur"><svg width="15" height="15" viewBox="0 0 15 15"><path d="M1 1 L1 12 L4.2 9.4 L6.2 14 L8.4 13 L6.4 8.6 L10.5 8.3 Z" fill="#12233F" stroke="#fff" stroke-width="1"/></svg></div>
     </div>
   </section>
   <section class="ld-ctaband">

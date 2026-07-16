@@ -5,6 +5,7 @@ const API = ''; // same origin; set to full URL if frontend hosted separately
 
 // ---------- State ----------
 const DEFAULT_SECTION_ORDER = ['skills','certifications','languages','projects','accomplishments','courses','summary','experience','education'];
+const CRED_KEYS = ['certifications','education']; // print in the header credentials area — grouped at top of the editor
 
 let R = emptyResume();
 
@@ -758,10 +759,13 @@ function buildEditor(){
   // Career insights at the very top (only if we have experience)
   if(R.experience.length) ed.appendChild(insightsCard());
 
-  // Always show every section — user-arranged order, personal pinned first
+  // Always show every section — grouped: personal (pinned) → header credentials → resume body
   if(!Array.isArray(R.section_order) || !R.section_order.length) R.section_order = DEFAULT_SECTION_ORDER.slice();
-  ed.appendChild(personalCard());
-  R.section_order.forEach(key => {
+  const pCard = personalCard();
+  pCard.setAttribute('data-seckey', 'personal');
+  ed.appendChild(pCard);
+
+  const makeCard = (key) => {
     let card;
     if(key === 'summary') card = summaryCard();
     else if(key === 'skills') card = skillsCard();
@@ -769,8 +773,14 @@ function buildEditor(){
     else if(key === 'accomplishments') card = linesCard('accomplishments','Accomplishments','e.g. Reduced audit findings by 40% year-on-year');
     else card = listCard(key);
     card.setAttribute('data-seckey', key);
-    ed.appendChild(card);
-  });
+    return card;
+  };
+  const credKeys = R.section_order.filter(k => CRED_KEYS.includes(k));
+  const bodyKeys = R.section_order.filter(k => !CRED_KEYS.includes(k));
+  ed.appendChild(el('div',{class:'sec-grpcap'},'Header credentials <span class="gtag">print under your name</span>'));
+  credKeys.forEach(k => ed.appendChild(makeCard(k)));
+  ed.appendChild(el('div',{class:'sec-grpcap'},'Resume body <span class="gtag">drag to arrange print order</span>'));
+  bodyKeys.forEach(k => ed.appendChild(makeCard(k)));
   R.extra_sections.forEach((sec,i)=> ed.appendChild(extraCard(sec,i)));
 
   // paint each card with its own accent colour
@@ -785,11 +795,14 @@ function buildEditor(){
     if(R.section_collapsed[k]) c.classList.add('collapsed');
   });
 
-  // ---- restructure every arrangeable section header into: [left tools][centre title][right tools] ----
+  // ---- restructure every section header into: [left tools][centred title][right tools] ----
   const TOGGLABLE = new Set(['summary','skills','certifications','languages','projects','accomplishments','courses','experience','education']);
   const order = R.section_order || [];
+  const groupOf = k => CRED_KEYS.includes(k) ? 'cred' : 'body';
+  const groupKeys = k => order.filter(x => groupOf(x) === groupOf(k));
   ed.querySelectorAll('.card[data-seckey]').forEach(card=>{
     const key = card.dataset.seckey;
+    const pinned = (key === 'personal');
     const h2 = card.querySelector('h2');
     if(!h2) return;
 
@@ -797,13 +810,15 @@ function buildEditor(){
     const titleZone = el('span',{class:'sec-title-zone'});
     while(h2.firstChild) titleZone.appendChild(h2.firstChild);
 
-    // LEFT: grip + arrows
+    // LEFT: grip + arrows (pinned card gets an invisible spacer so the title stays centred)
     const left = el('span',{class:'sec-tools-left'});
-    left.innerHTML = `<span class="sec-grip" draggable="true" title="Drag to rearrange sections">⬜⬜</span>`+
-      `<button class="sec-arrow" type="button" data-dir="-1" title="Move section up">▲</button>`+
-      `<button class="sec-arrow" type="button" data-dir="1" title="Move section down">▼</button>`;
-    // real grip glyph
-    left.querySelector('.sec-grip').textContent = '⣿';
+    if(pinned){
+      left.innerHTML = `<span class="sec-grip ghost">⣿</span>`;
+    } else {
+      left.innerHTML = `<span class="sec-grip" draggable="true" title="Drag to rearrange sections">⣿</span>`+
+        `<button class="sec-arrow" type="button" data-dir="-1" title="Move section up">▲</button>`+
+        `<button class="sec-arrow" type="button" data-dir="1" title="Move section down">▼</button>`;
+    }
 
     // header-credentials note appended to the title zone
     if(key==='certifications' || key==='education'){
@@ -812,7 +827,7 @@ function buildEditor(){
 
     // RIGHT: In-resume switch + chevron
     const right = el('span',{class:'sec-tools-right'});
-    if(TOGGLABLE.has(key)){
+    if(!pinned && TOGGLABLE.has(key)){
       const sw = el('label',{class:'switch sec-switch',title:'Show or hide this section in your exported resume'});
       sw.innerHTML = `<input type="checkbox" data-sec="${key}" ${R.section_prefs[key]!==false?'checked':''}><span class="slider"></span><span class="sw-lbl">In resume</span>`;
       right.appendChild(sw);
@@ -843,19 +858,24 @@ function buildEditor(){
     });
     chev.addEventListener('click', e=>{ e.stopPropagation(); toggleCollapse(); });
 
-    // arrows
-    left.querySelectorAll('.sec-arrow').forEach(b=> b.addEventListener('click', e=>{
+    // arrows — move within THIS group only (swap with same-group neighbour)
+    if(!pinned) left.querySelectorAll('.sec-arrow').forEach(b=> b.addEventListener('click', e=>{
       e.stopPropagation();
-      const i = order.indexOf(key), j = i + (+b.dataset.dir);
-      if(j < 0 || j >= order.length) return;
-      order.splice(j, 0, order.splice(i,1)[0]);
+      const gk = groupKeys(key);
+      const gi = gk.indexOf(key), gj = gi + (+b.dataset.dir);
+      if(gj < 0 || gj >= gk.length) return;
+      const a = order.indexOf(key), bIdx = order.indexOf(gk[gj]);
+      order[a] = gk[gj]; order[bIdx] = key;   // swap positions in the master order
       buildEditor(); flashPreviewSection(key);
       const nc = $('#editor .card[data-seckey="'+key+'"]'); if(nc && typeof nc.scrollIntoView === 'function') nc.scrollIntoView({block:'nearest'});
     }));
-    // disable arrows at the edges
-    const idx = order.indexOf(key);
-    if(idx === 0) left.querySelector('.sec-arrow[data-dir="-1"]').disabled = true;
-    if(idx === order.length - 1) left.querySelector('.sec-arrow[data-dir="1"]').disabled = true;
+    // disable arrows at the edges of the group
+    if(!pinned){
+      const gk = groupKeys(key), gi = gk.indexOf(key);
+      if(gi === 0) left.querySelector('.sec-arrow[data-dir="-1"]').disabled = true;
+      if(gi === gk.length - 1) left.querySelector('.sec-arrow[data-dir="1"]').disabled = true;
+    }
+    if(pinned) return; // pinned card: chevron + collapse only — no drag
     const grip = left.querySelector('.sec-grip');
     grip.addEventListener('dragstart', e=>{
       _secDrag = key; card.classList.add('dragging');
@@ -864,7 +884,7 @@ function buildEditor(){
     });
     grip.addEventListener('dragend', ()=>{ _secDrag = null; ed.querySelectorAll('.card').forEach(c=>c.classList.remove('dragging','dropbefore','dropafter')); });
     card.addEventListener('dragover', e=>{
-      if(!_secDrag || _secDrag === key) return;
+      if(!_secDrag || _secDrag === key || groupOf(_secDrag) !== groupOf(key)) return;
       e.preventDefault();
       const r = card.getBoundingClientRect(), before = (e.clientY - r.top) < r.height/2;
       card.classList.toggle('dropbefore', before);
@@ -872,7 +892,7 @@ function buildEditor(){
     });
     card.addEventListener('dragleave', ()=> card.classList.remove('dropbefore','dropafter'));
     card.addEventListener('drop', e=>{
-      if(!_secDrag || _secDrag === key) return;
+      if(!_secDrag || _secDrag === key || groupOf(_secDrag) !== groupOf(key)) return;
       e.preventDefault();
       const r = card.getBoundingClientRect(), before = (e.clientY - r.top) < r.height/2;
       const moved = _secDrag; _secDrag = null;
@@ -889,6 +909,8 @@ function buildEditor(){
 // ---- shared reorder logic: used by drag-drop AND arrows ----
 let _secDrag = null;
 function reorderSection(fromKey, toKey, before){
+  const credA = CRED_KEYS.includes(fromKey), credB = CRED_KEYS.includes(toKey);
+  if(credA !== credB) return; // sections cannot cross between credential and body groups
   const so = R.section_order;
   const fi = so.indexOf(fromKey); if(fi < 0) return;
   so.splice(fi,1);
@@ -2611,6 +2633,104 @@ function initLanding(){
       }, {threshold:.25});
       dio.observe(ldpApp);
     } else startDemo();
+  }
+
+  // Tailor peek demo: cursor pastes a JD, tailors, reviews & accepts changes,
+  // score ring climbs 42→82, apply. Starts on first visibility, loops forever.
+  const ldt2Stage = document.getElementById('ldt2Stage');
+  if(ldt2Stage){
+    const sleep = ms => new Promise(r=>setTimeout(r, ms));
+    const cur = document.getElementById('ldt2Cur');
+    const g = id => document.getElementById(id);
+    const JD_TEXT = 'Program Manager \u2014 GRC & Risk Transformation. Requires stakeholder leadership, ISO 27001, audit & C-level reporting\u2026';
+    const moveCur = (el, dx=0, dy=4)=>{
+      if(!el || !cur) return;
+      const a = ldt2Stage.getBoundingClientRect(), b = el.getBoundingClientRect();
+      cur.style.left = (b.left - a.left + b.width/2 + dx) + 'px';
+      cur.style.top  = (b.top - a.top + b.height/2 + dy) + 'px';
+    };
+    const clickFx = ()=>{ if(!cur) return; cur.classList.remove('click'); void cur.offsetWidth; cur.classList.add('click'); };
+    const press = el => { el.classList.add('pressed'); setTimeout(()=>el.classList.remove('pressed'), 250); };
+    async function typeJD(){
+      g('ldt2Ph').style.display = 'none';
+      g('ldt2Caret').style.display = 'inline-block';
+      const t = g('ldt2Typed'); t.textContent = '';
+      for(let i=0;i<JD_TEXT.length;i+=3){ t.textContent = JD_TEXT.slice(0,i+3); await sleep(22); }
+      g('ldt2Caret').style.display = 'none';
+    }
+    async function climbScore(from, to){
+      const arc = g('ldt2Arc'), val = g('ldt2Val'), C = 195;
+      for(let v=from; v<=to; v++){
+        val.textContent = v + '%';
+        arc.style.strokeDashoffset = C - (C * v/100);
+        await sleep(26);
+      }
+    }
+    function resetT(){
+      g('ldt2Ph').style.display=''; g('ldt2Typed').textContent=''; g('ldt2Caret').style.display='none';
+      g('ldt2An').classList.remove('on');
+      ['ldt2Old1','ldt2New1','ldt2New2'].forEach(id=>g(id).classList.remove('show','accepted','selecting'));
+      g('ldt2Score').classList.remove('show'); g('ldt2ApplyBar').classList.remove('show'); g('ldt2Done').classList.remove('show');
+      g('ldt2Arc').style.strokeDashoffset = 195; g('ldt2Val').textContent = '60%';
+      g('ldt2Rev1').style.display=''; g('ldt2Rev2').style.display='';
+      if(cur){ cur.style.left='60px'; cur.style.top='70px'; }
+    }
+    async function tLoop(){
+      while(true){
+        resetT();
+        g('ldt2Tag').textContent = '1 \u00b7 Paste the job';
+        await sleep(900);
+        moveCur(g('ldt2Jd'), -40, -6); await sleep(1200); clickFx();
+        await typeJD();
+        await sleep(350);
+
+        g('ldt2Tag').textContent = '2 \u00b7 One click';
+        moveCur(g('ldt2Btn')); await sleep(1200); clickFx(); press(g('ldt2Btn'));
+        g('ldt2An').classList.add('on');
+        await sleep(1900);
+        g('ldt2An').classList.remove('on');
+
+        g('ldt2Tag').textContent = '3 \u00b7 See every change';
+        g('ldt2Old1').classList.add('show'); await sleep(500);
+        g('ldt2New1').classList.add('show'); await sleep(500);
+        g('ldt2New2').classList.add('show');
+        await sleep(700);
+
+        // cursor sweeps across the replaceable red line to 'select' it
+        g('ldt2Tag').textContent = '4 \u00b7 Spot what\u2019s replaceable';
+        moveCur(g('ldt2Old1'), -120, 0); await sleep(1000);
+        g('ldt2Old1').classList.add('selecting');
+        moveCur(g('ldt2Old1'), 150, 0); await sleep(1100);
+        await sleep(500);
+        g('ldt2Old1').classList.remove('selecting');
+
+        g('ldt2Tag').textContent = '5 \u00b7 You approve each edit';
+        moveCur(g('ldt2Acc1')); await sleep(1200); clickFx(); press(g('ldt2Acc1')); await sleep(240);
+        g('ldt2New1').classList.add('accepted'); g('ldt2Rev1').style.display='none';
+        await sleep(600);
+        moveCur(g('ldt2Acc2')); await sleep(1100); clickFx(); press(g('ldt2Acc2')); await sleep(240);
+        g('ldt2New2').classList.add('accepted'); g('ldt2Rev2').style.display='none';
+        await sleep(500);
+
+        g('ldt2Tag').textContent = '6 \u00b7 Match score climbs';
+        g('ldt2Score').classList.add('show');
+        await climbScore(60, 95);
+        await sleep(700);
+
+        g('ldt2Tag').textContent = '7 \u00b7 Apply';
+        g('ldt2ApplyBar').classList.add('show');
+        moveCur(g('ldt2Apply')); await sleep(1200); clickFx(); press(g('ldt2Apply')); await sleep(260);
+        g('ldt2Done').classList.add('show');
+        await sleep(2600);
+      }
+    }
+    const startT = ()=>{ resetT(); tLoop(); };
+    if(typeof IntersectionObserver !== 'undefined'){
+      const tio = new IntersectionObserver(es=>{
+        es.forEach(e=>{ if(e.isIntersecting){ startT(); tio.unobserve(e.target); } });
+      }, {threshold:.25});
+      tio.observe(ldt2Stage);
+    } else startT();
   }
 
   // Options D+E+G: scroll-triggered reveal, timeline line, tailor demo
