@@ -1018,7 +1018,7 @@ function renderRail(){
   ];
   items.forEach((it,idx)=>{
     const b = el('button',{class:'rail-item'+(it.on?' detected':''),type:'button','data-anchor':it.anchor},
-      `<span class="dot"></span>${esc(it.label)}`);
+      `${esc(it.label)}`);
     b.style.setProperty('--sec', SEC_COLOURS[idx % SEC_COLOURS.length]);
     rail.appendChild(b);
   });

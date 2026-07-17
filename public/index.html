@@ -113,10 +113,9 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
 .rail-item:hover{transform:translateX(3px);border-color:var(--sec,var(--accent));
   box-shadow:0 2px 6px rgba(26,32,40,.1)}
 .rail-item.detected{color:var(--ink);border-left:4px solid var(--sec,var(--accent))}
-.rail-item .dot{width:9px;height:9px;border-radius:50%;background:var(--line);flex-shrink:0}
-.rail-item.detected .dot{background:var(--sec,var(--accent))}
-.rail-item::before{content:'⊗';font-size:10px;color:#B8BFBB;font-weight:700;position:absolute;left:2px;transition:all .2s}
-.rail-item.detected::before{content:'✓';color:var(--sec,var(--accent));font-size:9px;font-weight:900}
+.rail-item .dot{display:none}
+.rail-item::before{content:'';width:12px;min-width:12px;text-align:center;font-size:10px;font-weight:900;transition:all .2s;position:relative;display:inline-block}
+.rail-item.detected::before{content:'✓';color:var(--main);font-size:11px;font-weight:900}
 @media(max-width:860px){.rail{display:none}}
 
 /* ---------- Tailor for Job ---------- */
