@@ -643,7 +643,7 @@ function insightsCard(){
   const tl = careerTimelineSVG(t, true);
   const dm = domainsSVG(t, true);
   c.innerHTML = `
-    <div class="insights-head"><h2>Career Insights</h2></div>
+    <div class="insights-head"><h2>Career Insights</h2><button class="chev" type="button">▾</button></div>
     <div class="insights-body">
       <div class="trend-head"><h3>Career Timeline</h3>
         <span class="th-btns">
@@ -653,7 +653,7 @@ function insightsCard(){
       <div data-holder="tl">${tl || '<div class="chart-empty">Add work experience with dates to see your timeline.</div>'}</div>
       <div class="ins-editor" data-panel="tl"></div>
       <div class="ins-divider"></div>
-      <div class="trend-head"><h3>Domain Expertise</h3>
+      <div class="trend-head"><h3>Domain Expertise</h3><button class="trend-chev" type="button">▾</button>
         <span class="th-btns">
           <label class="switch" title="Slide on/off — show or hide this chart in your exported resume"><input type="checkbox" data-pref="domains" ${R.chart_prefs.domains?'checked':''}><span class="slider"></span><span class="sw-lbl">In resume</span></label>
           <button class="edit-btn" data-ed="dm" type="button">✎ Edit domains</button>
@@ -661,7 +661,7 @@ function insightsCard(){
       <div data-holder="dm">${dm || '<div class="chart-empty">No domains yet — click ✎ Edit domains to add rows like &ldquo;Risk Management · 2015 – Present&rdquo;.</div>'}</div>
       <div class="ins-editor" data-panel="dm"></div>
       <div class="ins-divider"></div>
-      <div class="trend-head"><h3>Tenure Ranking <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink-soft)">— companies by duration, highest → lowest</span></h3>
+      <div class="trend-head"><h3>Tenure Ranking <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink-soft)">— companies by duration, highest → lowest</span></h3><button class="trend-chev" type="button">▾</button>
         <span class="th-btns">
           <label class="switch" title="Slide on/off — show or hide this chart in your exported resume"><input type="checkbox" data-pref="tenure" ${R.chart_prefs.tenure?'checked':''}><span class="slider"></span><span class="sw-lbl">In resume</span></label>
         </span></div>
@@ -740,6 +740,26 @@ function insightsCard(){
     });
   });
 
+
+  // ---- Main Career Insights collapse handler ----
+  const insHead = c.querySelector('.insights-head');
+  const chevBtn = c.querySelector('.insights-head .chev');
+  insHead.addEventListener('click', e => {
+    if(!e.target.closest('.chev')) c.classList.toggle('collapsed');
+  });
+  chevBtn?.addEventListener('click', e => {
+    e.stopPropagation();
+    c.classList.toggle('collapsed');
+  });
+  
+  // ---- Domain Expertise & Tenure collapse handlers ----
+  c.querySelectorAll('.trend-head .trend-chev').forEach(chev => {
+    chev.addEventListener('click', e => {
+      e.stopPropagation();
+      chev.closest('.trend-head').classList.toggle('collapsed');
+    });
+  });
+
   return c;
 }
 
@@ -748,40 +768,7 @@ const SEC_COLOURS = ['#0F766E','#4338CA','#BE185D','#B45309','#166534','#7C3AED'
 // New order: header info → skills-band-ish → projects → summary → experience → education → the rest
 const EDITOR_ORDER = ['personal','skills','certifications','languages','projects','accomplishments','courses','summary','experience','education'];
 
-// ---- Detect which sections are non-empty (found in the resume) ----
-function getDetectedSections(){
-  const detected = new Set(['personal']); // personal is always considered "detected" (pinned)
-  if(R.summary && R.summary.trim()) detected.add('summary');
-  if(R.skills && R.skills.length) detected.add('skills');
-  if(R.languages && R.languages.length) detected.add('languages');
-  if(R.accomplishments && R.accomplishments.length) detected.add('accomplishments');
-  if(R.projects && R.projects.length) detected.add('projects');
-  if(R.courses && R.courses.length) detected.add('courses');
-  if(R.experience && R.experience.length) detected.add('experience');
-  if(R.education && R.education.length) detected.add('education');
-  if(R.certifications && R.certifications.length) detected.add('certifications');
-  return detected;
-}
 
-// ---- Build the @ Sections sidebar ----
-function buildSidebar(){
-  const sidebarDiv = $('#sidebarSecs');
-  if(!sidebarDiv) return;
-  sidebarDiv.innerHTML = '';
-  const detected = getDetectedSections();
-  const allSecs = ['summary','skills','certifications','languages','projects','accomplishments','courses','experience','education'];
-  allSecs.forEach(sec => {
-    const item = el('div', {class: 'sec-item' + (detected.has(sec) ? ' detected' : '')}, sec.charAt(0).toUpperCase() + sec.slice(1));
-    item.dataset.sec = sec;
-    item.addEventListener('click', () => {
-      document.querySelectorAll('.sec-item').forEach(s => s.classList.remove('selected'));
-      item.classList.add('selected');
-      const card = $('#editor').querySelector('.card[data-seckey="' + sec + '"]');
-      if(card && typeof card.scrollIntoView === 'function') card.scrollIntoView({behavior:'smooth', block:'nearest'});
-    });
-    sidebarDiv.appendChild(item);
-  });
-}
 
 function buildEditor(){
   $('#startArea').classList.add('hidden');
@@ -938,7 +925,6 @@ function buildEditor(){
   renderRail();
   renderAddPanel();
   $('#addSectionCard').classList.remove('hidden');
-  buildSidebar();
   if(typeof renderLivePreview === 'function') renderLivePreview();
 }
 
