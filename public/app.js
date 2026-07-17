@@ -817,122 +817,192 @@ const EDITOR_ORDER = ['personal','skills','certifications','languages','projects
 
 // ---- Quality Score Analysis (Vocabulary, Grammar, Context) ----
 function analyzeQualityScore(){
-  const issues = {vocab: [], grammar: [], context: []};
-  let vocabScore = 100, grammarScore = 100, contextScore = 100;
-  
-  // Weak vocabulary patterns
-  const weakWords = {
-    'very': 3, 'good': 5, 'bad': 5, 'stuff': 8, 'things': 8, 'did': 5, 'make': 5, 
-    'help': 3, 'work': 3, 'do': 5, 'lot': 5, 'many': 3, 'area of': 5, 'skillset': 8, 'skill set': 8,
-    'approach': 2, 'able to': 4, 'responsible for': 2, 'in charge of': 4
+  var errs=[], eid=0, vs=100, gs=100, cs=100;
+  var WEAK = {
+    'very':{p:3,s:'use "highly" or remove'},'good':{p:5,s:'replace with specific adjective'},
+    'bad':{p:5,s:'use "ineffective" or "problematic"'},'stuff':{p:8,s:'replace with specific term'},
+    'things':{p:8,s:'be specific about what'},'did':{p:5,s:'use "led", "managed", "spearheaded"'},
+    'make':{p:5,s:'use "develop", "create", "build"'},'help':{p:3,s:'use "assisted", "facilitated"'},
+    'lot':{p:5,s:'use a specific number or metric'},'many':{p:3,s:'specify the amount'},
+    'able to':{p:4,s:'use direct verb form'},'responsible for':{p:2,s:'use active voice (led, managed)'},
+    'in charge of':{p:4,s:'use "managed", "directed"'},'good work':{p:6,s:'be specific about achievements'},
+    'did various':{p:6,s:'use "Conducted", "Executed"'},'very good at':{p:6,s:'use "advanced" or "expert-level"'},
+    'skill set':{p:8,s:'use "skills"'},'skillset':{p:8,s:'use "skills"'}
   };
-  
-  // Get all text content from resume
-  const getText = (obj) => {
-    if(!obj) return '';
-    if(typeof obj === 'string') return obj.toLowerCase();
-    if(Array.isArray(obj)) return obj.map(getText).join(' ');
-    if(typeof obj === 'object') return Object.values(obj).map(getText).join(' ');
-    return '';
+  var vocabSections = {
+    summary:{text:R.summary||'',label:'Profile / Summary'},
+    skills:{text:(R.skills||[]).join(', '),label:'Skills'},
+    accomplishments:{text:(R.accomplishments||[]).join(' '),label:'Accomplishments'}
   };
-  
-  const allText = getText(R).toLowerCase();
-  
-  // ---- VOCABULARY ANALYSIS ----
-  const sectionTexts = {
-    summary: R.summary || '',
-    skills: (R.skills||[]).join(' '),
-    experience: (R.experience||[]).map(e => (e.title+' '+e.company+' '+e.desc||'')).join(' '),
-    certifications: (R.certifications||[]).map(c => (c.name+' '+c.issuer||'')).join(' '),
-    education: (R.education||[]).map(e => (e.degree+' '+e.institution||'')).join(' '),
-    projects: (R.projects||[]).map(p => (p.name+' '+p.desc||'')).join(' '),
-    accomplishments: (R.accomplishments||[]).join(' '),
-    domains: (R.domains||[]).map(d => (d.name+' '+d.detail||'')).join(' ')
-  };
-  
-  let vocabIssueCount = 0;
-  Object.entries(sectionTexts).forEach(([sec, text]) => {
-    Object.entries(weakWords).forEach(([word, penalty]) => {
-      const regex = new RegExp('\\b'+word+'\\b', 'gi');
-      const matches = text.match(regex);
-      if(matches && matches.length > 0){
-        vocabIssueCount += matches.length * (penalty/10);
-        if(!issues.vocab.includes(sec)) issues.vocab.push(sec);
+  (R.experience||[]).forEach(function(e,i){
+    vocabSections['experience_'+i]={text:(e.desc||''),label:'Experience \u2014 '+(e.title||'Job '+(i+1))};
+  });
+  Object.keys(vocabSections).forEach(function(secKey){
+    var info=vocabSections[secKey], sec=secKey.replace(/_\d+$/,'');
+    Object.keys(WEAK).forEach(function(word){
+      var w=WEAK[word], re=new RegExp('\\b'+word.replace(/\s+/g,'\\s+')+'\\b','gi'), m;
+      while((m=re.exec(info.text))!==null){
+        errs.push({id:'q'+(eid++),type:'vocab',section:sec,secKey:secKey,
+          location:info.label,match:m[0],desc:'"'+m[0]+'" \u2014 '+w.s,fixed:false});
+        vs-=3;
       }
     });
   });
-  vocabScore = Math.max(30, 100 - (vocabIssueCount * 3));
-  
-  // ---- GRAMMAR ANALYSIS ----
-  let grammarIssueCount = 0;
-  const grammarPatterns = [
-    {pattern: /\s{2,}/g, penalty: 2, section: 'all'}, // double spaces
-    {pattern: /[a-z]\s{0,1}[A-Z]/g, penalty: 3, section: 'all'}, // missing space/period before capital
-    {pattern: /^[^A-Z]/gm, penalty: 2, section: 'summary'}, // sentence doesn't start with capital
-    {pattern: /[^.!?]\s*$/gm, penalty: 1, section: 'summary'}, // missing ending punctuation
-  ];
-  
-  grammarPatterns.forEach(({pattern, penalty}) => {
-    const matches = allText.match(pattern);
-    if(matches) grammarIssueCount += matches.length * penalty;
-  });
-  grammarScore = Math.max(35, 100 - (grammarIssueCount * 2));
-  
-  // ---- CONTEXT ANALYSIS (vagueness, metrics, business impact) ----
-  let contextIssueCount = 0;
-  
-  // Check for quantifiable impact in experience/accomplishments
-  const hasMetrics = /\b(\d+%|\$|USD|increased|decreased|reduced|improved|grew|saved|delivered)\b/gi;
-  const metricMatches = allText.match(hasMetrics);
-  if(!metricMatches || metricMatches.length < 3) contextIssueCount += 15; // missing metrics
-  
-  // Check for vague descriptions
-  const vaguePatterns = ['did various', 'various things', 'different tasks', 'many responsibilities', 'handled different'];
-  vaguePatterns.forEach(vague => {
-    if(allText.includes(vague)) contextIssueCount += 8;
-    if(allText.includes(vague)) issues.context.push('experience');
-  });
-  
-  // Check experience section has good detail
-  if((R.experience||[]).length > 0){
-    const expDetail = R.experience.map(e => (e.desc||'').length).reduce((a,b)=>a+b,0);
-    if(expDetail < 200) contextIssueCount += 10; // too short
-  }
-  
-  contextScore = Math.max(30, 100 - (contextIssueCount * 3));
-  
-  // ---- OVERALL SCORE ----
-  const overallScore = Math.round((vocabScore + grammarScore + contextScore) / 3);
-  
-  return {
-    overall: overallScore,
-    vocabulary: Math.max(30, Math.round(vocabScore)),
-    grammar: Math.max(35, Math.round(grammarScore)),
-    context: Math.max(30, Math.round(contextScore)),
-    issues: issues,
-    issuesBySection: getSectionErrorMap(issues)
+  var grammarSections={
+    summary:{text:R.summary||'',label:'Profile / Summary'},
+    accomplishments:{text:(R.accomplishments||[]).join('\n'),label:'Accomplishments'}
   };
-}
-
-// Map which sections have which errors
-function getSectionErrorMap(issues){
-  const map = {};
-  ['vocab', 'grammar', 'context'].forEach(type => {
-    issues[type].forEach(sec => {
-      if(!map[sec]) map[sec] = [];
-      map[sec].push(type);
-    });
+  (R.experience||[]).forEach(function(e,i){
+    grammarSections['experience_'+i]={text:e.desc||'',label:'Experience \u2014 '+(e.title||'Job '+(i+1))};
   });
-  return map;
+  Object.keys(grammarSections).forEach(function(secKey){
+    var info=grammarSections[secKey], sec=secKey.replace(/_\d+$/,'');
+    if(/\s{2,}/.test(info.text)){
+      var dm=info.text.match(/\S+\s{2,}\S+/);
+      errs.push({id:'q'+(eid++),type:'grammar',section:sec,secKey:secKey,
+        location:info.label,match:dm?dm[0]:'',desc:'Double space detected \u2014 remove extra space',fixed:false});
+      gs-=4;
+    }
+    if(info.text && !info.text.trim().match(/[.!?]$/)){
+      errs.push({id:'q'+(eid++),type:'grammar',section:sec,secKey:secKey,
+        location:info.label,match:'',desc:'Missing punctuation at end',fixed:false});
+      gs-=3;
+    }
+  });
+  (R.experience||[]).forEach(function(e,i){
+    var d=(e.desc||'').toLowerCase();
+    if((/\b(was|were|had|managed|led|did)\b/.test(d))&&(/\b(is|are|manage|lead|do)\b/.test(d))){
+      errs.push({id:'q'+(eid++),type:'grammar',section:'experience',secKey:'experience_'+i,
+        location:'Experience \u2014 '+(e.title||'Job '+(i+1)),match:'',
+        desc:'Inconsistent tense \u2014 mixing present and past',fixed:false});
+      gs-=4;
+    }
+  });
+  var allText=[R.summary||''].concat((R.experience||[]).map(function(e){return e.desc||'';})).concat(R.accomplishments||[]).join(' ');
+  var metricMatches=allText.match(/\b(\d+%|\$\d+|\d+\s*(million|k|m\b)|increased|decreased|reduced|improved|saved|delivered)\b/gi);
+  if(!metricMatches||metricMatches.length<2){
+    (R.experience||[]).forEach(function(e,i){
+      if(!(e.desc||'').match(/\d+%|\$\d+/)){
+        errs.push({id:'q'+(eid++),type:'context',section:'experience',secKey:'experience_'+i,
+          location:'Experience \u2014 '+(e.title||'Job '+(i+1)),match:'',
+          desc:'No metrics \u2014 add numbers (e.g. "reduced risk by 40%")',fixed:false});
+        cs-=5;
+      }
+    });
+  }
+  (R.experience||[]).forEach(function(e,i){
+    var vagueRe=/did various|various things|different tasks|many responsibilities|handled different/gi, vm;
+    while((vm=vagueRe.exec(e.desc||''))!==null){
+      errs.push({id:'q'+(eid++),type:'context',section:'experience',secKey:'experience_'+i,
+        location:'Experience \u2014 '+(e.title||'Job '+(i+1)),match:vm[0],
+        desc:'"'+vm[0]+'" is vague \u2014 be specific',fixed:false});
+      cs-=5;
+    }
+  });
+  vs=Math.max(30,Math.round(vs)); gs=Math.max(35,Math.round(gs)); cs=Math.max(30,Math.round(cs));
+  var overall=Math.round((vs+gs+cs)/3);
+  var bySection={};
+  errs.forEach(function(e){if(!bySection[e.section])bySection[e.section]=[];bySection[e.section].push(e);});
+  return {overall:overall,vocabulary:vs,grammar:gs,context:cs,errors:errs,issuesBySection:bySection};
 }
 
-// Get severity color and label for score
 function getScoreSeverity(score){
-  if(score >= 85) return {color:'#10B981', label:'Excellent', bgClass:'ok'};
-  if(score >= 75) return {color:'#F59E0B', label:'Well-written', bgClass:'low'};
-  if(score >= 55) return {color:'#F59E0B', label:'Good but needs improvement', bgClass:'low'};
-  return {color:'#EF4444', label:'Poor - Requires fix', bgClass:'crit'};
+  if(score>=85)return{color:'#10B981',label:'Excellent \xb7 Perfect'};
+  if(score>=75)return{color:'#0FA968',label:'Well-written \xb7 Not Excellent'};
+  if(score>=55)return{color:'#F59E0B',label:'Good \xb7 Needs Improvements'};
+  return{color:'#EF4444',label:'Poor \xb7 Requires Fix'};
 }
+
+function markupWithErrors(text,fieldErrors){
+  if(!fieldErrors||!fieldErrors.length)return esc(text);
+  var html=esc(text);
+  var sorted=fieldErrors.filter(function(e){return e.match&&!e.fixed;}).sort(function(a,b){return b.match.length-a.match.length;});
+  sorted.forEach(function(err){
+    var escaped=esc(err.match);
+    var re=new RegExp('('+escaped.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','i');
+    var tip='<span class="err-tip"><span class="tip-badge '+err.type+'">'+err.type+'</span> '+esc(err.desc)+'</span>';
+    html=html.replace(re,'<span class="err-mark '+err.type+'" data-errid="'+err.id+'">$1'+tip+'</span>');
+  });
+  return html;
+}
+
+function qualityField(text,fieldErrors,onInput){
+  var div=el('div',{class:'q-editable',contenteditable:'true'});
+  div.innerHTML=markupWithErrors(text,fieldErrors);
+  div.addEventListener('input',function(){
+    var plain=div.textContent||div.innerText||'';
+    if(onInput)onInput(plain);
+    checkErrorsCleared(div);
+  });
+  return div;
+}
+
+function checkErrorsCleared(fieldEl){
+  var marks=fieldEl.querySelectorAll('.err-mark');
+  var qs=R.quality_score; if(!qs)return;
+  var deltas={vocab:4,grammar:4,context:5};
+  marks.forEach(function(mark){
+    var errid=mark.dataset.errid;
+    var err=qs.errors.find(function(e){return e.id===errid;});
+    if(!err||err.fixed)return;
+    var tip=mark.querySelector('.err-tip');
+    var currentText=(mark.textContent||'').replace(tip?tip.textContent:'','').trim();
+    if(currentText!==err.match){
+      err.fixed=true;
+      qs[err.type==='vocab'?'vocabulary':err.type==='grammar'?'grammar':'context']=
+        Math.min(100,(err.type==='vocab'?qs.vocabulary:err.type==='grammar'?qs.grammar:qs.context)+deltas[err.type]);
+      qs.overall=Math.round((qs.vocabulary+qs.grammar+qs.context)/3);
+      if(tip)tip.remove();
+      mark.replaceWith(mark.textContent||'');
+      refreshQualityDashboard(); renderRail(); showFixToast();
+    }
+  });
+  qs.errors.filter(function(e){return !e.fixed&&e.match;}).forEach(function(err){
+    if(!document.querySelector('[data-errid="'+err.id+'"]')){
+      err.fixed=true;
+      qs[err.type==='vocab'?'vocabulary':err.type==='grammar'?'grammar':'context']=
+        Math.min(100,(err.type==='vocab'?qs.vocabulary:err.type==='grammar'?qs.grammar:qs.context)+deltas[err.type]);
+      qs.overall=Math.round((qs.vocabulary+qs.grammar+qs.context)/3);
+      refreshQualityDashboard(); renderRail(); showFixToast();
+    }
+  });
+}
+
+function refreshQualityDashboard(){
+  var qs=R.quality_score; if(!qs)return;
+  var sev=getScoreSeverity(qs.overall), deg=qs.overall*3.6;
+  var se=document.getElementById('qdash-score');
+  if(se){se.textContent=qs.overall+'%';se.style.color=sev.color;se.classList.remove('qdash-flash');void se.offsetWidth;se.classList.add('qdash-flash');}
+  var le=document.getElementById('qdash-label');if(le){le.textContent=sev.label;le.style.color=sev.color;}
+  var re=document.getElementById('qdash-ring');if(re)re.style.background='conic-gradient('+sev.color+' 0deg,'+sev.color+' '+deg+'deg,#E5E7EB '+deg+'deg)';
+  var ri=document.getElementById('qdash-ring-inner');if(ri){ri.textContent=qs.overall+'%';ri.style.color=sev.color;}
+  var ve=document.getElementById('qdash-vocab');if(ve)ve.textContent=qs.vocabulary+'%';
+  var ge=document.getElementById('qdash-grammar');if(ge)ge.textContent=qs.grammar+'%';
+  var ce=document.getElementById('qdash-context');if(ce)ce.textContent=qs.context+'%';
+  var uf=qs.errors.filter(function(e){return !e.fixed;});
+  var vc=uf.filter(function(e){return e.type==='vocab';}).length;
+  var gc=uf.filter(function(e){return e.type==='grammar';}).length;
+  var cc=uf.filter(function(e){return e.type==='context';}).length;
+  var vd=document.getElementById('qdash-vocab-detail');if(vd)vd.textContent=vc+' issue'+(vc!==1?'s':'')+' remaining';
+  var gd=document.getElementById('qdash-grammar-detail');if(gd)gd.textContent=gc+' issue'+(gc!==1?'s':'')+' remaining';
+  var cd=document.getElementById('qdash-context-detail');if(cd)cd.textContent=cc+' issue'+(cc!==1?'s':'')+' remaining';
+}
+
+var _fixToastTimer;
+function showFixToast(){
+  var qs=R.quality_score;if(!qs)return;
+  var t=document.getElementById('fixToast');if(!t)return;
+  document.getElementById('fixToastScore').textContent=qs.overall+'%';
+  t.classList.add('show');
+  clearTimeout(_fixToastTimer);
+  _fixToastTimer=setTimeout(function(){t.classList.remove('show');},2500);
+}
+
+function getFieldErrors(secKey){
+  if(!R.quality_score)return[];
+  return R.quality_score.errors.filter(function(e){return e.secKey===secKey&&!e.fixed;});
+}
+
 
 
 function buildEditor(){
@@ -946,41 +1016,35 @@ function buildEditor(){
   // Calculate quality score for this resume
   R.quality_score = analyzeQualityScore();
 
-  // Quality score card at the very top
+  // Quality score dashboard at the very top
   const qs = R.quality_score;
   const severity = getScoreSeverity(qs.overall);
+  const deg = qs.overall * 3.6;
+  const unfixed = qs.errors.filter(function(e){return !e.fixed;});
+  const vc = unfixed.filter(function(e){return e.type==='vocab';}).length;
+  const gc = unfixed.filter(function(e){return e.type==='grammar';}).length;
+  const cc = unfixed.filter(function(e){return e.type==='context';}).length;
   const qCard = el('div', {class: 'card quality-card', id: 'sec-quality'});
-  qCard.innerHTML = `
-    <h2 style="position:relative;padding:12px 14px;min-height:40px;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:space-between">
-      <span>📊 Resume Quality</span>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div style="text-align:right;margin-right:8px">
-          <div style="font-size:10px;color:var(--ink-soft);font-weight:600">${severity.label}</div>
-          <div style="font-size:18px;font-weight:900;color:${severity.color}">${qs.overall}%</div>
-        </div>
-        <div style="width:60px;height:60px;border-radius:50%;background:conic-gradient(${severity.color} 0deg, ${severity.color} \${qs.overall * 3.6}deg, #E5E7EB \${qs.overall * 3.6}deg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:${severity.color}">${qs.overall}%</div>
-      </div>
-    </h2>
-    <div class="body" style="padding:12px 14px">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-        <div style="background:#F0FDF4;border-radius:8px;padding:10px;border:1px solid #BBF7D0">
-          <div style="font-size:10px;font-weight:700;color:#166534;text-transform:uppercase">Vocabulary</div>
-          <div style="font-size:18px;font-weight:900;color:#10B981;margin:4px 0">${qs.vocabulary}%</div>
-          <div style="font-size:10px;color:#4B5563">${qs.issues.vocab.length} sections</div>
-        </div>
-        <div style="background:#FEF3C7;border-radius:8px;padding:10px;border:1px solid #FDE68A">
-          <div style="font-size:10px;font-weight:700;color:#92400E;text-transform:uppercase">Grammar</div>
-          <div style="font-size:18px;font-weight:900;color:#F59E0B;margin:4px 0">${qs.grammar}%</div>
-          <div style="font-size:10px;color:#4B5563">${qs.issues.grammar.length} sections</div>
-        </div>
-        <div style="background:#E0E7FF;border-radius:8px;padding:10px;border:1px solid #C7D2FE">
-          <div style="font-size:10px;font-weight:700;color:#3730A3;text-transform:uppercase">Context</div>
-          <div style="font-size:18px;font-weight:900;color:#6366F1;margin:4px 0">${qs.context}%</div>
-          <div style="font-size:10px;color:#4B5563">${qs.issues.context.length} sections</div>
-        </div>
-      </div>
-    </div>
-  `;
+  qCard.innerHTML = '<div class="qdash-top">'
+    + '<div>'
+    + '<div class="qdash-title">Resume Quality Score</div>'
+    + '<div class="qdash-score" id="qdash-score" style="color:'+severity.color+'">'+qs.overall+'%</div>'
+    + '<div class="qdash-label" id="qdash-label" style="color:'+severity.color+'">'+severity.label+'</div>'
+    + '</div>'
+    + '<div class="qdash-ring" id="qdash-ring" style="background:conic-gradient('+severity.color+' 0deg,'+severity.color+' '+deg+'deg,#E5E7EB '+deg+'deg)">'
+    + '<div class="qdash-ring-inner" id="qdash-ring-inner" style="color:'+severity.color+'">'+qs.overall+'%</div>'
+    + '</div></div>'
+    + '<div class="qdash-subs">'
+    + '<div class="qsub qsub-vocab"><div class="qsub-label">Vocabulary</div>'
+    + '<div class="qsub-val" id="qdash-vocab">'+qs.vocabulary+'%</div>'
+    + '<div class="qsub-detail" id="qdash-vocab-detail">'+vc+' issue'+(vc!==1?'s':'')+' remaining</div></div>'
+    + '<div class="qsub qsub-grammar"><div class="qsub-label">Grammar</div>'
+    + '<div class="qsub-val" id="qdash-grammar">'+qs.grammar+'%</div>'
+    + '<div class="qsub-detail" id="qdash-grammar-detail">'+gc+' issue'+(gc!==1?'s':'')+' remaining</div></div>'
+    + '<div class="qsub qsub-context"><div class="qsub-label">Context</div>'
+    + '<div class="qsub-val" id="qdash-context">'+qs.context+'%</div>'
+    + '<div class="qsub-detail" id="qdash-context-detail">'+cc+' issue'+(cc!==1?'s':'')+' remaining</div></div>'
+    + '</div>';
   ed.appendChild(qCard);
   
   // Career insights at the very top (only if we have experience)
@@ -1178,38 +1242,32 @@ function renderRail(){
     ...R.extra_sections.map((s,i)=>({label:s.heading||'Extra', on:true, anchor:'sec-extra-'+i, key:'extra-'+i}))
   ];
   
-  // Get error map from quality score
-  const errorMap = (R.quality_score && R.quality_score.issuesBySection) || {};
-  
   items.forEach((it,idx)=>{
-    const b = el('button',{class:'rail-item'+(it.on?' detected':''),type:'button','data-anchor':it.anchor},
+    const b = el('button',{class:'rail-item'+(it.on?' detected':''),type:'button','data-anchor':it.anchor,'data-section':it.key},
       `${esc(it.label)}`);
     b.style.setProperty('--sec', SEC_COLOURS[idx % SEC_COLOURS.length]);
     
-    // Add error badge if section has issues
-    if(errorMap[it.key] && errorMap[it.key].length > 0){
-      const errorCount = errorMap[it.key].length;
-      const badge = el('span', {class: 'error-badge', style: 'margin-left:auto'});
-      
-      // Determine color based on error severity
-      let bgColor = '#EF4444'; // red for critical (3 error types)
-      if(errorCount === 1) bgColor = '#F59E0B'; // orange for 1 error type
-      if(errorCount === 2) bgColor = '#FCD34D'; // yellow for 2 error types
-      
-      badge.style.display = 'inline-flex';
-      badge.style.alignItems = 'center';
-      badge.style.justifyContent = 'center';
-      badge.style.width = '20px';
-      badge.style.height = '20px';
-      badge.style.borderRadius = '50%';
-      badge.style.background = bgColor;
-      badge.style.color = '#fff';
-      badge.style.fontSize = '10px';
-      badge.style.fontWeight = '900';
-      badge.style.cursor = 'pointer';
-      badge.textContent = errorCount;
-      badge.title = 'Issues found: '+errorMap[it.key].join(', ');
-      b.appendChild(badge);
+    // Count unfixed errors in this section
+    if((R.quality_score&&R.quality_score.issuesBySection&&R.quality_score.issuesBySection[it.key])){
+      const errors = R.quality_score.issuesBySection[it.key];
+      const unfixedCount = errors.filter(e => !e.fixed).length;
+      if(unfixedCount > 0){
+        const badge = el('span', {class: 'error-badge', style: 'margin-left:auto'});
+        badge.style.display = 'inline-flex';
+        badge.style.alignItems = 'center';
+        badge.style.justifyContent = 'center';
+        badge.style.width = '20px';
+        badge.style.height = '20px';
+        badge.style.borderRadius = '50%';
+        badge.style.color = '#fff';
+        badge.style.fontSize = '10px';
+        badge.style.fontWeight = '900';
+        let bgColor = '#EF4444';
+        if(unfixedCount === 1) bgColor = '#F59E0B';
+        badge.style.background = bgColor;
+        badge.textContent = unfixedCount;
+        b.appendChild(badge);
+      }
     }
     
     rail.appendChild(b);
@@ -1256,13 +1314,20 @@ function personalCard(){
 
 function summaryCard(){
   const c = el('div',{class:'card',id:'sec-summary'});
-  c.innerHTML = `<h2>Summary
-    <button class="btn btn-ai" type="button">✦ AI enhance</button></h2>
-    <textarea rows="4">${esc(R.summary)}</textarea>`;
-  const ta = c.querySelector('textarea');
-  ta.addEventListener('input', ()=> R.summary = ta.value);
-  c.querySelector('.btn-ai').addEventListener('click', e =>
-    enhance(e.currentTarget, ()=>R.summary, v=>{ R.summary=v; ta.value=v; }, 'professional summary'));
+  c.innerHTML = '<h2>Summary <button class="btn btn-ai" type="button">\u2726 AI enhance</button></h2>';
+  const fieldErrs = getFieldErrors('summary');
+  if(fieldErrs.length > 0){
+    const qf = qualityField(R.summary||'', fieldErrs, function(plain){ R.summary = plain; });
+    c.appendChild(qf);
+  } else {
+    const ta = el('textarea',{rows:'4'});
+    ta.value = R.summary||'';
+    ta.addEventListener('input', function(){ R.summary = ta.value; });
+    c.appendChild(ta);
+  }
+  c.querySelector('.btn-ai').addEventListener('click', function(e){
+    enhance(e.currentTarget, function(){return R.summary;}, function(v){ R.summary=v; buildEditor(); }, 'professional summary');
+  });
   return c;
 }
 
@@ -1372,12 +1437,18 @@ function listCard(key){
         const fw = el('div',{class:'field'});
         const canAI = AI_FIELDS[key]?.has(tf);
         fw.appendChild(fieldHead(tlab, canAI ? (btn)=>
-          askField(btn, tlab, ()=>item[tf], v=>{ item[tf]=v; ta.value=v; },
+          askField(btn, tlab, ()=>item[tf], v=>{ item[tf]=v; buildEditor(); },
             `${def.title} for ${item[def.fields[0][0]]||''}${key==='experience'?' at '+(item.company||''):''}`) : null));
-        const ta = el('textarea',{'data-f':tf,rows:'4'});
-        ta.value = item[tf]||'';
-        ta.addEventListener('input',()=> item[tf]=ta.value);
-        fw.appendChild(ta);
+        const fieldErrs = getFieldErrors(key+'_'+i);
+        if(fieldErrs.length > 0){
+          const qf = qualityField(item[tf]||'', fieldErrs, function(plain){ item[tf]=plain; });
+          fw.appendChild(qf);
+        } else {
+          const ta = el('textarea',{'data-f':tf,rows:'4'});
+          ta.value = item[tf]||'';
+          ta.addEventListener('input',()=> item[tf]=ta.value);
+          fw.appendChild(ta);
+        }
         en.appendChild(fw);
       }
 
@@ -1396,14 +1467,20 @@ function listCard(key){
 
 function skillsCard(){
   const c = el('div',{class:'card',id:'sec-skills'});
-  c.innerHTML = `<h2>Skills</h2>
-    <input placeholder="Type a skill and press Enter">
-    <div class="tags"></div>`;
+  c.innerHTML = '<h2>Skills</h2><input placeholder="Type a skill and press Enter"><div class="tags"></div>';
   const inp = c.querySelector('input'), tags = c.querySelector('.tags');
+  const skillErrors = getFieldErrors('skills');
   const render = ()=>{
     tags.innerHTML='';
     R.skills.forEach((s,i)=>{
-      const t = el('span',{class:'tag'}, `${esc(s)} <button type="button" aria-label="Remove ${esc(s)}">&times;</button>`);
+      const t = el('span',{class:'tag'}, esc(s)+' <button type="button" aria-label="Remove '+esc(s)+'">&times;</button>');
+      // Check if this skill has an error
+      const hasErr = skillErrors.find(function(e){ return !e.fixed && e.match && s.toLowerCase().indexOf(e.match.toLowerCase()) >= 0; });
+      if(hasErr){
+        t.style.background = 'rgba(16,185,129,.12)';
+        t.style.borderBottom = '2px solid #10B981';
+        t.title = hasErr.desc;
+      }
       t.querySelector('button').addEventListener('click', ()=>{ R.skills.splice(i,1); render(); });
       tags.appendChild(t);
     });
@@ -1438,11 +1515,24 @@ function simpleListCard(key, title){
 // Accomplishments: simple one-per-line card
 function linesCard(key, title, placeholder){
   const c = el('div',{class:'card',id:'sec-'+key});
-  c.innerHTML = `<h2>${title}</h2>
-    <textarea rows="4" placeholder="${placeholder}">${esc((R[key]||[]).join('\n'))}</textarea>
-    <div style="font-size:11px;color:var(--ink-soft);margin-top:4px">One per line — each becomes a bullet in your resume.</div>`;
-  c.querySelector('textarea').addEventListener('input', e=>
-    R[key] = e.target.value.split('\n').map(s=>s.trim()).filter(Boolean));
+  c.innerHTML = '<h2>'+title+'</h2>';
+  const fieldErrs = getFieldErrors(key);
+  const text = (R[key]||[]).join('\n');
+  if(fieldErrs.length > 0){
+    const qf = qualityField(text, fieldErrs, function(plain){
+      R[key] = plain.split('\n').map(function(s){return s.trim();}).filter(Boolean);
+    });
+    c.appendChild(qf);
+  } else {
+    const ta = el('textarea',{rows:'4',placeholder:placeholder});
+    ta.value = text;
+    ta.addEventListener('input', function(e){
+      R[key] = e.target.value.split('\n').map(function(s){return s.trim();}).filter(Boolean);
+    });
+    c.appendChild(ta);
+  }
+  const hint = el('div',{style:'font-size:11px;color:var(--ink-soft);margin-top:4px'},'One per line \u2014 each becomes a bullet in your resume.');
+  c.appendChild(hint);
   return c;
 }
 
