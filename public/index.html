@@ -394,12 +394,7 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
   pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.25)}
 
 /* ---------- Insights: chart headers + inline editors ---------- */
-.trend-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;cursor:pointer;padding:6px 0}
-.trend-head h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink);font-weight:600;font-family:'Inter';flex:1}
-.trend-head .trend-chev{font-size:8px;font-weight:900;width:18px;height:17px;border-radius:5px;padding:0;line-height:1;
-  background-image:var(--sheen),linear-gradient(180deg,#34C98A,#0FA968);
-  color:#fff;border:1px solid #0FA968;cursor:pointer;transition:all .25s;font-family:inherit;box-shadow:0 1.5px 4px rgba(15,169,104,.25)}
-.trend-head.collapsed .trend-chev{background:none;background:#fff;color:#0B4A31;border-color:#0B4A31;box-shadow:0 1.5px 3px rgba(5,61,40,.1) inset;transform:rotate(180deg)}
+.trend-head{display:none}
 .edit-btn{font-size:11.5px;font-weight:600;color:var(--accent);background:var(--card);
   border:1.5px solid var(--accent);border-radius:99px;padding:4px 12px;cursor:pointer;white-space:nowrap}
 .edit-btn:hover{background:var(--accent);color:#fff}
@@ -508,22 +503,12 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .hidden{display:none!important}
 
 /* ---------- Career Insights (charts) ---------- */
-.insights{background:linear-gradient(135deg,#F8FAFC 0%,#EFF6FF 100%);
-  border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin-bottom:20px;box-shadow:var(--shadow)}
-.insights-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
-.insights-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;cursor:pointer}
-.insights-head h2{font-size:12.5px;font-family:Inter,sans-serif;font-weight:700;display:flex;align-items:center;gap:6px;flex:1;margin:0}
-.insights-head h2::before{content:"📈";font-size:14px}
-.insights-head .chev{font-size:9px;font-weight:900;width:20px;height:19px;border-radius:6px;padding:0;line-height:1;
-  background-image:var(--sheen),linear-gradient(180deg,#34C98A,#0FA968);
-  color:#fff;border:1px solid #0FA968;cursor:pointer;transition:all .25s;font-family:inherit;box-shadow:0 1.5px 5px rgba(15,169,104,.3)}
-.insights-head .chev:hover{transform:scale(1.05)}
-.insights.collapsed .chev{background:none;background:#fff;color:#0B4A31;border-color:#0B4A31;box-shadow:0 1.5px 4px rgba(5,61,40,.12) inset;transform:rotate(180deg)}
+.insights{display:none}
+.insights-head{display:none}
 .insights-tabs{display:flex;gap:4px;background:#fff;border-radius:8px;padding:3px;border:1px solid var(--line)}
 .itab{font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:6px;color:var(--ink-soft);white-space:nowrap}
 .itab.on{background:var(--accent);color:#fff}
-.insights-body{background:#fff;border-radius:10px;padding:16px;min-height:230px;position:relative;overflow-x:auto;transition:max-height .25s,opacity .25s}
-.insights.collapsed .insights-body{max-height:0;opacity:0;overflow:hidden;padding:0}
+.insights-body{display:none}
 .chart-svg{display:block;width:100%;height:auto;font-family:Inter,sans-serif;font-size:11px}
 .chart-svg .bar{transition:opacity .15s}
 .chart-svg .bar:hover{opacity:.75}
@@ -1013,7 +998,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 /* slim header: absolute-centred title, tools at edges */
 .card[data-seckey] > h2{
   position:relative;display:flex;align-items:center;justify-content:space-between;
-  padding:6px 12px;margin:0;min-height:36px;font-size:12.5px;font-weight:700;
+  padding:8px 12px;margin:0;min-height:40px;font-size:12.5px;font-weight:700;
   cursor:pointer;transition:background .18s;
 }
 .card[data-seckey] > h2::before{display:none}

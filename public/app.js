@@ -639,45 +639,102 @@ function saveDomainRows(rows){
 // ---- Career Insights card: both charts, each with an inline editor ----
 function insightsCard(){
   const t = getTemplate();
-  const c = el('div',{class:'insights',id:'sec-insights'});
   const tl = careerTimelineSVG(t, true);
   const dm = domainsSVG(t, true);
-  c.innerHTML = `
-    <div class="insights-head"><h2>Career Insights</h2><button class="chev" type="button">▾</button></div>
-    <div class="insights-body">
-      <div class="trend-head"><h3>Career Timeline</h3>
-        <span class="th-btns">
-          <label class="switch" title="Slide on/off — show or hide this chart in your exported resume"><input type="checkbox" data-pref="timeline" ${R.chart_prefs.timeline?'checked':''}><span class="slider"></span><span class="sw-lbl">In resume</span></label>
-          <button class="edit-btn" data-ed="tl" type="button">✎ Edit timeline</button>
-        </span></div>
+  const tr = tenureRankingSVG(t, true);
+  
+  // Array of separate insight cards
+  const cards = [];
+  
+  // ---- CAREER INSIGHTS CARD ----
+  const cInsights = el('div',{class:'card',id:'sec-insights','data-seckey':'insights'});
+  cInsights.innerHTML = `
+    <h2 style="position:relative">
+      <span class="titlec">📊 Career Insights</span>
+      <span class="tools-right">
+        <label class="switch ${R.chart_prefs.timeline?'on':''}" title="Display in exported resume">
+          <input type="checkbox" data-pref="timeline" ${R.chart_prefs.timeline?'checked':''}>
+          <span class="slider"></span>
+        </label>
+        <button class="chev" type="button">▾</button>
+      </span>
+    </h2>
+    <div class="body">
+      <button class="edit-btn" data-ed="tl" type="button" style="margin-bottom:8px">✎ Edit timeline</button>
       <div data-holder="tl">${tl || '<div class="chart-empty">Add work experience with dates to see your timeline.</div>'}</div>
       <div class="ins-editor" data-panel="tl"></div>
-      <div class="ins-divider"></div>
-      <div class="trend-head"><h3>Domain Expertise</h3><button class="trend-chev" type="button">▾</button>
-        <span class="th-btns">
-          <label class="switch" title="Slide on/off — show or hide this chart in your exported resume"><input type="checkbox" data-pref="domains" ${R.chart_prefs.domains?'checked':''}><span class="slider"></span><span class="sw-lbl">In resume</span></label>
-          <button class="edit-btn" data-ed="dm" type="button">✎ Edit domains</button>
-        </span></div>
+    </div>`;
+  cards.push(cInsights);
+  
+  // ---- DOMAIN EXPERTISE CARD ----
+  const cDomain = el('div',{class:'card collapsed',id:'sec-domain','data-seckey':'domain'});
+  cDomain.innerHTML = `
+    <h2 style="position:relative">
+      <span class="titlec">🎯 Domain Expertise</span>
+      <span class="tools-right">
+        <label class="switch ${R.chart_prefs.domains?'on':''}" title="Display in exported resume">
+          <input type="checkbox" data-pref="domains" ${R.chart_prefs.domains?'checked':''}>
+          <span class="slider"></span>
+        </label>
+        <button class="chev" type="button">▾</button>
+      </span>
+    </h2>
+    <div class="body">
+      <button class="edit-btn" data-ed="dm" type="button" style="margin-bottom:8px">✎ Edit domains</button>
       <div data-holder="dm">${dm || '<div class="chart-empty">No domains yet — click ✎ Edit domains to add rows like &ldquo;Risk Management · 2015 – Present&rdquo;.</div>'}</div>
       <div class="ins-editor" data-panel="dm"></div>
-      <div class="ins-divider"></div>
-      <div class="trend-head"><h3>Tenure Ranking <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--ink-soft)">— companies by duration, highest → lowest</span></h3><button class="trend-chev" type="button">▾</button>
-        <span class="th-btns">
-          <label class="switch" title="Slide on/off — show or hide this chart in your exported resume"><input type="checkbox" data-pref="tenure" ${R.chart_prefs.tenure?'checked':''}><span class="slider"></span><span class="sw-lbl">In resume</span></label>
-        </span></div>
-      <div data-holder="tr">${tenureRankingSVG(t, true) || '<div class="chart-empty">Add work experience with dates to see tenure ranking.</div>'}</div>
     </div>`;
-
-  // chart-in-resume preference toggles (slide switches)
-  c.querySelectorAll('.switch input').forEach(cb=>{
-    cb.addEventListener('change', ()=>{
-      R.chart_prefs[cb.dataset.pref] = cb.checked;
-      toast(cb.checked ? 'Chart will appear in your resume' : 'Chart removed from your resume (still visible here)');
-      renderLivePreview();
+  cards.push(cDomain);
+  
+  // ---- TENURE RANKING CARD ----
+  const cTenure = el('div',{class:'card collapsed',id:'sec-tenure','data-seckey':'tenure'});
+  cTenure.innerHTML = `
+    <h2 style="position:relative">
+      <span class="titlec">📈 Tenure Ranking</span>
+      <span class="tools-right">
+        <label class="switch ${R.chart_prefs.tenure?'on':''}" title="Display in exported resume">
+          <input type="checkbox" data-pref="tenure" ${R.chart_prefs.tenure?'checked':''}>
+          <span class="slider"></span>
+        </label>
+        <button class="chev" type="button">▾</button>
+      </span>
+    </h2>
+    <div class="body">
+      <div data-holder="tr">${tr || '<div class="chart-empty">Add work experience with dates to see tenure ranking.</div>'}</div>
+    </div>`;
+  cards.push(cTenure);
+  
+  // Wire up toggle switches for all three cards
+  cards.forEach(card => {
+    card.querySelectorAll('.switch input').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        R.chart_prefs[cb.dataset.pref] = cb.checked;
+        cb.closest('.switch').classList.toggle('on');
+        toast(cb.checked ? 'Chart will appear in your resume' : 'Chart removed from your resume (still visible here)');
+        renderLivePreview();
+      });
     });
   });
-
-  // ----- editor wiring -----
+  
+  // Wire up chevron collapse buttons for all three cards
+  cards.forEach(card => {
+    const chevBtn = card.querySelector('.chev');
+    if(chevBtn) {
+      chevBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        card.classList.toggle('collapsed');
+      });
+    }
+    // Title bar click to collapse (except button clicks)
+    const h2 = card.querySelector('h2');
+    if(h2) {
+      h2.addEventListener('click', e => {
+        if(!e.target.closest('.chev, .switch')) card.classList.toggle('collapsed');
+      });
+    }
+  });
+  
+  // ----- Editor wiring -----
   const editors = {
     tl: {
       cols: [['name','Company',''],['start','From','yr'],['end','To (blank = Present)','yr']],
@@ -687,81 +744,68 @@ function insightsCard(){
       save: rows => { saveTimelineRows(rows); buildEditor(); toast('Timeline saved — Work Experience updated to match'); }
     },
     dm: {
-      cols: [['name','Domain name',''],['start','From','yr'],['end','To (blank = Present)','yr'],['detail','Detail (e.g. "team of 9")','']],
+      cols: [['name','Domain name',''],['start','From','yr'],['end','To (blank = Present)','yr'],['detail','Detail (e.g. \"team of 9\")','']],
       rows: ()=> (R.domains||[]).map(d => ({name:d.name, start:d.start_year, end:d.end_year, detail:d.detail||''})),
       blank: ()=> ({name:'', start:null, end:null, detail:''}),
       max: 8,
       save: rows => { saveDomainRows(rows); buildEditor(); toast('Domains saved'); }
     }
   };
+  
+  cards.forEach(card => {
+    card.querySelectorAll('[data-ed]').forEach(btn=>{
+      const key = btn.dataset.ed, cfg = editors[key];
+      const panel = card.querySelector(`[data-panel="${key}"]`);
+      let working = [];
 
-  c.querySelectorAll('[data-ed]').forEach(btn=>{
-    const key = btn.dataset.ed, cfg = editors[key];
-    const panel = c.querySelector(`[data-panel="${key}"]`);
-    let working = [];
-
-    const renderRows = ()=>{
-      const table = el('table');
-      table.innerHTML = `<thead><tr>${cfg.cols.map(([,lab])=>`<th>${lab}</th>`).join('')}<th></th></tr></thead>`;
-      const tb = el('tbody');
-      working.forEach((row,i)=>{
-        const tr = el('tr');
-        tr.innerHTML = cfg.cols.map(([f,,cls])=>
-          `<td><input ${cls?`class="${cls}"`:''} value="${esc(row[f]??'')}" data-i="${i}" data-f="${f}" ${cls==='yr'?'inputmode="numeric" placeholder="'+(f==='end'?'Present':'')+'"':''}></td>`
-        ).join('') + `<td><button class="rm" data-rm="${i}" type="button" title="Remove">×</button></td>`;
-        tb.appendChild(tr);
-      });
-      table.appendChild(tb);
-      panel.innerHTML = '';
-      panel.appendChild(table);
-      const actions = el('div',{class:'ed-actions'},
-        `<button class="btn btn-ghost" data-act="add" type="button">+ Add</button>
-         <button class="btn btn-primary" data-act="save" type="button">Save &amp; redraw</button>`);
-      panel.appendChild(actions);
-      panel.querySelectorAll('input').forEach(inp=>{
-        inp.addEventListener('input', ()=>{
-          const row = working[+inp.dataset.i], f = inp.dataset.f;
-          row[f] = inp.classList.contains('yr') ? (parseInt(inp.value)||null) : inp.value;
+      const renderRows = ()=>{
+        const table = el('table');
+        table.innerHTML = `<thead><tr>${cfg.cols.map(([,lab])=>`<th>${lab}</th>`).join('')}<th></th></tr></thead>`;
+        const tb = el('tbody');
+        working.forEach((row,i)=>{
+          const tr = el('tr');
+          tr.innerHTML = cfg.cols.map(([f,,cls])=>
+            `<td><input ${cls?`class="${cls}"`:''} value="${esc(row[f]??'')}" data-i="${i}" data-f="${f}" ${cls==='yr'?'inputmode="numeric" placeholder="'+(f==='end'?'Present':'')+'"':''}></td>`
+          ).join('') + `<td><button class="rm" data-rm="${i}" type="button" title="Remove">×</button></td>`;
+          tb.appendChild(tr);
         });
-      });
-      panel.querySelectorAll('[data-rm]').forEach(b=>
-        b.addEventListener('click', ()=>{ working.splice(+b.dataset.rm,1); renderRows(); }));
-      actions.querySelector('[data-act="add"]').addEventListener('click', ()=>{
-        if(cfg.max && working.length >= cfg.max) return toast('Maximum '+cfg.max+' entries');
-        working.push(cfg.blank()); renderRows();
-      });
-      actions.querySelector('[data-act="save"]').addEventListener('click', ()=> cfg.save(working));
-    };
+        table.appendChild(tb);
+        panel.innerHTML = '';
+        panel.appendChild(table);
+        const actions = el('div',{class:'ed-actions'},
+          `<button class="btn btn-ghost" data-act="add" type="button">+ Add</button>
+           <button class="btn btn-primary" data-act="save" type="button">Save &amp; redraw</button>`);
+        panel.appendChild(actions);
+        panel.querySelectorAll('input').forEach(inp=>{
+          inp.addEventListener('input', ()=>{
+            const row = working[+inp.dataset.i], f = inp.dataset.f;
+            row[f] = inp.classList.contains('yr') ? (parseInt(inp.value)||null) : inp.value;
+          });
+        });
+        panel.querySelectorAll('[data-rm]').forEach(b=>
+          b.addEventListener('click', ()=>{ working.splice(+b.dataset.rm,1); renderRows(); }));
+        actions.querySelector('[data-act="add"]').addEventListener('click', ()=>{
+          if(cfg.max && working.length >= cfg.max) return toast('Maximum '+cfg.max+' entries');
+          working.push(cfg.blank()); renderRows();
+        });
+        actions.querySelector('[data-act="save"]').addEventListener('click', ()=> cfg.save(working));
+      };
 
-    btn.addEventListener('click', ()=>{
-      const opening = !panel.classList.contains('open');
-      c.querySelectorAll('.ins-editor').forEach(p=>p.classList.remove('open'));
-      if(opening){ working = cfg.rows(); renderRows(); panel.classList.add('open'); }
+      btn.addEventListener('click', ()=>{
+        const opening = !panel.classList.contains('open');
+        card.querySelectorAll('.ins-editor').forEach(p=>p.classList.remove('open'));
+        if(opening){ working = cfg.rows(); renderRows(); panel.classList.add('open'); }
+      });
     });
-  });
-
-
-  // ---- Main Career Insights collapse handler ----
-  const insHead = c.querySelector('.insights-head');
-  const chevBtn = c.querySelector('.insights-head .chev');
-  insHead.addEventListener('click', e => {
-    if(!e.target.closest('.chev')) c.classList.toggle('collapsed');
-  });
-  chevBtn?.addEventListener('click', e => {
-    e.stopPropagation();
-    c.classList.toggle('collapsed');
   });
   
-  // ---- Domain Expertise & Tenure collapse handlers ----
-  c.querySelectorAll('.trend-head .trend-chev').forEach(chev => {
-    chev.addEventListener('click', e => {
-      e.stopPropagation();
-      chev.closest('.trend-head').classList.toggle('collapsed');
-    });
-  });
-
-  return c;
+  // Return a container div with all three cards
+  const container = el('div');
+  cards.forEach(c => container.appendChild(c));
+  return container;
 }
+
+
 
 const SEC_COLOURS = ['#0F766E','#4338CA','#BE185D','#B45309','#166534','#7C3AED','#0E7490','#9F1239','#0284C7'];
 
