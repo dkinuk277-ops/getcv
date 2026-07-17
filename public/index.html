@@ -1000,7 +1000,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 /* slim header: absolute-centred title, tools at edges */
 .card[data-seckey] > h2{
   position:relative;display:flex;align-items:center;justify-content:space-between;
-  padding:8px 14px;margin:0;min-height:44px;font-size:16px;
+  padding:6px 12px;margin:0;min-height:36px;font-size:13.5px;
   cursor:pointer;transition:background .18s;
 }
 .card[data-seckey] > h2::before{display:none}
@@ -1008,9 +1008,9 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 .sec-title-zone{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   display:inline-flex;align-items:center;gap:8px;white-space:nowrap;max-width:60%;overflow:hidden}
 /* LEFT tools */
-.sec-tools-left{display:inline-flex;align-items:center;gap:5px;z-index:1}
-.sec-grip{cursor:grab;color:#5F7085;font-size:15px;letter-spacing:1px;user-select:none;
-  padding:3px 6px;border-radius:6px;line-height:1;background:#F1F5F0;border:1.5px solid #D5E1D8;transition:all .18s}
+.sec-tools-left{display:inline-flex;align-items:center;gap:4px;z-index:1}
+.sec-grip{cursor:grab;color:#7085A0;font-size:11px;letter-spacing:.5px;user-select:none;
+  padding:2px 4px;border-radius:5px;line-height:1;background:#F1F5F0;border:1px solid #D5E1D8;transition:all .15s}
 .sec-grip:hover{background:var(--rv-tint);color:#0B4A31;border-color:#0FA968;transform:scale(1.07)}
 .sec-grip:active{cursor:grabbing}
 .sec-grip.ghost{visibility:hidden}
@@ -1020,16 +1020,16 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 .sec-arrow:disabled{opacity:.32;cursor:not-allowed}
 .sec-arrow:disabled:hover{background:#fff;transform:none}
 /* RIGHT tools */
-.sec-tools-right{display:inline-flex;align-items:center;gap:10px;z-index:1}
-.card[data-seckey] .sec-switch .slider{width:38px;height:21px}
-.card[data-seckey] .sec-switch .slider::before{width:17px;height:17px}
-.card[data-seckey] .sec-switch input:checked + .slider::before{transform:translateX(17px)}
+.sec-tools-right{display:inline-flex;align-items:center;gap:8px;z-index:1}
+.card[data-seckey] .sec-switch .slider{width:28px;height:16px}
+.card[data-seckey] .sec-switch .slider::before{width:13px;height:13px}
+.card[data-seckey] .sec-switch input:checked + .slider::before{transform:translateX(12.5px)}
 .card[data-seckey] .sec-switch .sw-lbl{font-size:10px;font-weight:800;color:#0B4A31;text-transform:uppercase;letter-spacing:.06em}
 /* chevron: light mint when collapsed, white when expanded */
 .sec-chev{background-image:var(--rv-sheen),linear-gradient(180deg,#34C98A,#0FA968);
-  border:1.5px solid #0FA968;color:#fff;font-size:13px;font-weight:900;
-  width:30px;height:26px;border-radius:7px;cursor:pointer;padding:0;line-height:1;
-  transition:all .25s;font-family:inherit;box-shadow:0 2px 6px rgba(15,169,104,.35)}
+  border:1px solid #0FA968;color:#fff;font-size:10px;font-weight:900;
+  width:22px;height:20px;border-radius:6px;cursor:pointer;padding:0;line-height:1;
+  transition:all .25s;font-family:inherit;box-shadow:0 1.5px 5px rgba(15,169,104,.3)}
 .sec-chev:hover{transform:scale(1.07);box-shadow:0 4px 10px rgba(15,169,104,.4)}
 .card[data-seckey]:not(.collapsed) .sec-chev{background-image:none;background:#fff;color:#0B4A31;
   border-color:#0B4A31;box-shadow:0 2px 5px rgba(5,61,40,.13) inset;transform:rotate(180deg)}
@@ -1123,6 +1123,23 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 .ldt2-done .big{font-size:44px}
 .ldt2-done .t{font-family:Fraunces,serif;font-size:22px;font-weight:900;color:#0B4A31}
 .ldt2-done .s{font-size:12.5px;color:#4A5B76}
+
+
+/* ============ SECTIONS SIDEBAR ============ */
+.tbl{display:grid;grid-template-columns:140px 1fr;gap:12px;margin-top:10px}
+.sidebar{background:var(--card);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.sctitle{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:var(--sec-text,#0B4A31);
+  padding:9px 10px;border-bottom:1px solid var(--rv-cardline);background:#F8FBF9}
+.seclist{padding:6px 0}
+.sec-item{padding:6px 10px;font-size:10.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;
+  display:flex;align-items:center;gap:7px;transition:all .2s;border-left:3px solid transparent}
+.sec-item::before{content:'⊗';font-size:11px;color:#B8BFBB;font-weight:700;transition:all .2s}
+.sec-item.detected{color:#0B4A31;font-weight:700}
+.sec-item.detected::before{content:'✓';color:#0FA968;font-size:10px;font-weight:900}
+.sec-item:hover{background:#F8FBF9}
+.sec-item.selected{background:#E9F8F0;border-left-color:#0FA968;color:#0B4A31}
+.editor-main{min-height:500px}
+@media(max-width:768px){.tbl{grid-template-columns:1fr}; .sidebar{display:none}}
 
 </style>
 </head>
@@ -1572,11 +1589,17 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 </div>
 
 <!-- Shared editor (moved between module slots by JS) -->
-<div id="editorWrap" class="hidden">
-  <div id="editor" class="hidden"></div>
-  <div class="card hidden" id="addSectionCard">
-    <h2>Add a missing section</h2>
-    <div class="add-panel" id="addPanel"></div>
+<div id="editorWrap" class="hidden tbl">
+  <div class="sidebar">
+    <div class="sctitle">@ Sections</div>
+    <div class="seclist" id="sidebarSecs"></div>
+  </div>
+  <div class="editor-main">
+    <div id="editor" class="hidden"></div>
+    <div class="card hidden" id="addSectionCard">
+      <h2>Add a missing section</h2>
+      <div class="add-panel" id="addPanel"></div>
+    </div>
   </div>
 </div>
 

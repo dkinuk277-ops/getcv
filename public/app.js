@@ -748,6 +748,41 @@ const SEC_COLOURS = ['#0F766E','#4338CA','#BE185D','#B45309','#166534','#7C3AED'
 // New order: header info → skills-band-ish → projects → summary → experience → education → the rest
 const EDITOR_ORDER = ['personal','skills','certifications','languages','projects','accomplishments','courses','summary','experience','education'];
 
+// ---- Detect which sections are non-empty (found in the resume) ----
+function getDetectedSections(){
+  const detected = new Set(['personal']); // personal is always considered "detected" (pinned)
+  if(R.summary && R.summary.trim()) detected.add('summary');
+  if(R.skills && R.skills.length) detected.add('skills');
+  if(R.languages && R.languages.length) detected.add('languages');
+  if(R.accomplishments && R.accomplishments.length) detected.add('accomplishments');
+  if(R.projects && R.projects.length) detected.add('projects');
+  if(R.courses && R.courses.length) detected.add('courses');
+  if(R.experience && R.experience.length) detected.add('experience');
+  if(R.education && R.education.length) detected.add('education');
+  if(R.certifications && R.certifications.length) detected.add('certifications');
+  return detected;
+}
+
+// ---- Build the @ Sections sidebar ----
+function buildSidebar(){
+  const sidebarDiv = $('#sidebarSecs');
+  if(!sidebarDiv) return;
+  sidebarDiv.innerHTML = '';
+  const detected = getDetectedSections();
+  const allSecs = ['summary','skills','certifications','languages','projects','accomplishments','courses','experience','education'];
+  allSecs.forEach(sec => {
+    const item = el('div', {class: 'sec-item' + (detected.has(sec) ? ' detected' : '')}, sec.charAt(0).toUpperCase() + sec.slice(1));
+    item.dataset.sec = sec;
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.sec-item').forEach(s => s.classList.remove('selected'));
+      item.classList.add('selected');
+      const card = $('#editor').querySelector('.card[data-seckey="' + sec + '"]');
+      if(card && typeof card.scrollIntoView === 'function') card.scrollIntoView({behavior:'smooth', block:'nearest'});
+    });
+    sidebarDiv.appendChild(item);
+  });
+}
+
 function buildEditor(){
   $('#startArea').classList.add('hidden');
   $('#fresherStart').classList.add('hidden');
@@ -903,6 +938,7 @@ function buildEditor(){
   renderRail();
   renderAddPanel();
   $('#addSectionCard').classList.remove('hidden');
+  buildSidebar();
   if(typeof renderLivePreview === 'function') renderLivePreview();
 }
 
