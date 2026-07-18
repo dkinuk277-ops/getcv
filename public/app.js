@@ -928,44 +928,70 @@ function markupWithErrors(text,fieldErrors){
 
 function qualityField(text,fieldErrors,onInput){
   var div=el('div',{class:'q-editable',contenteditable:'true'});
+  var fieldId='qf_'+(Math.random()*1e6|0);
+  div.setAttribute('data-qfid',fieldId);
   div.innerHTML=markupWithErrors(text,fieldErrors);
+  // Store which errors belong to this field for scanning
+  div._qErrors=fieldErrors;
   div.addEventListener('input',function(){
     var plain=div.textContent||div.innerText||'';
     if(onInput)onInput(plain);
-    checkErrorsCleared(div);
+    // Debounce: scan 1.5s after user stops typing
+    clearTimeout(div._scanTimer);
+    div._scanTimer=setTimeout(function(){scanFieldForFixes(div);},1500);
   });
   return div;
 }
 
-function checkErrorsCleared(fieldEl){
-  var marks=fieldEl.querySelectorAll('.err-mark');
+// Scan full field text — only clears error when weak word is genuinely GONE
+// and field still has real content (not just deleted everything)
+function scanFieldForFixes(fieldEl){
   var qs=R.quality_score; if(!qs)return;
+  var text=(fieldEl.textContent||'').trim();
+  var lower=text.toLowerCase();
   var deltas={vocab:4,grammar:4,context:5};
-  marks.forEach(function(mark){
-    var errid=mark.dataset.errid;
-    var err=qs.errors.find(function(e){return e.id===errid;});
-    if(!err||err.fixed)return;
-    var tip=mark.querySelector('.err-tip');
-    var currentText=(mark.textContent||'').replace(tip?tip.textContent:'','').trim();
-    if(currentText!==err.match){
-      err.fixed=true;
-      qs[err.type==='vocab'?'vocabulary':err.type==='grammar'?'grammar':'context']=
-        Math.min(100,(err.type==='vocab'?qs.vocabulary:err.type==='grammar'?qs.grammar:qs.context)+deltas[err.type]);
-      qs.overall=Math.round((qs.vocabulary+qs.grammar+qs.context)/3);
+
+  qs.errors.forEach(function(err){
+    if(err.fixed)return;
+    // Only check errors that belong to this field
+    var fieldErrors=fieldEl._qErrors;
+    if(!fieldErrors||fieldErrors.indexOf(err)===-1)return;
+
+    // Punctuation check (missing period)
+    if(!err.match){
+      if(lower.match(/[.!?]$/)){
+        markErrorFixed(err,deltas,fieldEl);
+      }
+      return;
+    }
+
+    // Check: is the weak word/phrase GONE from the full field text?
+    var wordLower=err.match.toLowerCase();
+    var stillThere=lower.indexOf(wordLower)>=0;
+
+    if(!stillThere && text.length>10){
+      // Weak phrase is gone and field has real content = FIXED
+      markErrorFixed(err,deltas,fieldEl);
+    }
+  });
+}
+
+function markErrorFixed(err,deltas,fieldEl){
+  var qs=R.quality_score;
+  err.fixed=true;
+  var scoreKey=err.type==='vocab'?'vocabulary':err.type==='grammar'?'grammar':'context';
+  qs[scoreKey]=Math.min(100,qs[scoreKey]+deltas[err.type]);
+  qs.overall=Math.round((qs.vocabulary+qs.grammar+qs.context)/3);
+  // Clean up highlight span if it still exists in DOM
+  if(fieldEl){
+    var span=fieldEl.querySelector('[data-errid="'+err.id+'"]');
+    if(span){
+      var tip=span.querySelector('.err-tip');
       if(tip)tip.remove();
-      mark.replaceWith(mark.textContent||'');
-      refreshQualityDashboard(); renderRail(); showFixToast();
+      span.replaceWith(span.textContent||'');
     }
-  });
-  qs.errors.filter(function(e){return !e.fixed&&e.match;}).forEach(function(err){
-    if(!document.querySelector('[data-errid="'+err.id+'"]')){
-      err.fixed=true;
-      qs[err.type==='vocab'?'vocabulary':err.type==='grammar'?'grammar':'context']=
-        Math.min(100,(err.type==='vocab'?qs.vocabulary:err.type==='grammar'?qs.grammar:qs.context)+deltas[err.type]);
-      qs.overall=Math.round((qs.vocabulary+qs.grammar+qs.context)/3);
-      refreshQualityDashboard(); renderRail(); showFixToast();
-    }
-  });
+  }
+  refreshQualityDashboard(); renderRail(); showFixToast();
 }
 
 function refreshQualityDashboard(){
