@@ -417,26 +417,30 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .quality-card h2{font-size:14px;font-weight:700}
 .quality-card .body{padding:0}
 
-/* ---------- Quality Dashboard ---------- */
-.qdash-top{display:flex;align-items:center;justify-content:space-between;padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid #F0F1EE}
-.qdash-title{font-size:15px;font-weight:800;color:var(--ink);margin-bottom:16px;letter-spacing:-.02em}
-.qdash-score{font-size:80px;font-weight:900;line-height:1;margin-bottom:4px;transition:all .3s}
-.qdash-label{font-size:13px;font-weight:700;transition:color .3s}
-.qdash-ring{width:90px;height:90px;border-radius:50%;position:relative;display:flex;align-items:center;
+/* ---------- Quality Dashboard (compact single-row) ---------- */
+.qdash-row{display:flex;align-items:center;gap:20px}
+.qdash-score-wrap{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.qdash-ring{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;flex-shrink:0;transition:background .5s}
-.qdash-ring-inner{width:64px;height:64px;border-radius:50%;background:var(--card);display:flex;align-items:center;
-  justify-content:center;font-size:15px;font-weight:900;transition:color .3s}
-.qdash-subs{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.qsub{border-radius:10px;padding:14px;text-align:center;border:1px solid}
-.qsub-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
-.qsub-val{font-size:32px;font-weight:900;margin-bottom:2px;transition:all .3s}
-.qsub-detail{font-size:10px;line-height:1.4}
+.qdash-ring-inner{width:38px;height:38px;border-radius:50%;background:var(--card);display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:900;transition:color .3s}
+.qdash-info{flex-shrink:0}
+.qdash-title{font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em}
+.qdash-score{font-size:36px;font-weight:900;line-height:1.1;transition:all .3s}
+.qdash-label{font-size:11px;font-weight:600;transition:color .3s}
+.qdash-subs{display:flex;gap:10px;flex:1;margin-left:auto}
+.qsub{flex:1;border-radius:8px;padding:10px;text-align:center;border:1px solid}
+.qsub-label{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+.qsub-val{font-size:22px;font-weight:900;transition:all .3s}
+.qsub-detail{font-size:9px;margin-top:2px}
 .qsub-vocab{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
 .qsub-vocab .qsub-val{color:#10B981}
 .qsub-grammar{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
 .qsub-grammar .qsub-val{color:#F59E0B}
 .qsub-context{background:#EEF2FF;border-color:#C7D2FE;color:#3730A3}
 .qsub-context .qsub-val{color:#6366F1}
+@media(max-width:700px){.qdash-row{flex-direction:column;align-items:stretch}
+  .qdash-score-wrap{justify-content:center}.qdash-subs{flex-direction:column}}
 
 /* ---------- Inline Error Marks ---------- */
 .q-editable{position:relative;padding:10px 12px;border:1px solid #ccd;border-radius:8px;font-size:13.5px;line-height:1.8;

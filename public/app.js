@@ -1025,14 +1025,14 @@ function buildEditor(){
   const gc = unfixed.filter(function(e){return e.type==='grammar';}).length;
   const cc = unfixed.filter(function(e){return e.type==='context';}).length;
   const qCard = el('div', {class: 'card quality-card', id: 'sec-quality'});
-  qCard.innerHTML = '<div class="qdash-top">'
-    + '<div>'
-    + '<div class="qdash-title">Resume Quality Score</div>'
+  qCard.innerHTML = '<div class="qdash-row">'
+    + '<div class="qdash-score-wrap">'
+    + '<div class="qdash-ring" id="qdash-ring" style="background:conic-gradient('+severity.color+' 0deg,'+severity.color+' '+deg+'deg,#E5E7EB '+deg+'deg)">'
+    + '<div class="qdash-ring-inner" id="qdash-ring-inner" style="color:'+severity.color+'">'+qs.overall+'%</div></div>'
+    + '<div class="qdash-info">'
+    + '<div class="qdash-title">Quality Score</div>'
     + '<div class="qdash-score" id="qdash-score" style="color:'+severity.color+'">'+qs.overall+'%</div>'
     + '<div class="qdash-label" id="qdash-label" style="color:'+severity.color+'">'+severity.label+'</div>'
-    + '</div>'
-    + '<div class="qdash-ring" id="qdash-ring" style="background:conic-gradient('+severity.color+' 0deg,'+severity.color+' '+deg+'deg,#E5E7EB '+deg+'deg)">'
-    + '<div class="qdash-ring-inner" id="qdash-ring-inner" style="color:'+severity.color+'">'+qs.overall+'%</div>'
     + '</div></div>'
     + '<div class="qdash-subs">'
     + '<div class="qsub qsub-vocab"><div class="qsub-label">Vocabulary</div>'
@@ -1044,7 +1044,7 @@ function buildEditor(){
     + '<div class="qsub qsub-context"><div class="qsub-label">Context</div>'
     + '<div class="qsub-val" id="qdash-context">'+qs.context+'%</div>'
     + '<div class="qsub-detail" id="qdash-context-detail">'+cc+' issue'+(cc!==1?'s':'')+' remaining</div></div>'
-    + '</div>';
+    + '</div></div>';
   ed.appendChild(qCard);
   
   // Career insights at the very top (only if we have experience)
