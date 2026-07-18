@@ -927,20 +927,34 @@ function markupWithErrors(text,fieldErrors){
 }
 
 function qualityField(text,fieldErrors,onInput){
+  var wrapper=el('div',{class:'q-field-wrap'});
   var div=el('div',{class:'q-editable',contenteditable:'true'});
-  var fieldId='qf_'+(Math.random()*1e6|0);
-  div.setAttribute('data-qfid',fieldId);
   div.innerHTML=markupWithErrors(text,fieldErrors);
-  // Store which errors belong to this field for scanning
   div._qErrors=fieldErrors;
   div.addEventListener('input',function(){
     var plain=div.textContent||div.innerText||'';
     if(onInput)onInput(plain);
-    // Debounce: scan 1.5s after user stops typing
     clearTimeout(div._scanTimer);
     div._scanTimer=setTimeout(function(){scanFieldForFixes(div);},1500);
   });
-  return div;
+  wrapper.appendChild(div);
+
+  // Show hint badges below field for ALL errors (including ones without match text)
+  var hintsDiv=el('div',{class:'q-hints'});
+  hintsDiv.setAttribute('data-hints-for',div.getAttribute('data-qfid')||'');
+  var colors={vocab:'#10B981',grammar:'#F59E0B',context:'#6366F1'};
+  var labels={vocab:'Vocabulary',grammar:'Grammar',context:'Context'};
+  fieldErrors.forEach(function(err){
+    if(err.fixed)return;
+    var hint=el('div',{class:'q-hint','data-hintid':err.id});
+    hint.innerHTML='<span class="q-hint-dot" style="background:'+colors[err.type]+'"></span>'
+      +'<span class="q-hint-label" style="color:'+colors[err.type]+'">'+labels[err.type]+'</span> '
+      +esc(err.desc);
+    hintsDiv.appendChild(hint);
+  });
+  if(hintsDiv.children.length>0) wrapper.appendChild(hintsDiv);
+
+  return wrapper;
 }
 
 // Scan full field text — only clears error when weak word is genuinely GONE
@@ -951,27 +965,46 @@ function scanFieldForFixes(fieldEl){
   var lower=text.toLowerCase();
   var deltas={vocab:4,grammar:4,context:5};
 
-  qs.errors.forEach(function(err){
-    if(err.fixed)return;
-    // Only check errors that belong to this field
-    var fieldErrors=fieldEl._qErrors;
-    if(!fieldErrors||fieldErrors.indexOf(err)===-1)return;
+  var fieldErrors=fieldEl._qErrors;
+  if(!fieldErrors)return;
 
-    // Punctuation check (missing period)
-    if(!err.match){
+  fieldErrors.forEach(function(err){
+    if(err.fixed)return;
+
+    // Context errors (no match text): check if user added metrics/specifics
+    if(err.type==='context' && !err.match){
+      var hasMetrics=/\b(\d+%|\$\d+|\d+\s*(million|k|m\b)|reduced|increased|improved|delivered|achieved|saved)\b/i.test(text);
+      if(hasMetrics){
+        markErrorFixed(err,deltas,fieldEl);
+      }
+      return;
+    }
+
+    // Grammar: punctuation check
+    if(err.type==='grammar' && !err.match){
       if(lower.match(/[.!?]$/)){
         markErrorFixed(err,deltas,fieldEl);
       }
       return;
     }
 
-    // Check: is the weak word/phrase GONE from the full field text?
-    var wordLower=err.match.toLowerCase();
-    var stillThere=lower.indexOf(wordLower)>=0;
+    // Grammar: tense check (no match text)
+    if(err.type==='grammar' && !err.match && err.desc && err.desc.indexOf('tense')>=0){
+      var hasPast=/\b(was|were|had|managed|led|did)\b/.test(lower);
+      var hasPresent=/\b(is|are|manage|lead|do)\b/.test(lower);
+      if(!(hasPast && hasPresent)){
+        markErrorFixed(err,deltas,fieldEl);
+      }
+      return;
+    }
 
-    if(!stillThere && text.length>10){
-      // Weak phrase is gone and field has real content = FIXED
-      markErrorFixed(err,deltas,fieldEl);
+    // Vocab/context errors with match text: check if phrase is gone
+    if(err.match){
+      var wordLower=err.match.toLowerCase();
+      var stillThere=lower.indexOf(wordLower)>=0;
+      if(!stillThere && text.length>10){
+        markErrorFixed(err,deltas,fieldEl);
+      }
     }
   });
 }
@@ -990,6 +1023,12 @@ function markErrorFixed(err,deltas,fieldEl){
       if(tip)tip.remove();
       span.replaceWith(span.textContent||'');
     }
+  }
+  // Strike through the hint badge
+  var hintEl=document.querySelector('[data-hintid="'+err.id+'"]');
+  if(hintEl){
+    hintEl.classList.add('q-hint-done');
+    hintEl.innerHTML=hintEl.innerHTML+' \u2714';
   }
   refreshQualityDashboard(); renderRail(); showFixToast();
 }
