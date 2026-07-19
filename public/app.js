@@ -3385,3 +3385,151 @@ function initLanding(){
 
 // Initial rail (nothing detected yet)
 renderRail();
+
+/* ============================================================
+   Ask AI Builder — batch fix orchestrator
+   Wires #aabInput/#aabRun to the existing per-error Fix-by-AI
+   pipeline. Parses natural language, targets matching errors,
+   triggers each fix and auto-accepts the AI preview.
+   ============================================================ */
+(function(){
+  function parseCmd(text){
+    var t=(text||'').toLowerCase();
+    if(!/\b(fix|correct|resolve|clean|repair|improve)\b/.test(t)) return null;
+    var type=null;
+    if(/grammar|spelling|tense|punctuation/.test(t)) type='grammar';
+    else if(/vocab|weak word|word choice/.test(t)) type='vocabulary';
+    else if(/context|metric|number|impact|quantif/.test(t)) type='context';
+    var sectionMap={
+      summary:['summary','profile','about'],
+      experience:['experience','work','employment','job'],
+      education:['education','degree','school','university'],
+      skills:['skill','tech stack','tool'],
+      certifications:['certif','license'],
+      projects:['project'],
+      personal:['personal','contact','header']
+    };
+    var section=null;
+    Object.keys(sectionMap).forEach(function(k){
+      if(section) return;
+      if(sectionMap[k].some(function(w){return t.indexOf(w)>=0;})) section=k;
+    });
+    return {isFix:true,type:type,section:section};
+  }
+  function collectErrors(cmd){
+    if(!window.R||!R.quality_score||!R.quality_score.errors) return [];
+    return R.quality_score.errors.filter(function(e){
+      if(e.fixed) return false;
+      if(cmd.type && e.type && String(e.type).toLowerCase().indexOf(cmd.type)<0) return false;
+      if(cmd.section && e.secKey){
+        var sk=String(e.secKey).toLowerCase();
+        if(sk.indexOf(cmd.section)<0 && cmd.section.indexOf(sk)<0) return false;
+      }
+      return true;
+    });
+  }
+  function renderSteps(labels){
+    var ul=document.getElementById('aabSteps'); if(!ul) return [];
+    ul.innerHTML=labels.map(function(l){return '<li><span class="aab-dot"></span><span>'+l+'</span></li>';}).join('');
+    return Array.prototype.slice.call(ul.querySelectorAll('li'));
+  }
+  function setPct(p){
+    var f=document.getElementById('aabFill'),t=document.getElementById('aabPct');
+    if(f) f.style.width=p+'%';
+    if(t) t.textContent=p+'%';
+  }
+  function showConfirm(msg){
+    var c=document.getElementById('aabConfirm'),t=document.getElementById('aabConfirmText');
+    if(!c||!t) return;
+    t.textContent=msg; c.hidden=false;
+  }
+  function findFixBtnFor(err){
+    var span=document.querySelector('[data-errid="'+err.id+'"]');
+    if(span){
+      var host=span.closest('.q-field-wrap')||span.parentElement;
+      if(host){
+        var btn=host.querySelector('.fix-ai-btn:not([disabled])');
+        if(btn) return btn;
+      }
+    }
+    return null;
+  }
+  function clickAndAutoAccept(btn){
+    return new Promise(function(resolve){
+      if(!btn) return resolve(false);
+      var wrap=btn.closest('.q-field-wrap')||document.body;
+      var done=false;
+      var obs=new MutationObserver(function(){
+        if(done) return;
+        var acc=wrap.querySelector('.ai-preview .btn-accept');
+        if(acc){ done=true; obs.disconnect(); acc.click(); setTimeout(function(){resolve(true);},250); }
+      });
+      obs.observe(wrap,{childList:true,subtree:true});
+      try{ btn.click(); }catch(e){}
+      setTimeout(function(){ if(!done){obs.disconnect(); resolve(false);} }, 15000);
+    });
+  }
+  function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+
+  async function runFix(text){
+    var cmd=parseCmd(text);
+    if(!cmd){
+      showConfirm('Try: "Fix all issues", "Fix grammar in summary", "Fix vocabulary in experience"');
+      return;
+    }
+    var errors=collectErrors(cmd);
+    var prog=document.getElementById('aabProgress'),conf=document.getElementById('aabConfirm');
+    if(conf) conf.hidden=true;
+    if(!errors.length){ showConfirm('No matching issues found — you\'re all clean!'); return; }
+    if(prog) prog.hidden=false;
+    setPct(0);
+    var labels=[
+      'Analyzing your resume',
+      'Locating '+errors.length+' issue'+(errors.length!==1?'s':'')+(cmd.section?' in '+cmd.section:''),
+      'Applying AI fixes',
+      'Recalculating quality score'
+    ];
+    var steps=renderSteps(labels);
+    steps[0]&&steps[0].classList.add('done'); setPct(15); await sleep(350);
+    steps[1]&&steps[1].classList.add('done'); setPct(30); await sleep(350);
+
+    var startOverall=(R.quality_score&&R.quality_score.overall)||0;
+    var fixed=0;
+    for(var i=0;i<errors.length;i++){
+      var btn=findFixBtnFor(errors[i]);
+      if(btn){ var ok=await clickAndAutoAccept(btn); if(ok) fixed++; }
+      setPct(30+Math.round(60*(i+1)/errors.length));
+    }
+    steps[2]&&steps[2].classList.add('done'); setPct(95); await sleep(300);
+    steps[3]&&steps[3].classList.add('done'); setPct(100);
+
+    var endOverall=(R.quality_score&&R.quality_score.overall)||startOverall;
+    var delta=Math.max(0,endOverall-startOverall);
+    var msg='Fixed '+fixed+' of '+errors.length+' issue'+(errors.length!==1?'s':'')
+      +(cmd.section?' in '+cmd.section:'')
+      +(delta>0?' — +'+delta+' points to Quality Score':' — section updated');
+    showConfirm(msg);
+    setTimeout(function(){ if(prog) prog.hidden=true; }, 5000);
+  }
+
+  function wire(){
+    var input=document.getElementById('aabInput');
+    var run=document.getElementById('aabRun');
+    var chips=document.getElementById('aabChips');
+    if(!input||!run) return false;
+    if(run._aabWired) return true;
+    run._aabWired=true;
+    function go(){ var v=input.value.trim(); if(v) runFix(v); }
+    run.addEventListener('click',go);
+    input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); go(); } });
+    if(chips){
+      chips.addEventListener('click',function(e){
+        var b=e.target.closest('.aab-chip'); if(!b) return;
+        input.value=b.textContent.trim(); go();
+      });
+    }
+    return true;
+  }
+  var tries=0;
+  var iv=setInterval(function(){ tries++; if(wire()||tries>80) clearInterval(iv); },300);
+})();
