@@ -1004,13 +1004,11 @@ function qualityField(text,fieldErrors,onInput){
     hint.innerHTML='<span class="q-hint-dot" style="background:'+colors[err.type]+'"></span>'
       +'<span class="q-hint-label" style="color:'+colors[err.type]+'">'+labels[err.type]+'</span> '
       +'<span class="q-hint-text">'+esc(err.desc)+'</span>';
-    // Fix by AI button — only when there is concrete text to fix (a line or a matched word)
-    var fixTarget = err.line || err.match;
-    if(fixTarget){
-      var btn=el('button',{class:'fix-ai-btn',type:'button'},'\u2726 Fix by AI');
-      btn.addEventListener('click',function(){ fixByAI(err, div, hint, btn); });
-      hint.appendChild(btn);
-    }
+    // Fix by AI button — targets the flagged line/word, or the whole field for
+    // rule-based errors (tense, punctuation) that have no specific text
+    var btn=el('button',{class:'fix-ai-btn',type:'button'},'\u2726 Fix by AI');
+    btn.addEventListener('click',function(){ fixByAI(err, div, hint, btn); });
+    hint.appendChild(btn);
     hintsDiv.appendChild(hint);
   });
   if(hintsDiv.children.length>0) wrapper.appendChild(hintsDiv);
@@ -1020,7 +1018,8 @@ function qualityField(text,fieldErrors,onInput){
 
 // ---- Fix by AI: request fix, show review box, apply on accept ----
 function fixByAI(err, fieldEl, hintEl, btn){
-  var target = err.line || err.match;
+  var wholeField = !(err.line || err.match);
+  var target = err.line || err.match || qFieldText(fieldEl).trim();
   if(!target) return;
   btn.disabled = true;
   btn.classList.add('loading');
@@ -1085,7 +1084,6 @@ function applyAIFix(err, fieldEl, original, suggestion){
       lineSpan.querySelectorAll('.err-line-badge,.err-tip').forEach(function(d){d.remove();});
       lineSpan.replaceWith(document.createTextNode(suggestion));
     } else {
-      // fallback: text replace in whole field
       replacePlainText(fieldEl, original, suggestion);
     }
   } else if(err.match){
@@ -1096,6 +1094,12 @@ function applyAIFix(err, fieldEl, original, suggestion){
     } else {
       replacePlainText(fieldEl, original, suggestion);
     }
+  } else {
+    // Rule-based error (tense/punctuation): AI rewrote the WHOLE field.
+    // Replace all content, re-render highlights for the remaining unfixed errors.
+    var remaining=(fieldEl._qErrors||[]).filter(function(e){return !e.fixed && e!==err;});
+    fieldEl.innerHTML=markupWithErrors(suggestion, remaining);
+    fieldEl._qOrigLen=suggestion.trim().length;
   }
   // 2. Sync data model via the field's input pipeline
   fieldEl.dispatchEvent(new Event('input', {bubbles:true}));
