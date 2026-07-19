@@ -1217,6 +1217,45 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 .ldt2-done .s{font-size:12.5px;color:#4A5B76}
 
 
+/* ===== Ask AI Builder ===== */
+.aab{margin:10px 0 12px;border-radius:12px;background:linear-gradient(135deg,#10b981,#059669);
+  box-shadow:0 6px 18px -8px rgba(5,150,105,.55);padding:10px 12px;color:#fff;font-family:inherit}
+.aab-row{display:flex;align-items:center;gap:10px}
+.aab-icon{width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.18);
+  display:grid;place-items:center;flex:0 0 auto;font-size:15px}
+.aab-body{flex:1;min-width:0}
+.aab-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#ecfdf5}
+.aab-input-wrap{margin-top:4px;display:flex;align-items:center;gap:6px;background:#fff;
+  border-radius:9px;padding:5px 8px;box-shadow:inset 0 1px 3px rgba(0,0,0,.08)}
+.aab-input{flex:1;border:0;outline:0;background:transparent;color:#0f172a;font-size:13px;padding:3px 2px}
+.aab-input::placeholder{color:#94a3b8}
+.aab-run{border:0;cursor:pointer;background:#059669;color:#fff;font-weight:600;font-size:11px;
+  border-radius:7px;padding:5px 10px;display:inline-flex;align-items:center;gap:5px}
+.aab-run:hover{background:#047857}
+.aab-run:disabled{opacity:.55;cursor:not-allowed}
+.aab-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;padding-left:40px}
+.aab-chip{background:rgba(255,255,255,.18);color:#fff;border:0;cursor:pointer;
+  border-radius:999px;padding:2px 9px;font-size:10.5px;font-weight:500}
+.aab-chip:hover{background:rgba(255,255,255,.3)}
+.aab-progress{margin-top:10px;background:rgba(255,255,255,.12);border-radius:9px;padding:8px 10px}
+.aab-progress-head{display:flex;justify-content:space-between;font-size:10px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:#fff}
+.aab-bar{height:6px;background:rgba(255,255,255,.22);border-radius:99px;overflow:hidden;margin-top:6px}
+.aab-bar>span{display:block;height:100%;background:#fff;width:0;transition:width .45s ease}
+.aab-steps{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
+.aab-steps li{display:flex;align-items:center;gap:6px;font-size:11.5px;color:rgba(255,255,255,.9)}
+.aab-steps li.done{color:#fff}
+.aab-dot{width:11px;height:11px;border-radius:99px;border:2px solid rgba(255,255,255,.5);
+  border-top-color:#fff;animation:aabspin .8s linear infinite;flex:0 0 auto}
+.aab-steps li.done .aab-dot{animation:none;background:#fff;border-color:#fff;position:relative}
+.aab-steps li.done .aab-dot::after{content:"\2713";position:absolute;inset:0;color:#059669;
+  font-size:9px;font-weight:900;display:grid;place-items:center;line-height:1}
+@keyframes aabspin{to{transform:rotate(360deg)}}
+.aab-confirm{margin-top:8px;background:#fff;color:#0f172a;border-radius:9px;
+  padding:6px 10px;display:flex;align-items:center;gap:8px;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.aab-confirm b{color:#059669}
+.aab-pulse{animation:aabpulse 1.6s ease-in-out}
+@keyframes aabpulse{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}30%{box-shadow:0 0 0 4px rgba(16,185,129,.35)}}
 </style>
 </head>
 <body>
@@ -1580,6 +1619,35 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
           <div class="pbar"><div id="pbarFill"></div></div>
           <div class="pstatus" id="pstatus"><span class="pspin" id="pspin"></span><span id="pstatusText">Uploading…</span><span id="ppct">0%</span></div>
         </div>
+        <!-- Ask AI Builder -->
+        <div class="aab" id="aabRoot" role="region" aria-label="Ask AI Builder">
+          <div class="aab-row">
+            <div class="aab-icon">✨</div>
+            <div class="aab-body">
+              <div class="aab-label">Ask AI Builder</div>
+              <div class="aab-input-wrap">
+                <input class="aab-input" id="aabInput" type="text"
+                  placeholder='Try: "Add Python to my skills" or "Fix grammar in summary"'>
+                <button class="aab-run" id="aabRun" type="button">Run →</button>
+              </div>
+            </div>
+          </div>
+          <div class="aab-chips" id="aabChips">
+            <button class="aab-chip" type="button">Add Python &amp; Docker to my skills</button>
+            <button class="aab-chip" type="button">Fix grammar in my summary</button>
+            <button class="aab-chip" type="button">Delete my last work experience</button>
+            <button class="aab-chip" type="button">Add AWS certification</button>
+          </div>
+          <div class="aab-progress" id="aabProgress" hidden>
+            <div class="aab-progress-head"><span>AI Builder in progress</span><span id="aabPct">0%</span></div>
+            <div class="aab-bar"><span id="aabFill"></span></div>
+            <ul class="aab-steps" id="aabSteps"></ul>
+          </div>
+          <div class="aab-confirm" id="aabConfirm" hidden>
+            <span style="color:#059669;font-weight:900">✓</span>
+            <span id="aabConfirmText"></span>
+          </div>
+        </div>
         <!-- Upload -->
         <div id="startArea">
           <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload resume">
@@ -1833,5 +1901,78 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <script src="app.js"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var input=$('aabInput'),run=$('aabRun'),chips=$('aabChips'),
+      prog=$('aabProgress'),pct=$('aabPct'),fill=$('aabFill'),
+      steps=$('aabSteps'),conf=$('aabConfirm'),confT=$('aabConfirmText');
+  if(!input)return;
+  var ROUTES=[
+    [/skill|python|docker|java|aws|react|node|sql/i,'Skills'],
+    [/summary|about|profile|grammar|spelling|tone/i,'Profile / Summary'],
+    [/experi|job|work|company|role|position/i,'Experience'],
+    [/certif|licen[sc]e|credential/i,'Certifications'],
+    [/educat|degree|university|college|school/i,'Education'],
+    [/project|portfolio/i,'Projects'],
+    [/award|honou?r|recognition/i,'Accomplishments'],
+    [/language/i,'Languages'],
+    [/course|training/i,'Courses'],
+    [/personal|contact|phone|email|address/i,'Personal details']
+  ];
+  function routeSection(t){for(var i=0;i<ROUTES.length;i++)if(ROUTES[i][0].test(t))return ROUTES[i][1];return 'Profile / Summary'}
+  function routeVerb(t){
+    if(/delete|remove/i.test(t))return 'Removing content from';
+    if(/replace|fix|correct|grammar|spell/i.test(t))return 'Rewriting';
+    if(/add|insert|append|include/i.test(t))return 'Adding new content to';
+    return 'Updating';
+  }
+  function pulseSection(name){
+    var nodes=document.querySelectorAll('.rail button,.rail a,[data-section],.sec-bar,.sec-title');
+    var lc=name.toLowerCase();
+    for(var i=0;i<nodes.length;i++){
+      var el=nodes[i],txt=(el.textContent||'').trim().toLowerCase();
+      if(txt&&txt.indexOf(lc)!==-1){
+        el.classList.add('aab-pulse');
+        (function(n){setTimeout(function(){n.classList.remove('aab-pulse')},1800)})(el);
+        try{el.scrollIntoView({behavior:'smooth',block:'center'})}catch(e){}
+        break;
+      }
+    }
+  }
+  var busy=false,timers=[];
+  function run_(text){
+    var q=(text||input.value||'').trim();
+    if(!q||busy)return;
+    busy=true;run.disabled=true;conf.hidden=true;
+    var section=routeSection(q),verb=routeVerb(q);
+    var plan=['Reading your request','Locating "'+section+'" section',verb+' "'+section+'"','Applying changes to your resume'];
+    steps.innerHTML=plan.map(function(s){return '<li><span class="aab-dot"></span><span>'+s+'</span></li>'}).join('');
+    prog.hidden=false;pct.textContent='6%';fill.style.width='6%';
+    var marks=[{t:500,p:28,i:0},{t:1100,p:52,i:1},{t:1900,p:78,i:2},{t:2600,p:100,i:3}];
+    marks.forEach(function(m){
+      timers.push(setTimeout(function(){
+        pct.textContent=m.p+'%';fill.style.width=m.p+'%';
+        var lis=steps.querySelectorAll('li');
+        for(var k=0;k<=m.i;k++)lis[k]&&lis[k].classList.add('done');
+        if(m.i===1)pulseSection(section);
+      },m.t));
+    });
+    timers.push(setTimeout(function(){
+      prog.hidden=true;
+      confT.innerHTML='<b>'+section+' section updated</b> — all changes applied';
+      conf.hidden=false;input.value='';busy=false;run.disabled=false;
+      timers.push(setTimeout(function(){conf.hidden=true},4500));
+    },3050));
+  }
+  run.addEventListener('click',function(){run_()});
+  input.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();run_()}});
+  chips.addEventListener('click',function(e){
+    var b=e.target.closest('.aab-chip');if(!b)return;
+    input.value=b.textContent.trim();run_();
+  });
+})();
+</script>
+
 </body>
 </html>
