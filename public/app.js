@@ -901,6 +901,13 @@ function analyzeQualityScore(){
   });
   vs=Math.max(30,Math.round(vs)); gs=Math.max(35,Math.round(gs)); cs=Math.max(30,Math.round(cs));
   var overall=Math.round((vs+gs+cs)/3);
+  // Per-error reward: fixing ALL errors of a type brings that sub-score to exactly 100
+  var typeCounts={vocab:0,grammar:0,context:0};
+  errs.forEach(function(e){typeCounts[e.type]++;});
+  var typeScores={vocab:vs,grammar:gs,context:cs};
+  errs.forEach(function(e){
+    e.reward = typeCounts[e.type]>0 ? (100 - typeScores[e.type]) / typeCounts[e.type] : 0;
+  });
   var bySection={};
   errs.forEach(function(e){if(!bySection[e.section])bySection[e.section]=[];bySection[e.section].push(e);});
   return {overall:overall,vocabulary:vs,grammar:gs,context:cs,errors:errs,issuesBySection:bySection};
@@ -931,6 +938,7 @@ function qualityField(text,fieldErrors,onInput){
   var div=el('div',{class:'q-editable',contenteditable:'true'});
   div.innerHTML=markupWithErrors(text,fieldErrors);
   div._qErrors=fieldErrors;
+  div._qOrigLen=(text||'').trim().length;
   div.addEventListener('input',function(){
     var plain=div.textContent||div.innerText||'';
     if(onInput)onInput(plain);
@@ -957,13 +965,16 @@ function qualityField(text,fieldErrors,onInput){
   return wrapper;
 }
 
-// Scan full field text — only clears error when weak word is genuinely GONE
-// and field still has real content (not just deleted everything)
+// Scan full field text with STRICT validation:
+// - phrase must be GONE
+// - user must have TYPED A REPLACEMENT (field length >= origLen - phraseLen + 3)
+//   so backspace/delete alone NEVER changes the score
+// - rule-based errors (punct/tense/metrics) check the actual condition
 function scanFieldForFixes(fieldEl){
   var qs=R.quality_score; if(!qs)return;
   var text=(fieldEl.textContent||'').trim();
   var lower=text.toLowerCase();
-  var deltas={vocab:4,grammar:4,context:5};
+  var origLen=fieldEl._qOrigLen||0;
 
   var fieldErrors=fieldEl._qErrors;
   if(!fieldErrors)return;
@@ -971,49 +982,54 @@ function scanFieldForFixes(fieldEl){
   fieldErrors.forEach(function(err){
     if(err.fixed)return;
 
-    // Context errors (no match text): check if user added metrics/specifics
-    if(err.type==='context' && !err.match){
-      var hasMetrics=/\b(\d+%|\$\d+|\d+\s*(million|k|m\b)|reduced|increased|improved|delivered|achieved|saved)\b/i.test(text);
-      if(hasMetrics){
-        markErrorFixed(err,deltas,fieldEl);
+    // Rule-based errors (no match text)
+    if(!err.match){
+      // Tense mixing check
+      if(err.type==='grammar' && err.desc && err.desc.toLowerCase().indexOf('tense')>=0){
+        var hasPast=/\b(was|were|had|managed|led|did)\b/.test(lower);
+        var hasPresent=/\b(is|are|manage|lead|do)\b/.test(lower);
+        if(!(hasPast && hasPresent)) markErrorFixed(err,fieldEl);
+        return;
+      }
+      // Missing punctuation check
+      if(err.type==='grammar'){
+        if(/[.!?]$/.test(lower)) markErrorFixed(err,fieldEl);
+        return;
+      }
+      // Context: metrics added check
+      if(err.type==='context'){
+        var hasMetrics=/\b(\d+%|\$\d+|\d+\s*(million|k|m\b)|reduced|increased|improved|delivered|achieved|saved)\b/i.test(text);
+        if(hasMetrics) markErrorFixed(err,fieldEl);
+        return;
       }
       return;
     }
 
-    // Grammar: punctuation check
-    if(err.type==='grammar' && !err.match){
-      if(lower.match(/[.!?]$/)){
-        markErrorFixed(err,deltas,fieldEl);
-      }
-      return;
-    }
+    // Word/phrase errors — STRICT validation
+    var wordLower=err.match.toLowerCase();
+    var gone = lower.indexOf(wordLower)===-1;
+    if(!gone) return; // phrase still present
 
-    // Grammar: tense check (no match text)
-    if(err.type==='grammar' && !err.match && err.desc && err.desc.indexOf('tense')>=0){
-      var hasPast=/\b(was|were|had|managed|led|did)\b/.test(lower);
-      var hasPresent=/\b(is|are|manage|lead|do)\b/.test(lower);
-      if(!(hasPast && hasPresent)){
-        markErrorFixed(err,deltas,fieldEl);
-      }
-      return;
-    }
+    // KEY: user must have typed replacement, not just deleted.
+    // minimum expected length = original - removed phrase + 3 chars new text
+    var minLen = origLen - wordLower.length + 3;
+    if(text.length < minLen) return; // deletion only — NO score change
 
-    // Vocab/context errors with match text: check if phrase is gone
-    if(err.match){
-      var wordLower=err.match.toLowerCase();
-      var stillThere=lower.indexOf(wordLower)>=0;
-      if(!stillThere && text.length>10){
-        markErrorFixed(err,deltas,fieldEl);
-      }
-    }
+    markErrorFixed(err,fieldEl);
   });
 }
 
-function markErrorFixed(err,deltas,fieldEl){
+function markErrorFixed(err,fieldEl){
   var qs=R.quality_score;
   err.fixed=true;
   var scoreKey=err.type==='vocab'?'vocabulary':err.type==='grammar'?'grammar':'context';
-  qs[scoreKey]=Math.min(100,qs[scoreKey]+deltas[err.type]);
+  // Use per-error reward so fixing ALL errors reaches exactly 100%
+  var reward = err.reward || 4;
+  qs[scoreKey]=Math.min(100, qs[scoreKey]+reward);
+  // If no unfixed errors of this type remain, snap to exactly 100
+  var remaining=qs.errors.filter(function(e){return !e.fixed && e.type===err.type;}).length;
+  if(remaining===0) qs[scoreKey]=100;
+  qs[scoreKey]=Math.round(qs[scoreKey]);
   qs.overall=Math.round((qs.vocabulary+qs.grammar+qs.context)/3);
   // Clean up highlight span if it still exists in DOM
   if(fieldEl){
@@ -1308,33 +1324,35 @@ function renderRail(){
   ];
   
   items.forEach((it,idx)=>{
-    const b = el('button',{class:'rail-item'+(it.on?' detected':''),type:'button','data-anchor':it.anchor,'data-section':it.key},
+    // Count unfixed errors in this section first
+    let unfixedCount = 0;
+    if(R.quality_score && R.quality_score.issuesBySection && R.quality_score.issuesBySection[it.key]){
+      unfixedCount = R.quality_score.issuesBySection[it.key].filter(e => !e.fixed).length;
+    }
+    // Green tick ONLY when detected AND fully clean; no tick when issues exist
+    const cls = 'rail-item' + (it.on && unfixedCount === 0 ? ' detected' : '') + (unfixedCount > 0 ? ' has-issues' : '');
+    const b = el('button',{class:cls,type:'button','data-anchor':it.anchor,'data-section':it.key},
       `${esc(it.label)}`);
     b.style.setProperty('--sec', SEC_COLOURS[idx % SEC_COLOURS.length]);
-    
-    // Count unfixed errors in this section
-    if((R.quality_score&&R.quality_score.issuesBySection&&R.quality_score.issuesBySection[it.key])){
-      const errors = R.quality_score.issuesBySection[it.key];
-      const unfixedCount = errors.filter(e => !e.fixed).length;
-      if(unfixedCount > 0){
-        const badge = el('span', {class: 'error-badge', style: 'margin-left:auto'});
-        badge.style.display = 'inline-flex';
-        badge.style.alignItems = 'center';
-        badge.style.justifyContent = 'center';
-        badge.style.width = '20px';
-        badge.style.height = '20px';
-        badge.style.borderRadius = '50%';
-        badge.style.color = '#fff';
-        badge.style.fontSize = '10px';
-        badge.style.fontWeight = '900';
-        let bgColor = '#EF4444';
-        if(unfixedCount === 1) bgColor = '#F59E0B';
-        badge.style.background = bgColor;
-        badge.textContent = unfixedCount;
-        b.appendChild(badge);
-      }
+
+    if(unfixedCount > 0){
+      const badge = el('span', {class: 'error-badge', style: 'margin-left:auto'});
+      badge.style.display = 'inline-flex';
+      badge.style.alignItems = 'center';
+      badge.style.justifyContent = 'center';
+      badge.style.width = '20px';
+      badge.style.height = '20px';
+      badge.style.borderRadius = '50%';
+      badge.style.color = '#fff';
+      badge.style.fontSize = '10px';
+      badge.style.fontWeight = '900';
+      let bgColor = '#EF4444';
+      if(unfixedCount === 1) bgColor = '#F59E0B';
+      badge.style.background = bgColor;
+      badge.textContent = unfixedCount;
+      b.appendChild(badge);
     }
-    
+
     rail.appendChild(b);
   });
 }
@@ -1343,7 +1361,12 @@ document.addEventListener('click', e=>{
   const item = e.target.closest('.rail-item[data-anchor]');
   if(!item) return;
   const t = document.getElementById(item.dataset.anchor);
-  if(t) t.scrollIntoView({behavior:'smooth', block:'start'});
+  if(t){
+    t.scrollIntoView({behavior:'smooth', block:'start'});
+    t.style.transition='box-shadow .3s';
+    t.style.boxShadow='0 0 0 3px rgba(15,169,104,.35)';
+    setTimeout(function(){ t.style.boxShadow=''; }, 1200);
+  }
 });
 
 // ---------- Cards ----------
