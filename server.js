@@ -710,18 +710,18 @@ app.post('/api/quality-fix', aiLimiter, requireAuth, async (req, res) => {
     if (errorType === 'context') {
       instruction = `This resume line lacks measurable impact. Rewrite it adding metric placeholders in square brackets that the candidate must replace with their real numbers, e.g. "[X]+ employees", "[Y]%", "[Z] audits". NEVER invent specific numbers — always use bracketed placeholders. Keep the candidate's meaning and language.`;
     } else if (errorType === 'grammar') {
-      instruction = `Fix the grammar issue in this resume line (${errorDesc || 'grammar error'}). Correct tense consistency, punctuation, and spacing. Change nothing else. Keep the candidate's language.`;
+      instruction = `Fix the grammar issue in this resume text (${errorDesc || 'grammar error'}). Correct tense consistency, punctuation, and spacing. Keep every bullet and all content — change ONLY what is needed to fix the grammar. Keep the candidate's language.`;
     } else {
       instruction = `Replace weak or informal vocabulary in this resume line (${errorDesc || 'weak wording'}) with strong professional resume language. Keep the meaning identical and keep the candidate's language.`;
     }
 
     const prompt = `${instruction}
-Respond with ONLY the rewritten line, no preamble, no quotes.
+Respond with ONLY the rewritten text, no preamble, no quotes. Preserve line breaks exactly as in the original.
 
-LINE:
-${String(text).slice(0, 1000)}`;
+TEXT:
+${String(text).slice(0, 6000)}`;
 
-    const fixed = await claudeText(prompt, 400);
+    const fixed = await claudeText(prompt, 1200);
     res.json({ success: true, text: fixed.trim() });
   } catch (err) {
     console.error('quality-fix error:', err.message);
