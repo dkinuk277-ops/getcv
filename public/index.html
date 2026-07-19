@@ -478,6 +478,26 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .q-hint-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px}
 .q-hint-label{font-weight:700;font-size:10px;flex-shrink:0}
 .q-hint-done{background:#D1FAE5;border-color:#A7F3D0;color:#065F46;text-decoration:line-through;opacity:.5}
+.q-hint-text{flex:1}
+.q-hint-fixed-tag{font-size:9px;font-weight:800;color:#059669;flex-shrink:0;text-decoration:none}
+
+/* ---------- Fix by AI ---------- */
+.fix-ai-btn{flex-shrink:0;display:inline-flex;align-items:center;gap:4px;margin-left:auto;
+  background:linear-gradient(135deg,#0FA968,#0B8A55);color:#fff;border:none;border-radius:6px;
+  padding:4px 10px;font-size:9.5px;font-weight:700;cursor:pointer;font-family:inherit;
+  transition:all .2s;box-shadow:0 1px 3px rgba(11,138,85,.3)}
+.fix-ai-btn:hover{transform:translateY(-1px);box-shadow:0 3px 8px rgba(11,138,85,.4)}
+.fix-ai-btn:disabled{opacity:.7;cursor:default;transform:none}
+.fix-ai-btn.loading{background:#9CA3AF}
+.ai-preview{background:#F0FDF9;border:1.5px solid #0FA968;border-radius:8px;padding:10px 12px;margin:4px 0;animation:aiSlideIn .3s}
+@keyframes aiSlideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.ai-preview-label{font-size:8px;font-weight:800;color:#0B8A55;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.ai-preview-text{font-size:11.5px;line-height:1.6;color:var(--ink);background:#fff;border-radius:6px;padding:8px 10px;border:1px solid #D1FAE5}
+.ai-preview-actions{display:flex;gap:6px;margin-top:8px}
+.btn-accept{background:#0FA968;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-accept:hover{background:#0B8A55}
+.btn-reject{background:#fff;color:#6B7280;border:1px solid #D1D5DB;border-radius:6px;padding:5px 14px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-reject:hover{background:#F9FAFB}
 
 /* ---------- Fix Toast ---------- */
 .fix-toast{position:fixed;bottom:24px;right:24px;background:#065F46;color:#fff;padding:14px 22px;

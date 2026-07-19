@@ -996,7 +996,6 @@ function qualityField(text,fieldErrors,onInput){
 
   // Show hint badges below field for ALL errors (including ones without match text)
   var hintsDiv=el('div',{class:'q-hints'});
-  hintsDiv.setAttribute('data-hints-for',div.getAttribute('data-qfid')||'');
   var colors={vocab:'#10B981',grammar:'#F59E0B',context:'#6366F1'};
   var labels={vocab:'Vocabulary',grammar:'Grammar',context:'Context'};
   fieldErrors.forEach(function(err){
@@ -1004,12 +1003,116 @@ function qualityField(text,fieldErrors,onInput){
     var hint=el('div',{class:'q-hint','data-hintid':err.id});
     hint.innerHTML='<span class="q-hint-dot" style="background:'+colors[err.type]+'"></span>'
       +'<span class="q-hint-label" style="color:'+colors[err.type]+'">'+labels[err.type]+'</span> '
-      +esc(err.desc);
+      +'<span class="q-hint-text">'+esc(err.desc)+'</span>';
+    // Fix by AI button — only when there is concrete text to fix (a line or a matched word)
+    var fixTarget = err.line || err.match;
+    if(fixTarget){
+      var btn=el('button',{class:'fix-ai-btn',type:'button'},'\u2726 Fix by AI');
+      btn.addEventListener('click',function(){ fixByAI(err, div, hint, btn); });
+      hint.appendChild(btn);
+    }
     hintsDiv.appendChild(hint);
   });
   if(hintsDiv.children.length>0) wrapper.appendChild(hintsDiv);
 
   return wrapper;
+}
+
+// ---- Fix by AI: request fix, show review box, apply on accept ----
+function fixByAI(err, fieldEl, hintEl, btn){
+  var target = err.line || err.match;
+  if(!target) return;
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.textContent = '\u2726 Fixing\u2026';
+
+  fetch('/api/quality-fix', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ text: target, errorType: err.type, errorDesc: err.desc })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    btn.classList.remove('loading');
+    if(!data.success || !data.text){ throw new Error(data.error || 'No suggestion'); }
+    btn.style.display='none';
+    showAIPreview(err, fieldEl, hintEl, btn, target, data.text);
+  })
+  .catch(function(e){
+    btn.disabled=false;
+    btn.classList.remove('loading');
+    btn.textContent='\u2726 Retry';
+    console.error('quality-fix failed:', e);
+  });
+}
+
+function showAIPreview(err, fieldEl, hintEl, btn, original, suggestion){
+  // Remove any previous preview for this hint
+  var old=hintEl.nextElementSibling;
+  if(old && old.classList.contains('ai-preview')) old.remove();
+
+  var box=el('div',{class:'ai-preview'});
+  box.innerHTML='<div class="ai-preview-label">\u2726 AI suggested fix \u2014 review before applying</div>'
+    +'<div class="ai-preview-text">'+esc(suggestion)+'</div>'
+    +'<div class="ai-preview-actions">'
+    +'<button class="btn-accept" type="button">\u2713 Accept &amp; apply</button>'
+    +'<button class="btn-reject" type="button">\u2715 Dismiss</button>'
+    +'</div>';
+  hintEl.insertAdjacentElement('afterend', box);
+
+  box.querySelector('.btn-accept').addEventListener('click',function(){
+    applyAIFix(err, fieldEl, original, suggestion);
+    box.remove();
+    // Hint state -> fixed by AI
+    hintEl.classList.add('q-hint-done');
+    var tag=el('span',{class:'q-hint-fixed-tag'},'\u2713 Fixed by AI');
+    hintEl.appendChild(tag);
+  });
+  box.querySelector('.btn-reject').addEventListener('click',function(){
+    box.remove();
+    btn.style.display='inline-flex';
+    btn.disabled=false;
+    btn.textContent='\u2726 Fix by AI';
+  });
+}
+
+function applyAIFix(err, fieldEl, original, suggestion){
+  // 1. Replace the text in the editable field
+  if(err.line){
+    // Line error: replace the wrapped line element
+    var lineSpan=fieldEl.querySelector('[data-errid="'+err.id+'"]');
+    if(lineSpan){
+      lineSpan.querySelectorAll('.err-line-badge,.err-tip').forEach(function(d){d.remove();});
+      lineSpan.replaceWith(document.createTextNode(suggestion));
+    } else {
+      // fallback: text replace in whole field
+      replacePlainText(fieldEl, original, suggestion);
+    }
+  } else if(err.match){
+    var wordSpan=fieldEl.querySelector('[data-errid="'+err.id+'"]');
+    if(wordSpan){
+      wordSpan.querySelectorAll('.err-tip').forEach(function(d){d.remove();});
+      wordSpan.replaceWith(document.createTextNode(suggestion));
+    } else {
+      replacePlainText(fieldEl, original, suggestion);
+    }
+  }
+  // 2. Sync data model via the field's input pipeline
+  fieldEl.dispatchEvent(new Event('input', {bubbles:true}));
+  // 3. Score up + UI refresh (markErrorFixed handles dashboard, rail, toast)
+  markErrorFixed(err, fieldEl);
+}
+
+function replacePlainText(fieldEl, original, suggestion){
+  var walker=document.createTreeWalker(fieldEl, NodeFilter.SHOW_TEXT);
+  var node;
+  while((node=walker.nextNode())){
+    var idx=node.textContent.indexOf(original);
+    if(idx>=0){
+      node.textContent=node.textContent.substring(0,idx)+suggestion+node.textContent.substring(idx+original.length);
+      return;
+    }
+  }
 }
 
 // Scan full field text with STRICT validation:
@@ -1106,11 +1209,13 @@ function markErrorFixed(err,fieldEl){
       span.replaceWith(document.createTextNode(span.textContent||''));
     }
   }
-  // Strike through the hint badge
+  // Strike through the hint badge (skip if already marked, e.g. by AI accept flow)
   var hintEl=document.querySelector('[data-hintid="'+err.id+'"]');
-  if(hintEl){
+  if(hintEl && !hintEl.classList.contains('q-hint-done')){
     hintEl.classList.add('q-hint-done');
-    hintEl.innerHTML=hintEl.innerHTML+' \u2714';
+    var doneTag=document.createElement('span');
+    doneTag.textContent=' \u2714';
+    hintEl.appendChild(doneTag);
   }
   refreshQualityDashboard(); renderRail(); showFixToast();
 }
