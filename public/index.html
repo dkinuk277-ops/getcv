@@ -451,6 +451,12 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .err-mark.vocab{background:rgba(16,185,129,.12);border-bottom:2px solid #10B981}
 .err-mark.grammar{background:rgba(245,158,11,.12);border-bottom:2px solid #F59E0B}
 .err-mark.context{background:rgba(99,102,241,.12);border-bottom:2px solid #6366F1}
+/* Line-level context highlight: whole line needs metrics */
+.err-line{display:block;background:rgba(99,102,241,.10);border-left:3px solid #6366F1;
+  padding:6px 10px;margin:4px 0;border-radius:4px}
+.err-line-badge{display:inline-block;background:#6366F1;color:#fff;font-size:8px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border-radius:3px;margin-right:6px;
+  user-select:none;vertical-align:middle}
 .err-mark:hover .err-tip{display:block}
 .err-tip{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
   background:#1F2937;color:#fff;padding:10px 14px;border-radius:8px;font-size:11px;line-height:1.5;

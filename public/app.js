@@ -839,9 +839,18 @@ function analyzeQualityScore(){
   });
   Object.keys(vocabSections).forEach(function(secKey){
     var info=vocabSections[secKey], sec=secKey.replace(/_\d+$/,'');
-    Object.keys(WEAK).forEach(function(word){
+    // Longest phrases first so "very good at" wins over "very"/"good"; overlaps are skipped
+    var consumed=[];
+    var wordsSorted=Object.keys(WEAK).sort(function(a,b){return b.length-a.length;});
+    wordsSorted.forEach(function(word){
       var w=WEAK[word], re=new RegExp('\\b'+word.replace(/\s+/g,'\\s+')+'\\b','gi'), m;
       while((m=re.exec(info.text))!==null){
+        var s0=m.index, e0=m.index+m[0].length, overlaps=false;
+        for(var ci=0;ci<consumed.length;ci++){
+          if(s0<consumed[ci][1] && e0>consumed[ci][0]){ overlaps=true; break; }
+        }
+        if(overlaps) continue;
+        consumed.push([s0,e0]);
         errs.push({id:'q'+(eid++),type:'vocab',section:sec,secKey:secKey,
           location:info.label,match:m[0],desc:'"'+m[0]+'" \u2014 '+w.s,fixed:false});
         vs-=3;
@@ -878,18 +887,22 @@ function analyzeQualityScore(){
       gs-=4;
     }
   });
-  var allText=[R.summary||''].concat((R.experience||[]).map(function(e){return e.desc||'';})).concat(R.accomplishments||[]).join(' ');
-  var metricMatches=allText.match(/\b(\d+%|\$\d+|\d+\s*(million|k|m\b)|increased|decreased|reduced|improved|saved|delivered)\b/gi);
-  if(!metricMatches||metricMatches.length<2){
-    (R.experience||[]).forEach(function(e,i){
-      if(!(e.desc||'').match(/\d+%|\$\d+/)){
-        errs.push({id:'q'+(eid++),type:'context',section:'experience',secKey:'experience_'+i,
-          location:'Experience \u2014 '+(e.title||'Job '+(i+1)),match:'',
-          desc:'No metrics \u2014 add numbers (e.g. "reduced risk by 40%")',fixed:false});
-        cs-=5;
-      }
+  // Context: per-LINE metric detection \u2014 highlights the exact lines that need numbers.
+  // Language-neutral: digits, %, currency symbols work in any language.
+  (R.experience||[]).forEach(function(e,i){
+    var lines=(e.desc||'').split(/\n/);
+    var flagged=0;
+    lines.forEach(function(line){
+      var t=line.trim();
+      if(t.length<40) return;               // skip short/heading lines
+      if(/[0-9]/.test(t)) return;            // already has a number/metric
+      if(flagged>=3) return;                 // cap 3 per job to avoid overload
+      errs.push({id:'q'+(eid++),type:'context',section:'experience',secKey:'experience_'+i,
+        location:'Experience \u2014 '+(e.title||'Job '+(i+1)),match:'',line:t,
+        desc:'This line has no measurable impact \u2014 add numbers (people trained, % reduced, \u00a3/$ saved, audits completed)',fixed:false});
+      cs-=4; flagged++;
     });
-  }
+  });
   (R.experience||[]).forEach(function(e,i){
     var vagueRe=/did various|various things|different tasks|many responsibilities|handled different/gi, vm;
     while((vm=vagueRe.exec(e.desc||''))!==null){
@@ -921,16 +934,50 @@ function getScoreSeverity(score){
 }
 
 function markupWithErrors(text,fieldErrors){
-  if(!fieldErrors||!fieldErrors.length)return esc(text);
-  var html=esc(text);
-  var sorted=fieldErrors.filter(function(e){return e.match&&!e.fixed;}).sort(function(a,b){return b.match.length-a.match.length;});
-  sorted.forEach(function(err){
-    var escaped=esc(err.match);
-    var re=new RegExp('('+escaped.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','i');
-    var tip='<span class="err-tip"><span class="tip-badge '+err.type+'">'+err.type+'</span> '+esc(err.desc)+'</span>';
-    html=html.replace(re,'<span class="err-mark '+err.type+'" data-errid="'+err.id+'">$1'+tip+'</span>');
+  var active=(fieldErrors||[]).filter(function(e){return !e.fixed;});
+  if(!active.length) return esc(text);
+
+  var lineErrs=active.filter(function(e){return e.line;});
+  var wordErrs=active.filter(function(e){return e.match&&!e.line;})
+    .sort(function(a,b){return b.match.length-a.match.length;});
+
+  // Build output line by line so context errors wrap the WHOLE line
+  var lines=String(text).split(/\n/);
+  var out=lines.map(function(rawLine){
+    var trimmed=rawLine.trim();
+    var html=esc(rawLine);
+
+    // word-level highlights inside the line
+    wordErrs.forEach(function(err){
+      var escaped=esc(err.match).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      var re=new RegExp('('+escaped+')','i');
+      if(re.test(html) && html.indexOf('data-errid="'+err.id+'"')===-1){
+        var tip='<span class="err-tip" contenteditable="false"><span class="tip-badge '+err.type+'">'+err.type+'</span> '+esc(err.desc)+'</span>';
+        html=html.replace(re,'<span class="err-mark '+err.type+'" data-errid="'+err.id+'">$1'+tip+'</span>');
+      }
+    });
+
+    // line-level context wrap
+    var lineErr=null;
+    for(var li=0;li<lineErrs.length;li++){
+      if(lineErrs[li].line===trimmed){ lineErr=lineErrs[li]; break; }
+    }
+    if(lineErr){
+      html='<span class="err-line" data-errid="'+lineErr.id+'">'
+        +'<span class="err-line-badge" contenteditable="false">Context \u2014 add metrics</span>'
+        +html+'</span>';
+    }
+    return html;
   });
-  return html;
+  return out.join('\n');
+}
+
+// Extract the user's real text — strips tooltips and badges so they never
+// leak into saved resume data or fix-checking
+function qFieldText(fieldEl){
+  var clone=fieldEl.cloneNode(true);
+  clone.querySelectorAll('.err-tip,.err-line-badge').forEach(function(d){d.remove();});
+  return clone.textContent||'';
 }
 
 function qualityField(text,fieldErrors,onInput){
@@ -940,7 +987,7 @@ function qualityField(text,fieldErrors,onInput){
   div._qErrors=fieldErrors;
   div._qOrigLen=(text||'').trim().length;
   div.addEventListener('input',function(){
-    var plain=div.textContent||div.innerText||'';
+    var plain=qFieldText(div);
     if(onInput)onInput(plain);
     clearTimeout(div._scanTimer);
     div._scanTimer=setTimeout(function(){scanFieldForFixes(div);},1500);
@@ -972,7 +1019,7 @@ function qualityField(text,fieldErrors,onInput){
 // - rule-based errors (punct/tense/metrics) check the actual condition
 function scanFieldForFixes(fieldEl){
   var qs=R.quality_score; if(!qs)return;
-  var text=(fieldEl.textContent||'').trim();
+  var text=qFieldText(fieldEl).trim();
   var lower=text.toLowerCase();
   var origLen=fieldEl._qOrigLen||0;
 
@@ -996,9 +1043,28 @@ function scanFieldForFixes(fieldEl){
         if(/[.!?]$/.test(lower)) markErrorFixed(err,fieldEl);
         return;
       }
-      // Context: metrics added check
+      // Context LINE errors: fixed when a matching line now contains a number.
+      // Match = current line shares >=40% of the original line's words (unicode-safe).
+      if(err.type==='context' && err.line){
+        var origWords=err.line.toLowerCase().split(/\s+/).filter(function(w){return w.length>3;});
+        var curLines=text.split(/\n/);
+        for(var ci=0;ci<curLines.length;ci++){
+          var cl=curLines[ci].trim(); if(cl.length<20) continue;
+          if(!/[0-9]/.test(cl)) continue;          // must now contain a number
+          var clLower=cl.toLowerCase(), hits=0;
+          for(var wi=0;wi<origWords.length;wi++){
+            if(clLower.indexOf(origWords[wi])>=0) hits++;
+          }
+          if(origWords.length>0 && hits/origWords.length>=0.4){
+            markErrorFixed(err,fieldEl);
+            break;
+          }
+        }
+        return;
+      }
+      // Context field-level: metrics anywhere in field
       if(err.type==='context'){
-        var hasMetrics=/\b(\d+%|\$\d+|\d+\s*(million|k|m\b)|reduced|increased|improved|delivered|achieved|saved)\b/i.test(text);
+        var hasMetrics=/[0-9]/.test(text);
         if(hasMetrics) markErrorFixed(err,fieldEl);
         return;
       }
@@ -1035,9 +1101,9 @@ function markErrorFixed(err,fieldEl){
   if(fieldEl){
     var span=fieldEl.querySelector('[data-errid="'+err.id+'"]');
     if(span){
-      var tip=span.querySelector('.err-tip');
-      if(tip)tip.remove();
-      span.replaceWith(span.textContent||'');
+      // remove non-content decorations first so their text never leaks into the resume
+      span.querySelectorAll('.err-tip,.err-line-badge').forEach(function(d){d.remove();});
+      span.replaceWith(document.createTextNode(span.textContent||''));
     }
   }
   // Strike through the hint badge
