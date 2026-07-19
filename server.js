@@ -699,6 +699,36 @@ ${resumeText}`;
 });
 
 // ---- 2. Enhance a section of text --------------------------
+// ---- Quality fix: AI-repair a single flagged line/word --------
+app.post('/api/quality-fix', aiLimiter, requireAuth, async (req, res) => {
+  try {
+    const { text, errorType, errorDesc } = req.body;
+    if (!requireKey(res)) return;
+    if (!text) return res.status(400).json({ error: 'No text provided' });
+
+    let instruction;
+    if (errorType === 'context') {
+      instruction = `This resume line lacks measurable impact. Rewrite it adding metric placeholders in square brackets that the candidate must replace with their real numbers, e.g. "[X]+ employees", "[Y]%", "[Z] audits". NEVER invent specific numbers — always use bracketed placeholders. Keep the candidate's meaning and language.`;
+    } else if (errorType === 'grammar') {
+      instruction = `Fix the grammar issue in this resume line (${errorDesc || 'grammar error'}). Correct tense consistency, punctuation, and spacing. Change nothing else. Keep the candidate's language.`;
+    } else {
+      instruction = `Replace weak or informal vocabulary in this resume line (${errorDesc || 'weak wording'}) with strong professional resume language. Keep the meaning identical and keep the candidate's language.`;
+    }
+
+    const prompt = `${instruction}
+Respond with ONLY the rewritten line, no preamble, no quotes.
+
+LINE:
+${String(text).slice(0, 1000)}`;
+
+    const fixed = await claudeText(prompt, 400);
+    res.json({ success: true, text: fixed.trim() });
+  } catch (err) {
+    console.error('quality-fix error:', err.message);
+    res.status(500).json({ error: err.message || 'Fix failed' });
+  }
+});
+
 app.post('/api/enhance', aiLimiter, requireAuth, async (req, res) => {
   try {
     const { text, context } = req.body;
