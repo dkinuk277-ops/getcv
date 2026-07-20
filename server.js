@@ -796,6 +796,34 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
   }
 });
 
+// ---- Ask AI about one section: free-text request scoped to a block ----
+app.post('/api/ask-section', aiLimiter, requireAuth, async (req, res) => {
+  try {
+    const { request, text, scope } = req.body;
+    if (!requireKey(res)) return;
+    if (!request || !String(request).trim()) return res.status(400).json({ error: 'No request provided' });
+
+    const prompt =
+      'You are editing ONE section of a resume. The user has asked for a specific change.\n\n' +
+      'USER REQUEST:\n' + String(request).slice(0, 800) + '\n\n' +
+      'CURRENT ' + (scope ? String(scope).toUpperCase().slice(0, 60) : 'SECTION') + ' TEXT:\n' +
+      String(text || '').slice(0, 3000) + '\n\n' +
+      'RULES:\n' +
+      '- Do exactly what was asked, nothing more. Leave untouched anything the request did not mention.\n' +
+      '- Never invent employers, dates, qualifications or achievements.\n' +
+      '- If a metric is needed and you cannot know it, use a bracketed placeholder such as [X] or [Y].\n' +
+      '- Keep the candidate\'s original language (do not translate).\n' +
+      '- Return ONLY the full updated section text. No preamble, no commentary, no quotes around it.';
+
+    const out = (await claudeText(prompt, 1200) || '').trim();
+    if (!out) return res.status(502).json({ error: 'Empty response — try rephrasing' });
+    res.json({ success: true, text: out });
+  } catch (err) {
+    console.error('ask-section error:', err.message);
+    res.status(500).json({ error: err.message || 'Request failed' });
+  }
+});
+
 app.post('/api/quality-fix', aiLimiter, requireAuth, async (req, res) => {
   try {
     const { text, errorType, errorDesc } = req.body;
