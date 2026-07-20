@@ -650,7 +650,7 @@ function insightsCard(){
   const cInsights = el('div',{class:'card',id:'sec-insights','data-seckey':'insights'});
   cInsights.innerHTML = `
     <h2 style="position:relative">
-      <span class="titlec">📊 Career Insights</span>
+      <span class="titlec">Career Insights</span>
       <span class="tools-right">
         <label class="switch ${R.chart_prefs.timeline?'on':''}" title="Display in exported resume">
           <input type="checkbox" data-pref="timeline" ${R.chart_prefs.timeline?'checked':''}>
@@ -670,7 +670,7 @@ function insightsCard(){
   const cDomain = el('div',{class:'card collapsed',id:'sec-domain','data-seckey':'domain'});
   cDomain.innerHTML = `
     <h2 style="position:relative">
-      <span class="titlec">🎯 Domain Expertise</span>
+      <span class="titlec">Domain Expertise</span>
       <span class="tools-right">
         <label class="switch ${R.chart_prefs.domains?'on':''}" title="Display in exported resume">
           <input type="checkbox" data-pref="domains" ${R.chart_prefs.domains?'checked':''}>
@@ -690,7 +690,7 @@ function insightsCard(){
   const cTenure = el('div',{class:'card collapsed',id:'sec-tenure','data-seckey':'tenure'});
   cTenure.innerHTML = `
     <h2 style="position:relative">
-      <span class="titlec">📈 Tenure Ranking</span>
+      <span class="titlec">Tenure Ranking</span>
       <span class="tools-right">
         <label class="switch ${R.chart_prefs.tenure?'on':''}" title="Display in exported resume">
           <input type="checkbox" data-pref="tenure" ${R.chart_prefs.tenure?'checked':''}>
@@ -1388,8 +1388,12 @@ function buildEditor(){
     + '<div class="qsub-detail" id="qdash-context-detail">'+cc+' issue'+(cc!==1?'s':'')+' remaining</div></div>'
     + '</div></div>';
   ed.appendChild(qCard);
-  
-  // Career insights at the very top (only if we have experience)
+
+  // AI Builder bar sits directly below the quality dashboard
+  var aiBar = document.getElementById('aiBuilderBar');
+  if(aiBar){ ed.appendChild(aiBar); aiBar.classList.remove('hidden'); }
+
+  // Career insights (only if we have experience)
   if(R.experience.length) ed.appendChild(insightsCard());
 
   // Always show every section — grouped: personal (pinned) → header credentials → resume body
@@ -1453,10 +1457,6 @@ function buildEditor(){
         `<button class="sec-arrow" type="button" data-dir="1" title="Move section down">▼</button>`;
     }
 
-    // header-credentials note appended to the title zone
-    if(key==='certifications' || key==='education'){
-      titleZone.appendChild(el('span',{class:'sec-note',title:'This section prints in the credentials area under your name — items reorder there'},'header credentials'));
-    }
 
     // RIGHT: In-resume switch + chevron
     const right = el('span',{class:'sec-tools-right'});
@@ -1470,6 +1470,17 @@ function buildEditor(){
         renderLivePreview();
       });
     }
+    // Ask AI — opens a popover pinned to this button, scoped to this section
+    if(ASKABLE.has(key)){
+      const askBtn = el('button',{class:'sec-askai',type:'button',
+        title:'Ask AI to change this section'},'\u2726 Ask AI');
+      askBtn.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        toggleAskPop(askBtn, key, card);
+      });
+      right.appendChild(askBtn);
+    }
+
     const chev = el('button',{class:'sec-chev',type:'button',title:'Expand / collapse this section'},'▾');
     right.appendChild(chev);
 
@@ -1486,7 +1497,7 @@ function buildEditor(){
     };
     h2.style.cursor = 'pointer';
     h2.addEventListener('click', e=>{
-      if(e.target.closest('.sec-tools-left, .sec-tools-right, button, label, input, .switch, .add-btn, .ai-btn')) return;
+      if(e.target.closest('.sec-tools-left, .sec-tools-right, button, label, input, .switch, .add-btn, .ai-btn, .sec-askai')) return;
       toggleCollapse();
     });
     chev.addEventListener('click', e=>{ e.stopPropagation(); toggleCollapse(); });
@@ -1684,7 +1695,7 @@ function summaryCard(){
 const LIST_DEFS = {
   experience:{title:'Work experience', fields:[
     ['title','Job title'],['company','Company'],['location','Location'],
-    ['start','Start (e.g. Mar 2019)'],['end','End (or Present)']], text:['desc','Achievements / responsibilities'], ai:true,
+    ['start','Start (e.g. Mar 2019)'],['end','End (or Present)']], text:['desc','Responsibilities'], ai:true,
     blank:()=>({title:'',company:'',location:'',start:'',end:'',duration:0,desc:''})},
   education:{title:'Education', fields:[
     ['degree','Degree'],['institution','Institution'],['year','Year'],['grade','Grade / score']],
@@ -3476,8 +3487,8 @@ renderRail();
 // ====== AI BUILDER FUNCTIONS ======
 // Show the AI builder bar when editor is active
 function showAIBuilder(){
-  var bar = document.getElementById('aiBuilderBar');
-  if(bar) bar.classList.remove('hidden');
+  // The bar is re-parented under the quality dashboard by buildEditor();
+  // this only fills the suggestion chips.
   populateAIChips();
 }
 
@@ -3517,8 +3528,14 @@ function runAIBuilder(){
   document.getElementById('aiProgFill').style.width='4%';
   document.getElementById('aiProgSections').innerHTML='';
 
-  // Snapshot issue count before, so we can report a truthful delta
-  window._aiBefore = (analyzeQualityScore().errors||[]).length;
+  // Snapshot issue counts by type, so the log reports only what actually changed
+  var _pre=(analyzeQualityScore().errors||[]);
+  window._aiBefore=_pre.length;
+  window._aiBeforeByType={
+    vocab:_pre.filter(function(e){return e.type==='vocab';}).length,
+    grammar:_pre.filter(function(e){return e.type==='grammar';}).length,
+    context:_pre.filter(function(e){return e.type==='context';}).length
+  };
 
   fetch('/api/ai-builder',{
     method:'POST',headers:{'Content-Type':'application/json'},
@@ -3569,68 +3586,87 @@ function writeAIUnit(u){
 function applyAIUnits(units, placeholders){
   var fill=document.getElementById('aiProgFill');
   var title=document.getElementById('aiProgTitle');
-  var box=document.getElementById('aiProgSections');
+  var log=document.getElementById('aiProgSections');
 
-  title.textContent='In progress \u2014 applying fixes\u2026';
-  box.innerHTML=units.map(function(u,i){
-    var name=u.section==='experience' ? (u.label||('Experience '+(u.index+1))) : u.section;
-    return '<div class="prog-sec" id="aips-'+i+'"><span class="prog-sec-ico">'+(i+1)+'</span><span>'+esc(name)+'</span></div>';
-  }).join('');
+  title.textContent='Working through your resume\u2026';
+  log.className='ai-prog-log';
+  log.innerHTML='';
 
   var applied=0, skipped=0;
 
+  function logLine(html, busy){
+    var d=document.createElement('div');
+    d.className='ai-pl'+(busy?' busy':'');
+    d.innerHTML='<span class="ic">'+(busy?'!':'\u2713')+'</span><span>'+html+'</span>';
+    log.appendChild(d);
+    requestAnimationFrame(function(){ d.classList.add('in'); });
+  }
+
   units.forEach(function(u,idx){
     setTimeout(function(){
-      if(idx>0){
-        var prev=document.getElementById('aips-'+(idx-1));
-        if(prev){ prev.className='prog-sec done'; prev.querySelector('.prog-sec-ico').textContent='\u2713'; }
-      }
-      var cur=document.getElementById('aips-'+idx);
-      if(cur) cur.className='prog-sec doing';
       fill.style.width=(((idx+1)/units.length)*88)+'%';
-
-      // --- the actual write ---
       if(u.unchanged || !u.fixed){ skipped++; }
       else if(writeAIUnit(u)){ applied++; }
       else { skipped++; }
 
-      // --- re-analyse against the NEW text and re-render everything ---
       R.quality_score = analyzeQualityScore();
       refreshQualityDashboard();
       renderRail();
       if(typeof schedulePreview==='function') schedulePreview();
-    }, 700*idx + 200);
+    }, 600*idx + 200);
   });
 
   setTimeout(function(){
-    var last=document.getElementById('aips-'+(units.length-1));
-    if(last){ last.className='prog-sec done'; last.querySelector('.prog-sec-ico').textContent='\u2713'; }
     fill.style.width='100%';
     document.getElementById('aiProgSpinner').style.display='none';
 
-    // Rebuild the editor so highlights, hints and fields reflect the new text
-    var wasScroll=window.scrollY;
+    var scrollY=window.scrollY;
     buildEditor();
-    window.scrollTo(0,wasScroll);
+    window.scrollTo(0,scrollY);
 
-    var after=(R.quality_score&&R.quality_score.errors?R.quality_score.errors:[]).length;
-    var before=window._aiBefore||after;
-    var cleared=Math.max(0, before-after);
-    title.textContent='\u2713 Done \u2014 '+cleared+' issue'+(cleared===1?'':'s')+' cleared, '+after+' remaining'
-      + (skipped? ' ('+skipped+' left unchanged)' : '');
+    // Report by what ACTUALLY changed, category by category
+    var after = (R.quality_score && R.quality_score.errors) ? R.quality_score.errors : [];
+    var before = window._aiBeforeByType || {vocab:0,grammar:0,context:0};
+    var afterBy = {
+      vocab:   after.filter(function(e){return e.type==='vocab';}).length,
+      grammar: after.filter(function(e){return e.type==='grammar';}).length,
+      context: after.filter(function(e){return e.type==='context';}).length
+    };
+
+    var LABEL={vocab:'vocabulary',grammar:'grammar &amp; punctuation',context:'context'};
+    var WORD ={vocab:'weak phrase',grammar:'grammar issue',context:'line'};
+    var total=0;
+    ['grammar','vocab'].forEach(function(t){
+      var n=before[t]-afterBy[t];
+      if(n>0){ total+=n; logLine('Fixed <b>'+LABEL[t]+'</b> \u2014 '+n+' '+WORD[t]+(n>1?'s':'')+' corrected'); }
+    });
+    var cFixed = before.context - afterBy.context;
+    if(cFixed>0){ total+=cFixed; logLine('Fixed <b>context</b> \u2014 '+cFixed+' line'+(cFixed>1?'s':'')+' now carry real metrics'); }
+    if(afterBy.context>0){
+      logLine('Reviewed <b>context</b> \u2014 '+afterBy.context+' line'+(afterBy.context>1?'s':'')
+        +' still need your real numbers', true);
+    }
+    if(skipped>0) logLine(skipped+' section'+(skipped>1?'s were':' was')+' left unchanged');
+    if(total===0 && afterBy.context===0 && skipped===0) logLine('Nothing needed changing \u2014 your resume is already clean');
+
+    title.innerHTML = total>0
+      ? '\u2713 Complete \u2014 '+total+' fix'+(total>1?'es':'')+' applied'
+        + (afterBy.context? ', '+afterBy.context+' line'+(afterBy.context>1?'s':'')+' awaiting your numbers' : '')
+      : (afterBy.context
+          ? '\u2713 Complete \u2014 text improved, '+afterBy.context+' line'+(afterBy.context>1?'s':'')+' awaiting your numbers'
+          : '\u2713 Complete');
 
     var note=document.getElementById('aiPlaceholderNote');
     if(note){
       note.innerHTML = placeholders
-        ? '\u26A0\uFE0F <b>'+placeholders+' metric placeholder'+(placeholders===1?'':'s')+'</b> were inserted as <b>[X]</b> / <b>[Y]</b>. The AI cannot know your real numbers \u2014 replace every bracket before you export. These lines stay flagged until you do.'
+        ? '\u26A0\uFE0F <b>'+placeholders+' metric placeholder'+(placeholders===1?'':'s')+'</b> were inserted as <b>[X]</b> / <b>[Y]</b>. The AI cannot know your real numbers \u2014 replace every bracket before you export. Those lines stay flagged until you do.'
         : 'No metric placeholders were inserted.';
     }
 
     setTimeout(function(){ document.getElementById('aiVerifyModal').classList.add('show'); }, 500);
-
     var btn=document.getElementById('aiBuilderBtn');
     btn.disabled=false; btn.textContent='Run';
-  }, 700*units.length + 700);
+  }, 600*units.length + 700);
 }
 
 function dismissAIModal(){
@@ -3662,3 +3698,262 @@ function confirmAIChanges(){
   if(typeof renderLivePreview === 'function') renderLivePreview();
 }
 
+
+// ====== ASK AI — per-section popover ======
+// Sections whose text we can safely read and write back as a block.
+var ASKABLE = new Set(['summary','skills','experience','accomplishments','certifications','education','projects','courses','languages']);
+
+var ASK_LABEL = {
+  summary:'Profile / Summary', skills:'Skills', experience:'Experience',
+  accomplishments:'Accomplishments', certifications:'Certifications',
+  education:'Education', projects:'Projects', courses:'Courses', languages:'Languages'
+};
+var ASK_HINTS = {
+  summary:['Make it two sentences','Lead with AI governance','Remove the first person'],
+  skills:['Group these by theme','Add Python and Docker','Drop the weakest three'],
+  experience:['Stronger, more senior tone','Make each line shorter','Add metric placeholders'],
+  accomplishments:['Make these outcome-focused','Add metric placeholders'],
+  certifications:['Order by seniority','Spell out the acronyms'],
+  education:['Shorten to one line each'],
+  projects:['Lead with the outcome'], courses:['Group by subject'], languages:['Add proficiency levels']
+};
+
+// Read a section as plain text
+function askReadSection(key){
+  if(key==='summary') return R.summary||'';
+  if(key==='skills') return (R.skills||[]).join('\n');
+  if(key==='accomplishments') return (R.accomplishments||[]).join('\n');
+  if(key==='experience'){
+    return (R.experience||[]).map(function(j,i){
+      return '['+(i+1)+'] '+(j.title||'')+(j.company?' — '+j.company:'')+'\n'+(j.desc||'');
+    }).join('\n\n');
+  }
+  var arr=R[key];
+  if(Array.isArray(arr)){
+    return arr.map(function(it){
+      if(typeof it==='string') return it;
+      return [it.name,it.title,it.issuer,it.school,it.degree,it.year,it.desc]
+        .filter(Boolean).join(' — ');
+    }).join('\n');
+  }
+  return '';
+}
+
+// Write a section back, preserving array shapes. Returns false if unsafe.
+function askWriteSection(key, text){
+  var t=(text||'').trim();
+  if(!t) return false;
+
+  if(key==='summary'){ R.summary=t; return true; }
+
+  if(key==='skills'){
+    var sk=t.split(/\n|,/).map(function(s){return s.trim();}).filter(Boolean);
+    if(!sk.length) return false;
+    R.skills=sk; return true;
+  }
+
+  if(key==='accomplishments'){
+    var ac=t.split(/\n/).map(function(s){return s.trim();}).filter(Boolean);
+    if(!ac.length) return false;
+    R.accomplishments=ac; return true;
+  }
+
+  if(key==='experience'){
+    // Split on the [n] markers we emitted; only the desc of each job is replaced,
+    // so title/company/dates/skills_used are never touched.
+    var blocks=t.split(/\n(?=\[\d+\]\s)/);
+    var wrote=0;
+    blocks.forEach(function(b){
+      var m=b.match(/^\[(\d+)\]/);
+      if(!m) return;
+      var idx=parseInt(m[1],10)-1;
+      if(!R.experience || !R.experience[idx]) return;
+      var lines=b.split('\n');
+      lines.shift();                       // drop the "[n] Title — Company" header line
+      var desc=lines.join('\n').trim();
+      if(desc){ R.experience[idx].desc=desc; wrote++; }
+    });
+    return wrote>0;
+  }
+
+  // Generic list sections: only accept if the model kept it as a list of lines
+  var arr=R[key];
+  if(Array.isArray(arr)){
+    var lines=t.split(/\n/).map(function(s){return s.trim();}).filter(Boolean);
+    if(!lines.length) return false;
+    if(arr.length && typeof arr[0]!=='string') return false;  // object rows: too risky to rebuild
+    R[key]=lines; return true;
+  }
+  return false;
+}
+
+// ---- popover ----
+var _askPop=null, _askKey=null, _askBtn=null, _askAI='';
+
+function buildAskPop(){
+  if(_askPop) return _askPop;
+  var p=el('div',{class:'ask-pop',id:'askPop'});
+  p.innerHTML =
+    '<div class="ask-pop-h">\u2726 Ask AI <span class="ask-scope"></span>'
+      +'<span class="ask-x" title="Close">\u2715</span></div>'
+    +'<div class="ask-sub"></div>'
+    +'<textarea class="ask-in" placeholder="What should I do with this section?"></textarea>'
+    +'<div class="ask-kbd"><b>Enter</b> to ask \u00b7 <b>Shift+Enter</b> new line \u00b7 <b>Esc</b> to close</div>'
+    +'<div class="ask-hints"></div>'
+    +'<div class="ask-think"><span class="ask-sp"></span> Thinking\u2026</div>'
+    +'<div class="ask-err"></div>'
+    +'<div class="ask-res">'
+      +'<div class="ask-res-h">AI response <span class="ask-pill">editable</span></div>'
+      +'<textarea class="ask-out"></textarea>'
+      +'<div class="ask-meta"><span class="ask-ph"></span><span class="ask-dirty"></span></div>'
+      +'<div class="ask-acts">'
+        +'<button class="ask-apply" type="button">\u2713 Apply to section</button>'
+        +'<button class="ask-again" type="button">\u21bb Ask again</button>'
+      +'</div>'
+    +'</div>';
+  document.body.appendChild(p);
+  _askPop=p;
+
+  var input=p.querySelector('.ask-in'), out=p.querySelector('.ask-out');
+
+  p.querySelector('.ask-x').addEventListener('click', closeAskPop);
+  p.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+
+  input.addEventListener('keydown', function(e){
+    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); runAsk(); }
+  });
+  out.addEventListener('input', function(){ askAutosize(); askMeta(); });
+  p.querySelector('.ask-again').addEventListener('click', function(){
+    p.querySelector('.ask-res').classList.remove('show');
+    input.focus(); input.select();
+  });
+  p.querySelector('.ask-apply').addEventListener('click', applyAsk);
+  return p;
+}
+
+function toggleAskPop(btn, key, card){
+  if(_askKey===key && _askPop && _askPop.classList.contains('show')) return closeAskPop();
+  openAskPop(btn, key, card);
+}
+
+function openAskPop(btn, key){
+  closeAskPop();
+  var p=buildAskPop();
+  _askKey=key; _askBtn=btn; _askAI='';
+  btn.classList.add('open');
+
+  p.querySelector('.ask-scope').textContent='\u00b7 '+(ASK_LABEL[key]||key);
+  p.querySelector('.ask-sub').textContent='Changes apply to this section only.';
+  p.querySelector('.ask-hints').innerHTML=(ASK_HINTS[key]||[]).map(function(h){
+    return '<span class="ask-h">'+esc(h)+'</span>';
+  }).join('');
+  p.querySelectorAll('.ask-h').forEach(function(h){
+    h.addEventListener('click', function(){
+      var i=p.querySelector('.ask-in'); i.value=h.textContent; i.focus();
+    });
+  });
+
+  p.querySelector('.ask-in').value='';
+  p.querySelector('.ask-res').classList.remove('show');
+  p.querySelector('.ask-think').classList.remove('show');
+  p.querySelector('.ask-err').classList.remove('show');
+  p.classList.add('show');
+  positionAskPop(btn);
+  setTimeout(function(){ p.querySelector('.ask-in').focus(); }, 40);
+}
+
+function positionAskPop(btn){
+  if(!_askPop||!btn) return;
+  var r=btn.getBoundingClientRect(), w=_askPop.offsetWidth||390;
+  var left=r.right+window.scrollX-w;
+  left=Math.max(10, Math.min(left, window.innerWidth-w-14));
+  _askPop.style.left=left+'px';
+  _askPop.style.top=(r.bottom+window.scrollY+10)+'px';
+}
+
+function closeAskPop(){
+  if(_askPop) _askPop.classList.remove('show');
+  document.querySelectorAll('.sec-askai.open').forEach(function(b){b.classList.remove('open');});
+  _askKey=null; _askBtn=null;
+}
+
+function askAutosize(){
+  var o=_askPop&&_askPop.querySelector('.ask-out'); if(!o) return;
+  o.style.height='auto';
+  o.style.height=Math.min(o.scrollHeight+2, 210)+'px';
+}
+function askMeta(){
+  if(!_askPop) return;
+  var o=_askPop.querySelector('.ask-out');
+  var ph=o.value.match(/\[[A-Za-z]\]/g)||[];
+  var e=_askPop.querySelector('.ask-ph');
+  if(ph.length){ e.className='ask-ph warn'; e.textContent='\u26a0 fill '+ph.join(' '); }
+  else if(/\[[A-Za-z]\]/.test(_askAI)){ e.className='ask-ph ok'; e.textContent='\u2713 placeholders filled'; }
+  else { e.className='ask-ph'; e.textContent=''; }
+  _askPop.querySelector('.ask-dirty').textContent = (o.value!==_askAI) ? 'edited by you' : '';
+}
+
+function runAsk(){
+  if(!_askPop||!_askKey) return;
+  var p=_askPop;
+  var req=(p.querySelector('.ask-in').value||'').trim();
+  if(!req){ p.querySelector('.ask-in').focus(); return; }
+
+  p.querySelector('.ask-think').classList.add('show');
+  p.querySelector('.ask-res').classList.remove('show');
+  p.querySelector('.ask-err').classList.remove('show');
+
+  var key=_askKey;
+  fetch('/api/ask-section',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({request:req, text:askReadSection(key), scope:ASK_LABEL[key]||key})
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){
+    p.querySelector('.ask-think').classList.remove('show');
+    if(!d.success||!d.text) throw new Error(d.error||'No response');
+    _askAI=d.text;
+    var o=p.querySelector('.ask-out');
+    o.value=d.text;
+    p.querySelector('.ask-res').classList.add('show');
+    askAutosize(); askMeta();
+    o.focus(); o.setSelectionRange(o.value.length,o.value.length);
+  })
+  .catch(function(err){
+    p.querySelector('.ask-think').classList.remove('show');
+    var e=p.querySelector('.ask-err');
+    e.textContent='\u2717 '+(err.message||'Something went wrong — try rephrasing');
+    e.classList.add('show');
+  });
+}
+
+function applyAsk(){
+  if(!_askPop||!_askKey) return;
+  var key=_askKey;
+  var val=(_askPop.querySelector('.ask-out').value||'').trim();
+  if(!val){ _askPop.querySelector('.ask-out').focus(); return; }
+
+  var edited = val!==_askAI;
+  if(!askWriteSection(key, val)){
+    var e=_askPop.querySelector('.ask-err');
+    e.textContent='\u2717 Could not apply safely — the structure changed too much. Edit your resume directly instead.';
+    e.classList.add('show');
+    return;
+  }
+
+  closeAskPop();
+  R.quality_score = analyzeQualityScore();
+  var y=window.scrollY;
+  buildEditor();
+  window.scrollTo(0,y);
+  if(typeof renderLivePreview==='function') renderLivePreview();
+  if(typeof toast==='function') toast(edited ? 'Applied your edited version' : 'Applied to section');
+}
+
+document.addEventListener('mousedown', function(e){
+  if(!_askPop||!_askPop.classList.contains('show')) return;
+  if(e.target.closest && e.target.closest('.sec-askai')) return;
+  closeAskPop();
+});
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeAskPop(); });
+window.addEventListener('resize', function(){ if(_askBtn) positionAskPop(_askBtn); });
