@@ -327,12 +327,14 @@ async function askField(btn, field, getVal, setVal, context){
 }
 
 // Build a label + optional AI button
-function fieldHead(labelText, aiHandler){
+// label + (optional) standard Ask AI button that opens the popover.
+// askSpec = {key, label, read, write}  — nothing is applied without review.
+function fieldHead(labelText, askSpec){
   const wrap = el('div',{class:'field-head'});
   wrap.appendChild(el('label',{},labelText));
-  if(aiHandler){
-    const b = el('button',{type:'button',class:'mini-ai',title:'Ask AI to improve'}, '✦ Ask AI');
-    b.addEventListener('click', () => aiHandler(b));
+  if(askSpec){
+    const b = el('button',{type:'button',class:'sec-askai',title:'Ask AI about this block'}, '✦ Ask AI');
+    b.addEventListener('click', (ev) => { ev.stopPropagation(); toggleAskPop(b, askSpec); });
     wrap.appendChild(b);
   }
   return wrap;
@@ -1658,11 +1660,7 @@ function personalCard(){
   const grid = el('div',{class:'grid2'});
   FIELDS.forEach(([f,lab,ai])=>{
     const wrap = el('div',{class:'field'});
-    wrap.appendChild(fieldHead(lab, ai ? (btn)=>
-      askField(btn, f==='headline'?'Professional headline':lab,
-        ()=> R.personal[f],
-        v=>{ R.personal[f]=v; inp.value=v; },
-        `Person: ${R.personal.name}. Latest role: ${R.experience[0]?.title||''} at ${R.experience[0]?.company||''}`) : null));
+    wrap.appendChild(fieldHead(lab, null));
     const inp = el('input',{'data-p':f,value:R.personal[f]||''});
     inp.addEventListener('input',()=> R.personal[f]=inp.value);
     wrap.appendChild(inp);
@@ -1674,7 +1672,9 @@ function personalCard(){
 
 function summaryCard(){
   const c = el('div',{class:'card',id:'sec-summary'});
-  c.innerHTML = '<h2>Summary <button class="btn btn-ai" type="button">\u2726 AI enhance</button></h2>';
+  c.innerHTML = '<h2>Summary</h2>';
+  const mbS = markBar('summary', R.summary||'');
+  if(mbS) c.appendChild(mbS);
   const fieldErrs = getFieldErrors('summary');
   if(fieldErrs.length > 0){
     const qf = qualityField(R.summary||'', fieldErrs, function(plain){ R.summary = plain; });
@@ -1685,9 +1685,8 @@ function summaryCard(){
     ta.addEventListener('input', function(){ R.summary = ta.value; });
     c.appendChild(ta);
   }
-  c.querySelector('.btn-ai').addEventListener('click', function(e){
-    enhance(e.currentTarget, function(){return R.summary;}, function(v){ R.summary=v; buildEditor(); }, 'professional summary');
-  });
+  const mlS = markLineList('summary', R.summary||'');
+  if(mlS) c.appendChild(mlS);
   return c;
 }
 
@@ -1781,10 +1780,7 @@ function listCard(key){
       const grid = el('div',{class:'grid2'});
       def.fields.forEach(([f,lab])=>{
         const fw = el('div',{class:'field'});
-        const canAI = AI_FIELDS[key]?.has(f);
-        fw.appendChild(fieldHead(lab, canAI ? (btn)=>
-          askField(btn, lab, ()=>item[f], v=>{ item[f]=v; inp.value=v; },
-            `${def.title} entry: ${JSON.stringify(item).slice(0,300)}`) : null));
+        fw.appendChild(fieldHead(lab, null));
         const inp = el('input',{'data-f':f,value:item[f]||''});
         inp.addEventListener('input',()=> item[f]=inp.value);
         fw.appendChild(inp);
@@ -1796,19 +1792,31 @@ function listCard(key){
         const [tf,tlab] = def.text;
         const fw = el('div',{class:'field'});
         const canAI = AI_FIELDS[key]?.has(tf);
-        fw.appendChild(fieldHead(tlab, canAI ? (btn)=>
-          askField(btn, tlab, ()=>item[tf], v=>{ item[tf]=v; buildEditor(); },
-            `${def.title} for ${item[def.fields[0][0]]||''}${key==='experience'?' at '+(item.company||''):''}`) : null));
+        const askSpec = canAI ? {
+          key: key+'_'+i+'_'+tf,
+          label: (item[def.fields[0][0]]||def.title) + (key==='experience' && item.company ? ' — '+item.company : ''),
+          scopeNote: 'Changes apply to this '+(key==='experience'?'role':'entry')+' only.',
+          hints: key==='experience'
+            ? ['Stronger, more senior tone','Make each line shorter','Add metric placeholders']
+            : ['Lead with the outcome','Make it shorter'],
+          read: ()=> item[tf]||'',
+          write: (v)=>{ item[tf]=v; }
+        } : null;
+        fw.appendChild(fieldHead(tlab, askSpec));
+        const markKey = key+'_'+i+'_'+tf;
+        const mb = markBar(markKey, item[tf]||'');
+        if(mb) fw.appendChild(mb);
         const fieldErrs = getFieldErrors(key+'_'+i);
         if(fieldErrs.length > 0){
-          const qf = qualityField(item[tf]||'', fieldErrs, function(plain){ item[tf]=plain; });
-          fw.appendChild(qf);
+          fw.appendChild(qualityField(item[tf]||'', fieldErrs, function(plain){ item[tf]=plain; }));
         } else {
           const ta = el('textarea',{'data-f':tf,rows:'4'});
           ta.value = item[tf]||'';
           ta.addEventListener('input',()=> item[tf]=ta.value);
           fw.appendChild(ta);
         }
+        const mlist = markLineList(markKey, item[tf]||'');
+        if(mlist) fw.appendChild(mlist);
         en.appendChild(fw);
       }
 
@@ -3788,7 +3796,22 @@ function askWriteSection(key, text){
 }
 
 // ---- popover ----
-var _askPop=null, _askKey=null, _askBtn=null, _askAI='';
+// A spec is {key,label,scopeNote,hints,read,write}. Section headers build one
+// from the section key; per-role blocks pass their own read/write closures.
+var _askPop=null, _askSpec=null, _askBtn=null, _askAI='', _askPos=null;
+var _askMarks={};   // key -> {type:'new'|'edited', idx:[], anchor:int|null}
+
+function sectionAskSpec(key){
+  return {
+    key:key,
+    label:(ASK_LABEL[key]||key),
+    scopeNote:'Changes apply to this section only.',
+    hints:(ASK_HINTS[key]||[]),
+    read:function(){ return askReadSection(key); },
+    write:function(v){ return askWriteSection(key, v); },
+    section:true
+  };
+}
 
 function buildAskPop(){
   if(_askPop) return _askPop;
@@ -3797,9 +3820,13 @@ function buildAskPop(){
     '<div class="ask-pop-h">\u2726 Ask AI <span class="ask-scope"></span>'
       +'<span class="ask-x" title="Close">\u2715</span></div>'
     +'<div class="ask-sub"></div>'
-    +'<textarea class="ask-in" placeholder="What should I do with this section?"></textarea>'
-    +'<div class="ask-kbd"><b>Enter</b> to ask \u00b7 <b>Shift+Enter</b> new line \u00b7 <b>Esc</b> to close</div>'
+    +'<textarea class="ask-in" placeholder="Ask for a change, or type a line to insert\u2026"></textarea>'
+    +'<div class="ask-kbd"><b>Enter</b> to ask AI \u00b7 <b>Shift+Enter</b> new line \u00b7 <b>Esc</b> to close</div>'
     +'<div class="ask-hints"></div>'
+    +'<div class="ask-row">'
+      +'<button class="ask-go" type="button">\u2726 Ask AI</button>'
+      +'<button class="ask-ins" type="button">\u21b3 Insert this line</button>'
+    +'</div>'
     +'<div class="ask-think"><span class="ask-sp"></span> Thinking\u2026</div>'
     +'<div class="ask-err"></div>'
     +'<div class="ask-res">'
@@ -3810,41 +3837,57 @@ function buildAskPop(){
         +'<button class="ask-apply" type="button">\u2713 Apply to section</button>'
         +'<button class="ask-again" type="button">\u21bb Ask again</button>'
       +'</div>'
+    +'</div>'
+    +'<div class="ask-insbox">'
+      +'<div class="ask-ins-h">Where should this line go?</div>'
+      +'<div class="ask-ins-sub"></div>'
+      +'<div class="ask-lines"></div>'
+      +'<div class="ask-ins-foot">'
+        +'<span class="ask-posnote">No position chosen</span>'
+        +'<button class="ask-do-ins" type="button" disabled>\u21b3 Insert here</button>'
+        +'<button class="ask-cancel-ins" type="button">\u2715 Cancel</button>'
+      +'</div>'
     +'</div>';
   document.body.appendChild(p);
   _askPop=p;
 
   var input=p.querySelector('.ask-in'), out=p.querySelector('.ask-out');
-
   p.querySelector('.ask-x').addEventListener('click', closeAskPop);
   p.addEventListener('mousedown', function(e){ e.stopPropagation(); });
-
   input.addEventListener('keydown', function(e){
     if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); runAsk(); }
   });
   out.addEventListener('input', function(){ askAutosize(); askMeta(); });
+  p.querySelector('.ask-go').addEventListener('click', runAsk);
+  p.querySelector('.ask-ins').addEventListener('click', openInsertPicker);
   p.querySelector('.ask-again').addEventListener('click', function(){
-    p.querySelector('.ask-res').classList.remove('show');
-    input.focus(); input.select();
+    p.querySelector('.ask-res').classList.remove('show'); input.focus(); input.select();
   });
   p.querySelector('.ask-apply').addEventListener('click', applyAsk);
+  p.querySelector('.ask-do-ins').addEventListener('click', doInsertLine);
+  p.querySelector('.ask-cancel-ins').addEventListener('click', function(){
+    p.querySelector('.ask-insbox').classList.remove('show');
+  });
   return p;
 }
 
-function toggleAskPop(btn, key, card){
-  if(_askKey===key && _askPop && _askPop.classList.contains('show')) return closeAskPop();
-  openAskPop(btn, key, card);
+function toggleAskPop(btn, spec){
+  if(typeof spec==='string') spec=sectionAskSpec(spec);
+  if(_askSpec && _askSpec.key===spec.key && _askPop && _askPop.classList.contains('show')) return closeAskPop();
+  openAskPop(btn, spec);
 }
 
-function openAskPop(btn, key){
+function openAskPop(btn, spec){
   closeAskPop();
   var p=buildAskPop();
-  _askKey=key; _askBtn=btn; _askAI='';
+  _askSpec=spec; _askBtn=btn; _askAI=''; _askPos=null;
   btn.classList.add('open');
+  // a fresh action supersedes the previous marker on this block
+  if(_askMarks[spec.key]){ delete _askMarks[spec.key]; }
 
-  p.querySelector('.ask-scope').textContent='\u00b7 '+(ASK_LABEL[key]||key);
-  p.querySelector('.ask-sub').textContent='Changes apply to this section only.';
-  p.querySelector('.ask-hints').innerHTML=(ASK_HINTS[key]||[]).map(function(h){
+  p.querySelector('.ask-scope').textContent='\u00b7 '+spec.label;
+  p.querySelector('.ask-sub').textContent=spec.scopeNote||'Changes apply to this section only.';
+  p.querySelector('.ask-hints').innerHTML=(spec.hints||[]).map(function(h){
     return '<span class="ask-h">'+esc(h)+'</span>';
   }).join('');
   p.querySelectorAll('.ask-h').forEach(function(h){
@@ -3853,8 +3896,12 @@ function openAskPop(btn, key){
     });
   });
 
+  // Insert only makes sense for a single block, not a whole multi-entry section
+  p.querySelector('.ask-ins').style.display = spec.section && spec.key==='experience' ? 'none' : '';
+
   p.querySelector('.ask-in').value='';
   p.querySelector('.ask-res').classList.remove('show');
+  p.querySelector('.ask-insbox').classList.remove('show');
   p.querySelector('.ask-think').classList.remove('show');
   p.querySelector('.ask-err').classList.remove('show');
   p.classList.add('show');
@@ -3864,7 +3911,7 @@ function openAskPop(btn, key){
 
 function positionAskPop(btn){
   if(!_askPop||!btn) return;
-  var r=btn.getBoundingClientRect(), w=_askPop.offsetWidth||390;
+  var r=btn.getBoundingClientRect(), w=_askPop.offsetWidth||400;
   var left=r.right+window.scrollX-w;
   left=Math.max(10, Math.min(left, window.innerWidth-w-14));
   _askPop.style.left=left+'px';
@@ -3874,7 +3921,7 @@ function positionAskPop(btn){
 function closeAskPop(){
   if(_askPop) _askPop.classList.remove('show');
   document.querySelectorAll('.sec-askai.open').forEach(function(b){b.classList.remove('open');});
-  _askKey=null; _askBtn=null;
+  _askSpec=null; _askBtn=null; _askPos=null;
 }
 
 function askAutosize(){
@@ -3894,19 +3941,20 @@ function askMeta(){
 }
 
 function runAsk(){
-  if(!_askPop||!_askKey) return;
+  if(!_askPop||!_askSpec) return;
   var p=_askPop;
   var req=(p.querySelector('.ask-in').value||'').trim();
   if(!req){ p.querySelector('.ask-in').focus(); return; }
 
+  p.querySelector('.ask-insbox').classList.remove('show');
   p.querySelector('.ask-think').classList.add('show');
   p.querySelector('.ask-res').classList.remove('show');
   p.querySelector('.ask-err').classList.remove('show');
 
-  var key=_askKey;
+  var spec=_askSpec;
   fetch('/api/ask-section',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({request:req, text:askReadSection(key), scope:ASK_LABEL[key]||key})
+    body:JSON.stringify({request:req, text:spec.read(), scope:spec.label})
   })
   .then(function(r){return r.json();})
   .then(function(d){
@@ -3922,25 +3970,40 @@ function runAsk(){
   .catch(function(err){
     p.querySelector('.ask-think').classList.remove('show');
     var e=p.querySelector('.ask-err');
-    e.textContent='\u2717 '+(err.message||'Something went wrong — try rephrasing');
+    e.textContent='\u2717 '+(err.message||'Something went wrong \u2014 try rephrasing');
     e.classList.add('show');
   });
 }
 
+// Which line numbers differ between two blocks of text
+function diffLines(beforeText, afterText){
+  var b=(beforeText||'').split('\n').filter(function(l){return l.trim();});
+  var af=(afterText||'').split('\n').filter(function(l){return l.trim();});
+  var changed=[];
+  af.forEach(function(l,i){ if(b[i]===undefined || b[i]!==l) changed.push(i); });
+  return changed;
+}
+
 function applyAsk(){
-  if(!_askPop||!_askKey) return;
-  var key=_askKey;
+  if(!_askPop||!_askSpec) return;
+  var spec=_askSpec;
   var val=(_askPop.querySelector('.ask-out').value||'').trim();
   if(!val){ _askPop.querySelector('.ask-out').focus(); return; }
 
   var edited = val!==_askAI;
-  if(!askWriteSection(key, val)){
+  var before = spec.read();
+  if(spec.write(val)===false){
     var e=_askPop.querySelector('.ask-err');
-    e.textContent='\u2717 Could not apply safely — the structure changed too much. Edit your resume directly instead.';
+    e.textContent='\u2717 Could not apply safely \u2014 the structure changed too much. Edit the section directly instead.';
     e.classList.add('show');
     return;
   }
 
+  var changed=diffLines(before, val);
+  if(changed.length) _askMarks[spec.key]={type:'edited', idx:changed, anchor:null};
+  else delete _askMarks[spec.key];
+
+  var key=spec.key;
   closeAskPop();
   R.quality_score = analyzeQualityScore();
   var y=window.scrollY;
@@ -3948,6 +4011,123 @@ function applyAsk(){
   window.scrollTo(0,y);
   if(typeof renderLivePreview==='function') renderLivePreview();
   if(typeof toast==='function') toast(edited ? 'Applied your edited version' : 'Applied to section');
+  setTimeout(function(){ jumpToMark(key); }, 160);
+}
+
+// ---- Insert: pick the exact position ----
+function openInsertPicker(){
+  if(!_askPop||!_askSpec) return;
+  var p=_askPop;
+  var line=(p.querySelector('.ask-in').value||'').trim();
+  if(!line){
+    var i=p.querySelector('.ask-in');
+    i.focus(); i.style.borderColor='#DC2626';
+    setTimeout(function(){ i.style.borderColor=''; }, 900);
+    return;
+  }
+  p.querySelector('.ask-res').classList.remove('show');
+  _askPos=null;
+
+  var lines=(_askSpec.read()||'').split('\n').filter(function(l){return l.trim();});
+  var box=p.querySelector('.ask-lines');
+  var h=slotHtml(0,'Insert at the top');
+  lines.forEach(function(l,i){
+    h+='<div class="ask-ln"><span class="num">'+(i+1)+'</span>'+esc(l)+'</div>';
+    h+=slotHtml(i+1, i===lines.length-1 ? 'Insert at the end' : 'Insert after line '+(i+1));
+  });
+  box.innerHTML=h;
+
+  box.querySelectorAll('.ask-slot').forEach(function(s){
+    s.addEventListener('click', function(){
+      _askPos=parseInt(s.dataset.p,10);
+      box.querySelectorAll('.ask-slot').forEach(function(x){x.classList.remove('on');});
+      box.querySelectorAll('.ask-gh').forEach(function(g){ g.remove(); });
+      s.classList.add('on');
+      var g=document.createElement('div');
+      g.className='ask-gh';
+      g.innerHTML='<span class="tg">NEW</span>'+esc(line);
+      s.insertAdjacentElement('afterend', g);
+      p.querySelector('.ask-posnote').textContent =
+        _askPos===0 ? 'Will become line 1' : 'Will become line '+(_askPos+1)+', after line '+_askPos;
+      p.querySelector('.ask-do-ins').disabled=false;
+    });
+  });
+
+  p.querySelector('.ask-ins-sub').textContent='Click a position \u2014 the green row shows exactly where it lands.';
+  p.querySelector('.ask-posnote').textContent='No position chosen';
+  p.querySelector('.ask-do-ins').disabled=true;
+  p.querySelector('.ask-insbox').classList.add('show');
+}
+
+function slotHtml(p,label){
+  return '<div class="ask-slot" data-p="'+p+'"><span class="bar"></span>'
+    +'<span class="lbl">'+esc(label)+'</span><span class="bar"></span></div>';
+}
+
+function doInsertLine(){
+  if(_askPos===null || !_askSpec) return;
+  var spec=_askSpec;
+  var line=(_askPop.querySelector('.ask-in').value||'').trim();
+  if(!line) return;
+
+  var lines=(spec.read()||'').split('\n').filter(function(l){return l.trim();});
+  lines.splice(_askPos, 0, line);
+  var joined=lines.join('\n');
+
+  if(spec.write(joined)===false){
+    var e=_askPop.querySelector('.ask-err');
+    e.textContent='\u2717 Could not insert into this section safely.';
+    e.classList.add('show');
+    return;
+  }
+
+  _askMarks[spec.key]={type:'new', idx:[_askPos], anchor:_askPos>0?_askPos-1:null};
+
+  var key=spec.key, at=_askPos;
+  closeAskPop();
+  R.quality_score = analyzeQualityScore();
+  var y=window.scrollY;
+  buildEditor();
+  window.scrollTo(0,y);
+  if(typeof renderLivePreview==='function') renderLivePreview();
+  if(typeof toast==='function') toast('Inserted as line '+(at+1));
+  setTimeout(function(){ jumpToMark(key); }, 160);
+}
+
+function jumpToMark(key){
+  var bar=document.querySelector('[data-markbar="'+key+'"]');
+  if(bar && bar.scrollIntoView) bar.scrollIntoView({behavior:'smooth',block:'center'});
+  var row=document.querySelector('[data-markrow="'+key+'"]');
+  if(row){ row.classList.remove('mark-flash'); void row.offsetWidth; row.classList.add('mark-flash'); }
+}
+
+function clearAskMark(key){
+  delete _askMarks[key];
+  var y=window.scrollY; buildEditor(); window.scrollTo(0,y);
+}
+
+// Build the "what changed and where" bar shown above a field
+function markBar(key, currentText){
+  var m=_askMarks[key];
+  if(!m) return null;
+  var lines=(currentText||'').split('\n').filter(function(l){return l.trim();});
+  var bar=el('div',{class:'mark-bar'+(m.type==='edited'?' amber':''),'data-markbar':key});
+  var txt;
+  if(m.type==='new'){
+    var anchorTxt = (m.anchor!==null && lines[m.anchor]!==undefined)
+      ? ', after \u201c'+esc(lines[m.anchor].slice(0,40))+(lines[m.anchor].length>40?'\u2026':'')+'\u201d'
+      : ', at the very top';
+    txt='<b>1 line inserted</b> at line '+(m.idx[0]+1)+anchorTxt;
+  } else {
+    txt='<b>'+m.idx.length+' line'+(m.idx.length>1?'s':'')+' rewritten by AI</b> \u2014 line'
+      +(m.idx.length>1?'s ':' ')+m.idx.map(function(i){return i+1;}).join(', ');
+  }
+  bar.innerHTML='<span>'+txt+'</span>'
+    +'<button class="mark-jump" type="button">Jump to it</button>'
+    +'<button class="mark-dis" type="button">Dismiss</button>';
+  bar.querySelector('.mark-jump').addEventListener('click', function(){ jumpToMark(key); });
+  bar.querySelector('.mark-dis').addEventListener('click', function(){ clearAskMark(key); });
+  return bar;
 }
 
 document.addEventListener('mousedown', function(e){
@@ -3957,3 +4137,30 @@ document.addEventListener('mousedown', function(e){
 });
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeAskPop(); });
 window.addEventListener('resize', function(){ if(_askBtn) positionAskPop(_askBtn); });
+
+// Numbered map of a block, marking exactly which line was inserted or rewritten.
+// Rendered under the field so it never interferes with editing or error highlights.
+function markLineList(key, text){
+  var m=_askMarks[key];
+  if(!m) return null;
+  var lines=(text||'').split('\n').filter(function(l){return l.trim();});
+  if(!lines.length) return null;
+
+  var wrap=el('div',{class:'mark-lines'});
+  lines.forEach(function(l,i){
+    var isMark=m.idx.indexOf(i)>=0;
+    var isAnchor=(m.type==='new' && m.anchor===i);
+    var cls='mark-ln'+(isMark?(m.type==='new'?' new':' edited'):'')+(isAnchor?' anchor':'');
+    var row=el('div',{class:cls});
+    if(isMark) row.setAttribute('data-markrow',key);
+    var badge='';
+    if(isMark){
+      badge='<span class="mark-badge '+(m.type==='new'?'new':'edit')+'">'
+        +(m.type==='new'?'\u25b8 New \u00b7 line '+(i+1):'\u270e Edited \u00b7 line '+(i+1))+'</span>';
+    }
+    var anchorTag = isAnchor ? '<span class="mark-anchor-tag">\u2193 new line added below</span>' : '';
+    row.innerHTML='<span class="n">'+(i+1)+'</span><span class="t">'+esc(l)+badge+anchorTag+'</span>';
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
