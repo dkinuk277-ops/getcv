@@ -3418,149 +3418,134 @@ function setAICommand(cmd){
 }
 
 function runAIBuilder(){
-  var input = document.getElementById('aiBuilderInput').value.trim();
-  if(!input) {
-    document.getElementById('aiBuilderInput').focus();
-    return;
-  }
-  
-  // Disable button and show progress
-  var btn = document.getElementById('aiBuilderBtn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Working…';
-  
-  // Show progress panel
-  var prog = document.getElementById('aiBuilderProgress');
-  prog.style.display = 'block';
-  prog.classList.remove('hidden');
-  
-  // Send command to AI Builder endpoint
-  fetch('/api/ai-builder', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({command: input, resume: R})
-  })
-  .then(r => r.json())
-  .then(data => {
-    if(!data.success) throw new Error(data.error || 'Builder failed');
-    applyAIChanges(data.results, input);
-  })
-  .catch(err => {
-    console.error('AI Builder error:', err);
-    btn.disabled = false;
-    btn.textContent = 'Run';
-    document.getElementById('aiProgTitle').textContent = '✗ Error: ' + (err.message || 'Try again');
-  });
-}
+  var inputEl=document.getElementById('aiBuilderInput');
+  var input=(inputEl.value||'').trim();
+  if(!input){ inputEl.focus(); return; }
 
-function applyAIChanges(results, command){
-  if(!results || results.length === 0) return;
-  
-  // Animate through sections
-  var sections = results;
-  var index = 0;
-  var btn = document.getElementById('aiBuilderBtn');
-  var progSections = document.getElementById('aiProgSections');
-  var progFill = document.getElementById('aiProgFill');
-  var progTitle = document.getElementById('aiProgTitle');
-  
-  // Build progress step elements
-  progSections.innerHTML = sections.map((s,i) => 
-    '<div class="prog-sec pend" id="psec-' + s.section + '">' +
-    '<span class="prog-sec-ico">' + (i+1) + '</span> ' +
-    '<span>' + s.section + '</span></div>'
-  ).join('');
-  
-  // Process sections sequentially
-  sections.forEach((sec, idx) => {
-    setTimeout(() => {
-      // Mark current as doing
-      if(idx > 0) {
-        var prev = document.getElementById('psec-' + sections[idx-1].section);
-        if(prev) {
-          prev.className = 'prog-sec done';
-          prev.querySelector('.prog-sec-ico').textContent = '✓';
-        }
-      }
-      var cur = document.getElementById('psec-' + sec.section);
-      if(cur) {
-        cur.className = 'prog-sec doing';
-      }
-      progFill.style.width = ((idx + 1) / sections.length * 85) + '%';
-      
-      // Apply the fix to resume data
-      if(R[sec.section]) {
-        if(Array.isArray(R[sec.section])) {
-          // For arrays, reconstruct from fixed text
-          R[sec.section] = sec.fixed.split('\n').filter(l => l.trim().length > 0).map(l => ({text: l.trim()}));
-        } else {
-          R[sec.section] = sec.fixed;
-        }
-      }
-      
-      // Re-analyze quality score for this section
-      var qs = analyzeQualityScore();
-      updateQualityDisplay(qs);
-      updateSidebarBadges(qs);
-      
-      // Scroll to section card if visible
-      var card = document.querySelector('[data-seckey="' + sec.section + '_0"], [data-seckey="' + sec.section + '"]');
-      if(card) {
-        card.style.borderLeft = '4px solid #0FA968';
-        setTimeout(() => { card.style.borderLeft = ''; }, 500);
-      }
-    }, 800 * (idx + 1));
-  });
-  
-  // Finish
-  setTimeout(() => {
-    var last = document.getElementById('psec-' + sections[sections.length-1].section);
-    if(last) {
-      last.className = 'prog-sec done';
-      last.querySelector('.prog-sec-ico').textContent = '✓';
+  var btn=document.getElementById('aiBuilderBtn');
+  btn.disabled=true; btn.textContent='\u23F3 Working\u2026';
+
+  var prog=document.getElementById('aiBuilderProgress');
+  prog.classList.remove('hidden'); prog.style.display='block';
+  document.getElementById('aiProgSpinner').style.display='';
+  document.getElementById('aiProgTitle').textContent='Reading your resume\u2026';
+  document.getElementById('aiProgFill').style.width='4%';
+  document.getElementById('aiProgSections').innerHTML='';
+
+  // Snapshot issue count before, so we can report a truthful delta
+  window._aiBefore = (analyzeQualityScore().errors||[]).length;
+
+  fetch('/api/ai-builder',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({command:input,resume:R})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if(!data.success) throw new Error(data.error||'Builder failed');
+    if(!data.units || !data.units.length){
+      document.getElementById('aiProgSpinner').style.display='none';
+      document.getElementById('aiProgTitle').textContent =
+        data.note==='no-fix-intent'
+          ? '\u2139 Try: "fix all issues", "fix grammar in summary", "fix vocabulary in experience"'
+          : '\u2139 Nothing to fix for that request.';
+      btn.disabled=false; btn.textContent='Run';
+      return;
     }
-    progFill.style.width = '100%';
-    document.getElementById('aiProgSpinner').style.display = 'none';
-    progTitle.textContent = '✓ All changes applied';
-    
-    // Show verification modal after a short delay
-    setTimeout(() => {
-      document.getElementById('aiVerifyModal').classList.add('show');
-    }, 600);
-  }, 800 * (sections.length + 1));
+    applyAIUnits(data.units, data.placeholders||0);
+  })
+  .catch(function(err){
+    console.error('AI Builder error:',err);
+    document.getElementById('aiProgSpinner').style.display='none';
+    document.getElementById('aiProgTitle').textContent='\u2717 '+(err.message||'Something went wrong \u2014 try again');
+    btn.disabled=false; btn.textContent='Run';
+  });
 }
 
-function updateQualityDisplay(qs){
-  // Update dashboard scores (if they exist in the UI)
-  var overall = document.getElementById('overall-pct');
-  var vocab = document.getElementById('vocab-pct');
-  var grammar = document.getElementById('grammar-pct');
-  var context = document.getElementById('context-pct');
-  
-  if(overall) overall.textContent = qs.overall + '%';
-  if(vocab) vocab.textContent = qs.vocabulary + '%';
-  if(grammar) grammar.textContent = qs.grammar + '%';
-  if(context) context.textContent = qs.context + '%';
-  
-  // Update issue counts
-  var vocabIssues = document.getElementById('vocab-issues');
-  var grammarIssues = document.getElementById('grammar-issues');
-  var contextIssues = document.getElementById('context-issues');
-  
-  var vocabCount = qs.errors.filter(e => !e.fixed && e.type === 'vocab').length;
-  var grammarCount = qs.errors.filter(e => !e.fixed && e.type === 'grammar').length;
-  var contextCount = qs.errors.filter(e => !e.fixed && e.type === 'context').length;
-  
-  if(vocabIssues) vocabIssues.textContent = vocabCount + ' issue' + (vocabCount !== 1 ? 's' : '');
-  if(grammarIssues) grammarIssues.textContent = grammarCount + ' issue' + (grammarCount !== 1 ? 's' : '');
-  if(contextIssues) contextIssues.textContent = contextCount + ' issue' + (contextCount !== 1 ? 's' : '');
-}
-
-function updateSidebarBadges(qs){
-  // Update the sidebar error badges
-  if(R.quality_score && R.quality_score.issuesBySection) {
-    renderRail();
+// Write one unit back into R, preserving the exact data shape
+function writeAIUnit(u){
+  if(u.section==='summary'){ R.summary=u.fixed; return true; }
+  if(u.section==='experience'){
+    if(R.experience && R.experience[u.index]){ R.experience[u.index].desc=u.fixed; return true; }
+    return false;
   }
+  if(u.section==='skills'){
+    var sk=u.fixed.split(/\n|,/).map(function(s){return s.trim();}).filter(Boolean);
+    if(sk.length){ R.skills=sk; return true; }
+    return false;
+  }
+  if(u.section==='accomplishments'){
+    var ac=u.fixed.split(/\n/).map(function(s){return s.trim();}).filter(Boolean);
+    if(ac.length){ R.accomplishments=ac; return true; }
+    return false;
+  }
+  return false;
+}
+
+function applyAIUnits(units, placeholders){
+  var fill=document.getElementById('aiProgFill');
+  var title=document.getElementById('aiProgTitle');
+  var box=document.getElementById('aiProgSections');
+
+  title.textContent='In progress \u2014 applying fixes\u2026';
+  box.innerHTML=units.map(function(u,i){
+    var name=u.section==='experience' ? (u.label||('Experience '+(u.index+1))) : u.section;
+    return '<div class="prog-sec" id="aips-'+i+'"><span class="prog-sec-ico">'+(i+1)+'</span><span>'+esc(name)+'</span></div>';
+  }).join('');
+
+  var applied=0, skipped=0;
+
+  units.forEach(function(u,idx){
+    setTimeout(function(){
+      if(idx>0){
+        var prev=document.getElementById('aips-'+(idx-1));
+        if(prev){ prev.className='prog-sec done'; prev.querySelector('.prog-sec-ico').textContent='\u2713'; }
+      }
+      var cur=document.getElementById('aips-'+idx);
+      if(cur) cur.className='prog-sec doing';
+      fill.style.width=(((idx+1)/units.length)*88)+'%';
+
+      // --- the actual write ---
+      if(u.unchanged || !u.fixed){ skipped++; }
+      else if(writeAIUnit(u)){ applied++; }
+      else { skipped++; }
+
+      // --- re-analyse against the NEW text and re-render everything ---
+      R.quality_score = analyzeQualityScore();
+      refreshQualityDashboard();
+      renderRail();
+      if(typeof schedulePreview==='function') schedulePreview();
+    }, 700*idx + 200);
+  });
+
+  setTimeout(function(){
+    var last=document.getElementById('aips-'+(units.length-1));
+    if(last){ last.className='prog-sec done'; last.querySelector('.prog-sec-ico').textContent='\u2713'; }
+    fill.style.width='100%';
+    document.getElementById('aiProgSpinner').style.display='none';
+
+    // Rebuild the editor so highlights, hints and fields reflect the new text
+    var wasScroll=window.scrollY;
+    buildEditor();
+    window.scrollTo(0,wasScroll);
+
+    var after=(R.quality_score&&R.quality_score.errors?R.quality_score.errors:[]).length;
+    var before=window._aiBefore||after;
+    var cleared=Math.max(0, before-after);
+    title.textContent='\u2713 Done \u2014 '+cleared+' issue'+(cleared===1?'':'s')+' cleared, '+after+' remaining'
+      + (skipped? ' ('+skipped+' left unchanged)' : '');
+
+    var note=document.getElementById('aiPlaceholderNote');
+    if(note){
+      note.innerHTML = placeholders
+        ? '\u26A0\uFE0F <b>'+placeholders+' metric placeholder'+(placeholders===1?'':'s')+'</b> were inserted as <b>[X]</b> / <b>[Y]</b>. The AI cannot know your real numbers \u2014 replace every bracket before you export. These lines stay flagged until you do.'
+        : 'No metric placeholders were inserted.';
+    }
+
+    setTimeout(function(){ document.getElementById('aiVerifyModal').classList.add('show'); }, 500);
+
+    var btn=document.getElementById('aiBuilderBtn');
+    btn.disabled=false; btn.textContent='Run';
+  }, 700*units.length + 700);
 }
 
 function dismissAIModal(){
