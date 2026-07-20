@@ -700,74 +700,10 @@ ${resumeText}`;
 
 // ---- 2. Enhance a section of text --------------------------
 // ---- Quality fix: AI-repair a single flagged line/word --------
-// ---- AI Builder: command-driven bulk fixes to sections --------
-app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
-  try {
-    const { command, resume } = req.body;
-    if (!requireKey(res)) return;
-    if (!command || !resume) return res.status(400).json({ error: 'Missing command or resume' });
-
-    // Parse intent: what sections to fix, what action
-    const cmd = String(command).toLowerCase();
-    let targetSections = [];
-    let action = 'fix';
-
-    if(cmd.includes('fix all')) {
-      targetSections = ['summary','skills','experience','education','certifications','accomplishments'];
-      action = 'fix-all-quality';
-    } else if(cmd.includes('fix grammar')||cmd.includes('fix spelling')) {
-      targetSections = Object.keys(resume).filter(k => typeof resume[k] === 'string' || Array.isArray(resume[k]));
-      action = 'fix-grammar';
-    } else if(cmd.includes('add') && cmd.includes('skill')) {
-      targetSections = ['skills'];
-      action = 'add-content';
-    } else if(cmd.includes('add') && cmd.includes('certif')) {
-      targetSections = ['certifications'];
-      action = 'add-content';
-    } else if(cmd.includes('add') && cmd.includes('experience')) {
-      targetSections = ['experience'];
-      action = 'add-content';
-    } else if(cmd.includes('delete')||cmd.includes('remove')) {
-      targetSections = ['experience','education','certifications'];
-      action = 'delete-item';
-    } else {
-      targetSections = ['summary','experience'];
-      action = 'fix-all-quality';
-    }
-
-    const results = [];
-
-    // Process each section sequentially
-    for(const sec of targetSections) {
-      if(!resume[sec]) continue;
-
-      let fixed, prompt;
-      const content = Array.isArray(resume[sec]) 
-        ? resume[sec].map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n')
-        : String(resume[sec]);
-
-      if(action === 'fix-all-quality') {
-        prompt = 'Fix all grammar, spelling, tense, and punctuation issues in this resume section. Also improve weak vocabulary (avoid "very", "good", "managed", etc.) with stronger professional terms. Keep all facts and dates exact. Return ONLY the corrected text, no preamble.\n\nSECTION: ' + sec + '\nCONTENT:\n' + content.slice(0, 2000);
-      } else if(action === 'fix-grammar') {
-        prompt = 'Fix grammar, spelling, tense, and punctuation in this resume text. Change nothing else. Return ONLY the corrected text.\n\n' + content.slice(0, 2000);
-      } else if(action === 'add-content') {
-        prompt = 'Based on this command: "' + command + '"\nCurrent ' + sec + ': ' + content + '\n\nAdd the requested item to the ' + sec + ' section. Keep existing entries. Use professional resume language. Return ONLY the updated full section, no preamble.\n\nNEW ' + sec.toUpperCase() + ':';
-      } else if(action === 'delete-item') {
-        prompt = 'Based on this command: "' + command + '"\nCurrent ' + sec + ': ' + content + '\n\nRemove the specified item. Return ONLY the updated ' + sec + ' with remaining items, no preamble.';
-      }
-
-      fixed = await claudeText(prompt, 800);
-      results.push({section: sec, fixed: fixed.trim(), original: content});
-    }
-
-    res.json({success: true, results});
-  } catch (err) {
-    console.error('ai-builder error:', err.message);
-    res.status(500).json({ error: err.message || 'Build failed' });
-  }
-});
-
-// ---- AI Builder: command-driven bulk fixes to sections --------
+// ---- AI Builder: command-driven fixes, unit by unit --------
+// A "unit" is one addressable piece of text: the summary, one job's
+// description, one skill, one accomplishment. Fixing unit-by-unit means the
+// resume's array shapes can never be mangled by a bad split.
 app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
   try {
     const { command, resume } = req.body;
@@ -775,52 +711,85 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
     if (!command || !resume) return res.status(400).json({ error: 'Missing command or resume' });
 
     const cmd = String(command).toLowerCase();
-    let targetSections = [];
-    let action = 'fix';
 
-    if(cmd.includes('fix all')) {
-      targetSections = ['summary','skills','experience','education','certifications','accomplishments'];
-      action = 'fix-all-quality';
-    } else if(cmd.includes('fix grammar')||cmd.includes('fix spelling')) {
-      targetSections = Object.keys(resume).filter(k => typeof resume[k] === 'string' || Array.isArray(resume[k]));
-      action = 'fix-grammar';
-    } else if(cmd.includes('add') && cmd.includes('skill')) {
-      targetSections = ['skills'];
-      action = 'add-content';
-    } else if(cmd.includes('add') && cmd.includes('certif')) {
-      targetSections = ['certifications'];
-      action = 'add-content';
-    } else if(cmd.includes('delete')||cmd.includes('remove')) {
-      targetSections = ['experience','education','certifications'];
-      action = 'delete-item';
-    } else {
-      targetSections = ['summary','experience'];
-      action = 'fix-all-quality';
+    // Which error types is the user asking about?
+    const all    = /\bfix all\b|\ball issues\b|\beverything\b/.test(cmd);
+    const wantV  = all || /vocab|wording|weak word|active voice/.test(cmd);
+    const wantG  = all || /grammar|spell|punctuat|tense|full stop|typo/.test(cmd);
+    const wantC  = all || /context|metric|number|measurab|impact/.test(cmd);
+    if (!wantV && !wantG && !wantC) {
+      return res.json({ success: true, units: [], note: 'no-fix-intent' });
     }
 
-    const results = [];
-    for(const sec of targetSections) {
-      if(!resume[sec]) continue;
-      let fixed, prompt;
-      const content = Array.isArray(resume[sec]) 
-        ? resume[sec].map(item => typeof item === 'string' ? item : JSON.stringify(item)).join('\n')
-        : String(resume[sec]);
+    // Which sections? Default = all; narrow if the user named one.
+    let secs = ['summary', 'experience', 'skills', 'accomplishments'];
+    const named = secs.filter(s => cmd.includes(s === 'summary' ? 'summary' : s));
+    if (cmd.includes('profile')) named.push('summary');
+    if (named.length) secs = [...new Set(named)];
 
-      if(action === 'fix-all-quality') {
-        prompt = 'Fix all grammar, spelling, tense, and punctuation issues in this resume section. Also improve weak vocabulary (avoid "very", "good", "managed", etc.) with stronger professional terms. Keep all facts and dates exact. Return ONLY the corrected text, no preamble.\n\nSECTION: ' + sec + '\nCONTENT:\n' + content.slice(0, 2000);
-      } else if(action === 'fix-grammar') {
-        prompt = 'Fix grammar, spelling, tense, and punctuation in this resume text. Change nothing else. Return ONLY the corrected text.\n\n' + content.slice(0, 2000);
-      } else if(action === 'add-content') {
-        prompt = 'Based on this command: "' + command + '"\nCurrent ' + sec + ': ' + content + '\n\nAdd the requested item to the ' + sec + ' section. Keep existing entries. Use professional resume language. Return ONLY the updated full section, no preamble.\n\nNEW ' + sec.toUpperCase() + ':';
-      } else if(action === 'delete-item') {
-        prompt = 'Based on this command: "' + command + '"\nCurrent ' + sec + ': ' + content + '\n\nRemove the specified item. Return ONLY the updated ' + sec + ' with remaining items, no preamble.';
+    // Build the unit list
+    const units = [];
+    if (secs.includes('summary') && resume.summary && String(resume.summary).trim()) {
+      units.push({ section: 'summary', index: -1, text: String(resume.summary) });
+    }
+    if (secs.includes('experience') && Array.isArray(resume.experience)) {
+      resume.experience.forEach((job, i) => {
+        if (job && job.desc && String(job.desc).trim()) {
+          units.push({ section: 'experience', index: i, text: String(job.desc),
+                       label: job.title || ('Job ' + (i + 1)) });
+        }
+      });
+    }
+    if (secs.includes('skills') && Array.isArray(resume.skills) && resume.skills.length) {
+      units.push({ section: 'skills', index: -1, text: resume.skills.join('\n') });
+    }
+    if (secs.includes('accomplishments') && Array.isArray(resume.accomplishments) && resume.accomplishments.length) {
+      units.push({ section: 'accomplishments', index: -1, text: resume.accomplishments.join('\n') });
+    }
+    if (!units.length) return res.json({ success: true, units: [] });
+
+    const asks = [];
+    if (wantV) asks.push('Replace weak or passive wording with strong active resume verbs (e.g. "responsible for" becomes "Led"/"Owned"/"Delivered").');
+    if (wantG) asks.push('Fix grammar, spelling, punctuation and spacing. Every line must end with a full stop. Use past tense consistently throughout.');
+    if (wantC) asks.push('Where a line states no measurable impact, append a metric using BRACKETED PLACEHOLDERS the candidate must fill in, e.g. "[X] staff", "[Y]%", "[Z] audits". NEVER invent a specific number.');
+
+    const rules = [
+      'Keep the SAME NUMBER OF LINES as the input. One line in, one line out.',
+      'Never invent employers, dates, technologies or achievements.',
+      'Keep the candidate\'s original language (do not translate).',
+      'Return ONLY the corrected text. No preamble, no commentary, no bullet characters that were not already there.'
+    ];
+
+    const out = [];
+    for (const u of units) {
+      const prompt =
+        'You are correcting one section of a resume.\n\nDO THIS:\n' +
+        asks.map(a => '- ' + a).join('\n') +
+        '\n\nRULES:\n' + rules.map(r => '- ' + r).join('\n') +
+        '\n\nTEXT:\n' + u.text.slice(0, 3000);
+
+      let fixed;
+      try {
+        fixed = (await claudeText(prompt, 1200) || '').trim();
+      } catch (e) {
+        console.error('ai-builder unit failed:', u.section, e.message);
+        out.push({ ...u, fixed: u.text, unchanged: true, error: 'AI call failed' });
+        continue;
       }
 
-      fixed = await claudeText(prompt, 800);
-      results.push({section: sec, fixed: fixed.trim(), original: content});
+      // Guard: if the model returned nothing usable, or dropped more than half
+      // the lines, keep the original rather than damaging the resume.
+      const inLines  = u.text.split('\n').filter(l => l.trim()).length;
+      const outLines = fixed.split('\n').filter(l => l.trim()).length;
+      if (!fixed || outLines < Math.ceil(inLines / 2)) {
+        out.push({ ...u, fixed: u.text, unchanged: true, error: 'rejected unsafe rewrite' });
+      } else {
+        out.push({ ...u, fixed, unchanged: fixed === u.text });
+      }
     }
 
-    res.json({success: true, results});
+    const placeholders = out.reduce((n, u) => n + ((u.fixed.match(/\[[A-Z]\]/g) || []).length), 0);
+    res.json({ success: true, units: out, placeholders });
   } catch (err) {
     console.error('ai-builder error:', err.message);
     res.status(500).json({ error: err.message || 'Build failed' });
