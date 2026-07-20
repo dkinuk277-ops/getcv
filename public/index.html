@@ -1216,46 +1216,50 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 .ldt2-done .t{font-family:Fraunces,serif;font-size:22px;font-weight:900;color:#0B4A31}
 .ldt2-done .s{font-size:12.5px;color:#4A5B76}
 
+/* AI Builder Bar */
+.ai-builder-bar{position:relative}
+.ai-builder-bar.hidden{display:none}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-progress.hidden{display:none!important}
+.ai-progress{animation:slideDown .25s}
+.prog-sec{display:flex;align-items:center;gap:6px;font-size:10px;padding:6px 10px;background:#F3F4F6;border-radius:8px;border-left:3px solid #E5E7EB;transition:all .3s}
+.prog-sec.doing{background:#FEF3C7;border-left-color:#D97706}
+.prog-sec.done{background:#D1FAE5;border-left-color:#0FA968;color:#059669;font-weight:600}
+.prog-sec-ico{width:14px;height:14px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;flex-shrink:0;background:#E5E7EB;color:#9CA3AF}
+.prog-sec.doing .prog-sec-ico{background:#FDE68A;color:#D97706;animation:pulse 1s infinite}
+.prog-sec.done .prog-sec-ico{background:#0FA968;color:#fff}
+@keyframes pulse{50%{transform:scale(1.2)}}
 
-/* ===== Ask AI Builder ===== */
-.aab{margin:10px 0 12px;border-radius:12px;background:linear-gradient(135deg,#10b981,#059669);
-  box-shadow:0 6px 18px -8px rgba(5,150,105,.55);padding:10px 12px;color:#fff;font-family:inherit}
-.aab-row{display:flex;align-items:center;gap:10px}
-.aab-icon{width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.18);
-  display:grid;place-items:center;flex:0 0 auto;font-size:15px}
-.aab-body{flex:1;min-width:0}
-.aab-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#ecfdf5}
-.aab-input-wrap{margin-top:4px;display:flex;align-items:center;gap:6px;background:#fff;
-  border-radius:9px;padding:5px 8px;box-shadow:inset 0 1px 3px rgba(0,0,0,.08)}
-.aab-input{flex:1;border:0;outline:0;background:transparent;color:#0f172a;font-size:13px;padding:3px 2px}
-.aab-input::placeholder{color:#94a3b8}
-.aab-run{border:0;cursor:pointer;background:#059669;color:#fff;font-weight:600;font-size:11px;
-  border-radius:7px;padding:5px 10px;display:inline-flex;align-items:center;gap:5px}
-.aab-run:hover{background:#047857}
-.aab-run:disabled{opacity:.55;cursor:not-allowed}
-.aab-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;padding-left:40px}
-.aab-chip{background:rgba(255,255,255,.18);color:#fff;border:0;cursor:pointer;
-  border-radius:999px;padding:2px 9px;font-size:10.5px;font-weight:500}
-.aab-chip:hover{background:rgba(255,255,255,.3)}
-.aab-progress{margin-top:10px;background:rgba(255,255,255,.12);border-radius:9px;padding:8px 10px}
-.aab-progress-head{display:flex;justify-content:space-between;font-size:10px;font-weight:700;
-  letter-spacing:.08em;text-transform:uppercase;color:#fff}
-.aab-bar{height:6px;background:rgba(255,255,255,.22);border-radius:99px;overflow:hidden;margin-top:6px}
-.aab-bar>span{display:block;height:100%;background:#fff;width:0;transition:width .45s ease}
-.aab-steps{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
-.aab-steps li{display:flex;align-items:center;gap:6px;font-size:11.5px;color:rgba(255,255,255,.9)}
-.aab-steps li.done{color:#fff}
-.aab-dot{width:11px;height:11px;border-radius:99px;border:2px solid rgba(255,255,255,.5);
-  border-top-color:#fff;animation:aabspin .8s linear infinite;flex:0 0 auto}
-.aab-steps li.done .aab-dot{animation:none;background:#fff;border-color:#fff;position:relative}
-.aab-steps li.done .aab-dot::after{content:"\2713";position:absolute;inset:0;color:#059669;
-  font-size:9px;font-weight:900;display:grid;place-items:center;line-height:1}
-@keyframes aabspin{to{transform:rotate(360deg)}}
-.aab-confirm{margin-top:8px;background:#fff;color:#0f172a;border-radius:9px;
-  padding:6px 10px;display:flex;align-items:center;gap:8px;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.08)}
-.aab-confirm b{color:#059669}
-.aab-pulse{animation:aabpulse 1.6s ease-in-out}
-@keyframes aabpulse{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}30%{box-shadow:0 0 0 4px rgba(16,185,129,.35)}}
+/* Verification Modal */
+.ai-verify-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(2px)}
+.ai-verify-overlay.show{display:flex;animation:fadeIn .25s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.ai-verify-box{background:#fff;border-radius:16px;max-width:540px;width:90%;box-shadow:0 20px 50px rgba(0,0,0,.3);overflow:hidden;animation:slideUp .3s}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.ai-verify-head{background:linear-gradient(135deg,#0FA968,#0B8A55);padding:20px;color:#fff}
+.ai-verify-head .icon{font-size:24px;margin-bottom:8px}
+.ai-verify-head .title{font-size:16px;font-weight:800;margin-bottom:4px}
+.ai-verify-head .subtitle{font-size:11px;color:#D1FAE5;line-height:1.5}
+.ai-verify-body{padding:20px}
+.ai-verify-warn{background:#FEF2F2;border:1px solid #FEE2E2;border-radius:10px;padding:12px;margin-bottom:14px;display:flex;gap:10px}
+.ai-verify-warn-icon{font-size:18px;flex-shrink:0}
+.ai-verify-warn-text{font-size:11px;line-height:1.6;color:#7F1D1D}
+.ai-verify-warn-text strong{color:#DC2626;font-weight:800}
+.ai-verify-body h3{font-size:12px;font-weight:800;margin:12px 0 8px;color:#1A2028}
+.ai-verify-body ul{margin-left:18px;font-size:11px;color:#4B5563;line-height:1.7}
+.ai-verify-body li{margin-bottom:5px}
+.ai-verify-footer{padding:14px 20px;background:#F9FAFB;border-top:1px solid #E3E6E0;display:flex;gap:10px;justify-content:flex-end}
+.btn-review{background:#fff;color:#1A2028;border:1.5px solid #E3E6E0;border-radius:8px;padding:9px 20px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit}
+.btn-review:hover{background:#F9FAFB;border-color:#4B5563}
+.btn-verify{background:#0FA968;color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit}
+.btn-verify:hover{background:#0B8A55}
+
+/* Done toast */
+.ai-done-toast{position:fixed;bottom:22px;right:22px;background:#065F46;color:#fff;padding:12px 20px;border-radius:12px;font-size:11.5px;font-weight:800;box-shadow:0 6px 24px rgba(0,0,0,.3);transform:translateX(400px);opacity:0;transition:all .3s;z-index:300;display:flex;align-items:center;gap:8px}
+.ai-done-toast.show{transform:translateX(0);opacity:1}
+
+
 </style>
 </head>
 <body>
@@ -1619,35 +1623,6 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
           <div class="pbar"><div id="pbarFill"></div></div>
           <div class="pstatus" id="pstatus"><span class="pspin" id="pspin"></span><span id="pstatusText">Uploading…</span><span id="ppct">0%</span></div>
         </div>
-        <!-- Ask AI Builder -->
-        <div class="aab" id="aabRoot" role="region" aria-label="Ask AI Builder">
-          <div class="aab-row">
-            <div class="aab-icon">✨</div>
-            <div class="aab-body">
-              <div class="aab-label">Ask AI Builder</div>
-              <div class="aab-input-wrap">
-                <input class="aab-input" id="aabInput" type="text"
-                  placeholder='Try: "Add Python to my skills" or "Fix grammar in summary"'>
-                <button class="aab-run" id="aabRun" type="button">Run →</button>
-              </div>
-            </div>
-          </div>
-          <div class="aab-chips" id="aabChips">
-            <button class="aab-chip" type="button">Add Python &amp; Docker to my skills</button>
-            <button class="aab-chip" type="button">Fix grammar in my summary</button>
-            <button class="aab-chip" type="button">Delete my last work experience</button>
-            <button class="aab-chip" type="button">Add AWS certification</button>
-          </div>
-          <div class="aab-progress" id="aabProgress" hidden>
-            <div class="aab-progress-head"><span>AI Builder in progress</span><span id="aabPct">0%</span></div>
-            <div class="aab-bar"><span id="aabFill"></span></div>
-            <ul class="aab-steps" id="aabSteps"></ul>
-          </div>
-          <div class="aab-confirm" id="aabConfirm" hidden>
-            <span style="color:#059669;font-weight:900">✓</span>
-            <span id="aabConfirmText"></span>
-          </div>
-        </div>
         <!-- Upload -->
         <div id="startArea">
           <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload resume">
@@ -1734,12 +1709,66 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <!-- Shared editor (moved between module slots by JS) -->
 <div id="editorWrap" class="hidden">
+  <!-- AI BUILDER BAR -->
+  <div id="aiBuilderBar" class="ai-builder-bar hidden" style="background:linear-gradient(180deg,#BFE3D2,#CDE9DC);padding:12px 20px;border-bottom:1px solid #D1D5DB">
+    <div style="max-width:900px;margin:0 auto">
+      <div style="font-size:10px;font-weight:800;color:#0B4A31;text-transform:uppercase;letter-spacing:.12em;text-align:center;margin-bottom:8px">✦ Ask AI Builder</div>
+      <div style="display:flex;gap:0;background:#fff;border:2px solid #0FA968;border-radius:14px;box-shadow:0 3px 14px rgba(11,74,49,.14)">
+        <span style="padding:0 12px 0 16px;font-size:16px;color:#0FA968">✦</span>
+        <input id="aiBuilderInput" type="text" placeholder="Tell me what to change — add, delete, update, fix, replace anything…" style="flex:1;border:none;outline:none;padding:12px 4px;font-size:12.5px;font-family:inherit;color:#12233F;background:transparent">
+        <button id="aiBuilderBtn" style="background:linear-gradient(135deg,#0FA968,#0B8A55);color:#fff;border:none;padding:12px 22px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit" onclick="runAIBuilder()">Run</button>
+      </div>
+      <div id="aiBuilderChips" style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:8px"></div>
+      <!-- Progress -->
+      <div id="aiBuilderProgress" class="ai-progress hidden" style="max-width:100%;margin:10px 0 0;background:#fff;border:1px solid #E9EBE8;border-radius:12px;padding:14px;box-shadow:0 2px 8px rgba(5,61,40,.08);display:none;animation:slideDown .25s">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;margin-bottom:10px">
+          <span id="aiProgSpinner" style="width:14px;height:14px;border:2.5px solid #D1FAE5;border-top-color:#0FA968;border-radius:50%;animation:spin .8s linear infinite"></span>
+          <span id="aiProgTitle">In progress — fixing issues…</span>
+        </div>
+        <div style="height:6px;background:#E5E7EB;border-radius:3px;overflow:hidden;margin-bottom:12px">
+          <div id="aiProgFill" style="height:100%;background:linear-gradient(90deg,#0FA968,#34D399);width:0%;transition:width .4s ease"></div>
+        </div>
+        <div id="aiProgSections" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+    </div>
+  </div>
+  
   <div id="editor" class="hidden"></div>
   <div class="card hidden" id="addSectionCard">
     <h2>Add a missing section</h2>
     <div class="add-panel" id="addPanel"></div>
   </div>
 </div>
+
+<!-- ===== AI Verification Modal ===== -->
+<div class="ai-verify-overlay" id="aiVerifyModal">
+  <div class="ai-verify-box">
+    <div class="ai-verify-head">
+      <div class="icon">⚠️</div>
+      <div class="title">Verify the details</div>
+      <div class="subtitle">AI sometimes hallucinate. Human review is essential before publishing.</div>
+    </div>
+    <div class="ai-verify-body">
+      <div class="ai-verify-warn">
+        <div class="ai-verify-warn-icon">🤖</div>
+        <div class="ai-verify-warn-text"><strong>AI Limitation:</strong> The AI generated changes based on your request. It may have added placeholder values, misunderstood context, or created content that doesn't match your real experience. Please review all changes carefully.</div>
+      </div>
+      <h3>What to check:</h3>
+      <ul>
+        <li><strong>Accuracy:</strong> Are the facts, dates, and numbers correct?</li>
+        <li><strong>Tone:</strong> Does the content match your professional voice?</li>
+        <li><strong>Completeness:</strong> Did the AI miss any important details?</li>
+        <li><strong>Context:</strong> Are metrics and claims realistic for your role?</li>
+      </ul>
+    </div>
+    <div class="ai-verify-footer">
+      <button class="btn-review" onclick="dismissAIModal()">↻ Review changes</button>
+      <button class="btn-verify" onclick="confirmAIChanges()">✓ Looks good, continue</button>
+    </div>
+  </div>
+</div>
+
+<div class="ai-done-toast" id="aiDoneToast"><span style="font-size:16px">✅</span> All changes are done!</div>
 
 <!-- ===== Tailor-for-Job modal ===== -->
 <div class="modal" id="tailorModal" role="dialog" aria-modal="true">
@@ -1901,78 +1930,5 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <script src="app.js"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
-<script>
-(function(){
-  var $=function(id){return document.getElementById(id)};
-  var input=$('aabInput'),run=$('aabRun'),chips=$('aabChips'),
-      prog=$('aabProgress'),pct=$('aabPct'),fill=$('aabFill'),
-      steps=$('aabSteps'),conf=$('aabConfirm'),confT=$('aabConfirmText');
-  if(!input)return;
-  var ROUTES=[
-    [/skill|python|docker|java|aws|react|node|sql/i,'Skills'],
-    [/summary|about|profile|grammar|spelling|tone/i,'Profile / Summary'],
-    [/experi|job|work|company|role|position/i,'Experience'],
-    [/certif|licen[sc]e|credential/i,'Certifications'],
-    [/educat|degree|university|college|school/i,'Education'],
-    [/project|portfolio/i,'Projects'],
-    [/award|honou?r|recognition/i,'Accomplishments'],
-    [/language/i,'Languages'],
-    [/course|training/i,'Courses'],
-    [/personal|contact|phone|email|address/i,'Personal details']
-  ];
-  function routeSection(t){for(var i=0;i<ROUTES.length;i++)if(ROUTES[i][0].test(t))return ROUTES[i][1];return 'Profile / Summary'}
-  function routeVerb(t){
-    if(/delete|remove/i.test(t))return 'Removing content from';
-    if(/replace|fix|correct|grammar|spell/i.test(t))return 'Rewriting';
-    if(/add|insert|append|include/i.test(t))return 'Adding new content to';
-    return 'Updating';
-  }
-  function pulseSection(name){
-    var nodes=document.querySelectorAll('.rail button,.rail a,[data-section],.sec-bar,.sec-title');
-    var lc=name.toLowerCase();
-    for(var i=0;i<nodes.length;i++){
-      var el=nodes[i],txt=(el.textContent||'').trim().toLowerCase();
-      if(txt&&txt.indexOf(lc)!==-1){
-        el.classList.add('aab-pulse');
-        (function(n){setTimeout(function(){n.classList.remove('aab-pulse')},1800)})(el);
-        try{el.scrollIntoView({behavior:'smooth',block:'center'})}catch(e){}
-        break;
-      }
-    }
-  }
-  var busy=false,timers=[];
-  function run_(text){
-    var q=(text||input.value||'').trim();
-    if(!q||busy)return;
-    busy=true;run.disabled=true;conf.hidden=true;
-    var section=routeSection(q),verb=routeVerb(q);
-    var plan=['Reading your request','Locating "'+section+'" section',verb+' "'+section+'"','Applying changes to your resume'];
-    steps.innerHTML=plan.map(function(s){return '<li><span class="aab-dot"></span><span>'+s+'</span></li>'}).join('');
-    prog.hidden=false;pct.textContent='6%';fill.style.width='6%';
-    var marks=[{t:500,p:28,i:0},{t:1100,p:52,i:1},{t:1900,p:78,i:2},{t:2600,p:100,i:3}];
-    marks.forEach(function(m){
-      timers.push(setTimeout(function(){
-        pct.textContent=m.p+'%';fill.style.width=m.p+'%';
-        var lis=steps.querySelectorAll('li');
-        for(var k=0;k<=m.i;k++)lis[k]&&lis[k].classList.add('done');
-        if(m.i===1)pulseSection(section);
-      },m.t));
-    });
-    timers.push(setTimeout(function(){
-      prog.hidden=true;
-      confT.innerHTML='<b>'+section+' section updated</b> — all changes applied';
-      conf.hidden=false;input.value='';busy=false;run.disabled=false;
-      timers.push(setTimeout(function(){conf.hidden=true},4500));
-    },3050));
-  }
-  run.addEventListener('click',function(){run_()});
-  input.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();run_()}});
-  chips.addEventListener('click',function(e){
-    var b=e.target.closest('.aab-chip');if(!b)return;
-    input.value=b.textContent.trim();run_();
-  });
-})();
-</script>
-
 </body>
 </html>

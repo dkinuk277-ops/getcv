@@ -1265,6 +1265,7 @@ function buildEditor(){
   $('#startArea').classList.add('hidden');
   $('#fresherStart').classList.add('hidden');
   $('#editorWrap').classList.remove('hidden');
+  showAIBuilder();
   const ed = $('#editor');
   ed.classList.remove('hidden');
   ed.innerHTML = '';
@@ -2654,6 +2655,7 @@ function clearBuilder(){
   R = emptyResume();
   currentResumeId = null; currentResumeName = '';
   $('#editorWrap').classList.add('hidden');
+  hideAIBuilder();
   $('#editor').classList.add('hidden');
   $('#addSectionCard').classList.add('hidden');
   $('#startArea').classList.remove('hidden');
@@ -3386,150 +3388,207 @@ function initLanding(){
 // Initial rail (nothing detected yet)
 renderRail();
 
-/* ============================================================
-   Ask AI Builder — batch fix orchestrator
-   Wires #aabInput/#aabRun to the existing per-error Fix-by-AI
-   pipeline. Parses natural language, targets matching errors,
-   triggers each fix and auto-accepts the AI preview.
-   ============================================================ */
-(function(){
-  function parseCmd(text){
-    var t=(text||'').toLowerCase();
-    if(!/\b(fix|correct|resolve|clean|repair|improve)\b/.test(t)) return null;
-    var type=null;
-    if(/grammar|spelling|tense|punctuation/.test(t)) type='grammar';
-    else if(/vocab|weak word|word choice/.test(t)) type='vocabulary';
-    else if(/context|metric|number|impact|quantif/.test(t)) type='context';
-    var sectionMap={
-      summary:['summary','profile','about'],
-      experience:['experience','work','employment','job'],
-      education:['education','degree','school','university'],
-      skills:['skill','tech stack','tool'],
-      certifications:['certif','license'],
-      projects:['project'],
-      personal:['personal','contact','header']
-    };
-    var section=null;
-    Object.keys(sectionMap).forEach(function(k){
-      if(section) return;
-      if(sectionMap[k].some(function(w){return t.indexOf(w)>=0;})) section=k;
-    });
-    return {isFix:true,type:type,section:section};
+// ====== AI BUILDER FUNCTIONS ======
+// Show the AI builder bar when editor is active
+function showAIBuilder(){
+  var bar = document.getElementById('aiBuilderBar');
+  if(bar) bar.classList.remove('hidden');
+  populateAIChips();
+}
+
+function hideAIBuilder(){
+  var bar = document.getElementById('aiBuilderBar');
+  if(bar) bar.classList.add('hidden');
+}
+
+function populateAIChips(){
+  var chips = document.getElementById('aiBuilderChips');
+  if(!chips) return;
+  chips.innerHTML = [
+    {text:'🔧 Fix all issues', cmd:'Fix all quality issues'},
+    {text:'+ Add skill', cmd:'Add Python and Docker to my skills'},
+    {text:'− Delete job', cmd:'Delete my last work experience'},
+    {text:'+ Add certification', cmd:'Add AWS certification from AWS, June 2024'}
+  ].map(c => '<span class="ai-chip" style="background:rgba(255,255,255,.8);border:1px solid rgba(11,74,49,.2);border-radius:20px;padding:5px 12px;font-size:10px;font-weight:600;color:#0B4A31;cursor:pointer;transition:all .15s" onclick="setAICommand(\''+c.cmd.replace(/'/g,"\\'")+'\')" onmouseover="this.style.background=\'#fff\';this.style.borderColor=\'#0FA968\';this.style.transform=\'translateY(-1px)\';" onmouseout="this.style.background=\'rgba(255,255,255,.8)\';this.style.borderColor=\'rgba(11,74,49,.2)\';this.style.transform=\'translateY(0)\'">'+c.text+'</span>').join('');
+}
+
+function setAICommand(cmd){
+  document.getElementById('aiBuilderInput').value = cmd;
+  document.getElementById('aiBuilderInput').focus();
+}
+
+function runAIBuilder(){
+  var input = document.getElementById('aiBuilderInput').value.trim();
+  if(!input) {
+    document.getElementById('aiBuilderInput').focus();
+    return;
   }
-  function collectErrors(cmd){
-    if(!window.R||!R.quality_score||!R.quality_score.errors) return [];
-    return R.quality_score.errors.filter(function(e){
-      if(e.fixed) return false;
-      if(cmd.type && e.type && String(e.type).toLowerCase().indexOf(cmd.type)<0) return false;
-      if(cmd.section && e.secKey){
-        var sk=String(e.secKey).toLowerCase();
-        if(sk.indexOf(cmd.section)<0 && cmd.section.indexOf(sk)<0) return false;
+  
+  // Disable button and show progress
+  var btn = document.getElementById('aiBuilderBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Working…';
+  
+  // Show progress panel
+  var prog = document.getElementById('aiBuilderProgress');
+  prog.style.display = 'block';
+  prog.classList.remove('hidden');
+  
+  // Send command to AI Builder endpoint
+  fetch('/api/ai-builder', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({command: input, resume: R})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if(!data.success) throw new Error(data.error || 'Builder failed');
+    applyAIChanges(data.results, input);
+  })
+  .catch(err => {
+    console.error('AI Builder error:', err);
+    btn.disabled = false;
+    btn.textContent = 'Run';
+    document.getElementById('aiProgTitle').textContent = '✗ Error: ' + (err.message || 'Try again');
+  });
+}
+
+function applyAIChanges(results, command){
+  if(!results || results.length === 0) return;
+  
+  // Animate through sections
+  var sections = results;
+  var index = 0;
+  var btn = document.getElementById('aiBuilderBtn');
+  var progSections = document.getElementById('aiProgSections');
+  var progFill = document.getElementById('aiProgFill');
+  var progTitle = document.getElementById('aiProgTitle');
+  
+  // Build progress step elements
+  progSections.innerHTML = sections.map((s,i) => 
+    '<div class="prog-sec pend" id="psec-' + s.section + '">' +
+    '<span class="prog-sec-ico">' + (i+1) + '</span> ' +
+    '<span>' + s.section + '</span></div>'
+  ).join('');
+  
+  // Process sections sequentially
+  sections.forEach((sec, idx) => {
+    setTimeout(() => {
+      // Mark current as doing
+      if(idx > 0) {
+        var prev = document.getElementById('psec-' + sections[idx-1].section);
+        if(prev) {
+          prev.className = 'prog-sec done';
+          prev.querySelector('.prog-sec-ico').textContent = '✓';
+        }
       }
-      return true;
-    });
-  }
-  function renderSteps(labels){
-    var ul=document.getElementById('aabSteps'); if(!ul) return [];
-    ul.innerHTML=labels.map(function(l){return '<li><span class="aab-dot"></span><span>'+l+'</span></li>';}).join('');
-    return Array.prototype.slice.call(ul.querySelectorAll('li'));
-  }
-  function setPct(p){
-    var f=document.getElementById('aabFill'),t=document.getElementById('aabPct');
-    if(f) f.style.width=p+'%';
-    if(t) t.textContent=p+'%';
-  }
-  function showConfirm(msg){
-    var c=document.getElementById('aabConfirm'),t=document.getElementById('aabConfirmText');
-    if(!c||!t) return;
-    t.textContent=msg; c.hidden=false;
-  }
-  function findFixBtnFor(err){
-    var span=document.querySelector('[data-errid="'+err.id+'"]');
-    if(span){
-      var host=span.closest('.q-field-wrap')||span.parentElement;
-      if(host){
-        var btn=host.querySelector('.fix-ai-btn:not([disabled])');
-        if(btn) return btn;
+      var cur = document.getElementById('psec-' + sec.section);
+      if(cur) {
+        cur.className = 'prog-sec doing';
       }
+      progFill.style.width = ((idx + 1) / sections.length * 85) + '%';
+      
+      // Apply the fix to resume data
+      if(R[sec.section]) {
+        if(Array.isArray(R[sec.section])) {
+          // For arrays, reconstruct from fixed text
+          R[sec.section] = sec.fixed.split('\n').filter(l => l.trim().length > 0).map(l => ({text: l.trim()}));
+        } else {
+          R[sec.section] = sec.fixed;
+        }
+      }
+      
+      // Re-analyze quality score for this section
+      var qs = analyzeQualityScore();
+      updateQualityDisplay(qs);
+      updateSidebarBadges(qs);
+      
+      // Scroll to section card if visible
+      var card = document.querySelector('[data-seckey="' + sec.section + '_0"], [data-seckey="' + sec.section + '"]');
+      if(card) {
+        card.style.borderLeft = '4px solid #0FA968';
+        setTimeout(() => { card.style.borderLeft = ''; }, 500);
+      }
+    }, 800 * (idx + 1));
+  });
+  
+  // Finish
+  setTimeout(() => {
+    var last = document.getElementById('psec-' + sections[sections.length-1].section);
+    if(last) {
+      last.className = 'prog-sec done';
+      last.querySelector('.prog-sec-ico').textContent = '✓';
     }
-    return null;
-  }
-  function clickAndAutoAccept(btn){
-    return new Promise(function(resolve){
-      if(!btn) return resolve(false);
-      var wrap=btn.closest('.q-field-wrap')||document.body;
-      var done=false;
-      var obs=new MutationObserver(function(){
-        if(done) return;
-        var acc=wrap.querySelector('.ai-preview .btn-accept');
-        if(acc){ done=true; obs.disconnect(); acc.click(); setTimeout(function(){resolve(true);},250); }
-      });
-      obs.observe(wrap,{childList:true,subtree:true});
-      try{ btn.click(); }catch(e){}
-      setTimeout(function(){ if(!done){obs.disconnect(); resolve(false);} }, 15000);
-    });
-  }
-  function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+    progFill.style.width = '100%';
+    document.getElementById('aiProgSpinner').style.display = 'none';
+    progTitle.textContent = '✓ All changes applied';
+    
+    // Show verification modal after a short delay
+    setTimeout(() => {
+      document.getElementById('aiVerifyModal').classList.add('show');
+    }, 600);
+  }, 800 * (sections.length + 1));
+}
 
-  async function runFix(text){
-    var cmd=parseCmd(text);
-    if(!cmd){
-      showConfirm('Try: "Fix all issues", "Fix grammar in summary", "Fix vocabulary in experience"');
-      return;
-    }
-    var errors=collectErrors(cmd);
-    var prog=document.getElementById('aabProgress'),conf=document.getElementById('aabConfirm');
-    if(conf) conf.hidden=true;
-    if(!errors.length){ showConfirm('No matching issues found — you\'re all clean!'); return; }
-    if(prog) prog.hidden=false;
-    setPct(0);
-    var labels=[
-      'Analyzing your resume',
-      'Locating '+errors.length+' issue'+(errors.length!==1?'s':'')+(cmd.section?' in '+cmd.section:''),
-      'Applying AI fixes',
-      'Recalculating quality score'
-    ];
-    var steps=renderSteps(labels);
-    steps[0]&&steps[0].classList.add('done'); setPct(15); await sleep(350);
-    steps[1]&&steps[1].classList.add('done'); setPct(30); await sleep(350);
+function updateQualityDisplay(qs){
+  // Update dashboard scores (if they exist in the UI)
+  var overall = document.getElementById('overall-pct');
+  var vocab = document.getElementById('vocab-pct');
+  var grammar = document.getElementById('grammar-pct');
+  var context = document.getElementById('context-pct');
+  
+  if(overall) overall.textContent = qs.overall + '%';
+  if(vocab) vocab.textContent = qs.vocabulary + '%';
+  if(grammar) grammar.textContent = qs.grammar + '%';
+  if(context) context.textContent = qs.context + '%';
+  
+  // Update issue counts
+  var vocabIssues = document.getElementById('vocab-issues');
+  var grammarIssues = document.getElementById('grammar-issues');
+  var contextIssues = document.getElementById('context-issues');
+  
+  var vocabCount = qs.errors.filter(e => !e.fixed && e.type === 'vocab').length;
+  var grammarCount = qs.errors.filter(e => !e.fixed && e.type === 'grammar').length;
+  var contextCount = qs.errors.filter(e => !e.fixed && e.type === 'context').length;
+  
+  if(vocabIssues) vocabIssues.textContent = vocabCount + ' issue' + (vocabCount !== 1 ? 's' : '');
+  if(grammarIssues) grammarIssues.textContent = grammarCount + ' issue' + (grammarCount !== 1 ? 's' : '');
+  if(contextIssues) contextIssues.textContent = contextCount + ' issue' + (contextCount !== 1 ? 's' : '');
+}
 
-    var startOverall=(R.quality_score&&R.quality_score.overall)||0;
-    var fixed=0;
-    for(var i=0;i<errors.length;i++){
-      var btn=findFixBtnFor(errors[i]);
-      if(btn){ var ok=await clickAndAutoAccept(btn); if(ok) fixed++; }
-      setPct(30+Math.round(60*(i+1)/errors.length));
-    }
-    steps[2]&&steps[2].classList.add('done'); setPct(95); await sleep(300);
-    steps[3]&&steps[3].classList.add('done'); setPct(100);
-
-    var endOverall=(R.quality_score&&R.quality_score.overall)||startOverall;
-    var delta=Math.max(0,endOverall-startOverall);
-    var msg='Fixed '+fixed+' of '+errors.length+' issue'+(errors.length!==1?'s':'')
-      +(cmd.section?' in '+cmd.section:'')
-      +(delta>0?' — +'+delta+' points to Quality Score':' — section updated');
-    showConfirm(msg);
-    setTimeout(function(){ if(prog) prog.hidden=true; }, 5000);
+function updateSidebarBadges(qs){
+  // Update the sidebar error badges
+  if(R.quality_score && R.quality_score.issuesBySection) {
+    renderRail();
   }
+}
 
-  function wire(){
-    var input=document.getElementById('aabInput');
-    var run=document.getElementById('aabRun');
-    var chips=document.getElementById('aabChips');
-    if(!input||!run) return false;
-    if(run._aabWired) return true;
-    run._aabWired=true;
-    function go(){ var v=input.value.trim(); if(v) runFix(v); }
-    run.addEventListener('click',go);
-    input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); go(); } });
-    if(chips){
-      chips.addEventListener('click',function(e){
-        var b=e.target.closest('.aab-chip'); if(!b) return;
-        input.value=b.textContent.trim(); go();
-      });
-    }
-    return true;
-  }
-  var tries=0;
-  var iv=setInterval(function(){ tries++; if(wire()||tries>80) clearInterval(iv); },300);
-})();
+function dismissAIModal(){
+  document.getElementById('aiVerifyModal').classList.remove('show');
+  document.getElementById('aiBuilderInput').value = '';
+  var btn = document.getElementById('aiBuilderBtn');
+  btn.disabled = false;
+  btn.textContent = 'Run';
+}
+
+function confirmAIChanges(){
+  document.getElementById('aiVerifyModal').classList.remove('show');
+  
+  // Trigger save
+  if(typeof saveResume === 'function') saveResume();
+  
+  // Show toast
+  var toast = document.getElementById('aiDoneToast');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+  
+  // Reset
+  document.getElementById('aiBuilderInput').value = '';
+  var btn = document.getElementById('aiBuilderBtn');
+  btn.disabled = false;
+  btn.textContent = 'Run';
+  
+  // Refresh preview
+  if(typeof renderLivePreview === 'function') renderLivePreview();
+}
+
