@@ -1051,22 +1051,95 @@ function showAIPreview(err, fieldEl, hintEl, btn, original, suggestion){
   if(old && old.classList.contains('ai-preview')) old.remove();
 
   var box=el('div',{class:'ai-preview'});
-  box.innerHTML='<div class="ai-preview-label">\u2726 AI suggested fix \u2014 review before applying</div>'
-    +'<div class="ai-preview-text">'+esc(suggestion)+'</div>'
+  box.innerHTML='<div class="ai-preview-label">\u2726 AI suggested fix \u2014 review and edit before applying'
+      +'<span class="ai-edit-pill">editable</span></div>'
+    +'<textarea class="ai-preview-ta" spellcheck="true"></textarea>'
+    +'<div class="ai-preview-meta">'
+      +'<span class="ai-ph"></span>'
+      +'<span class="ai-dirty"></span>'
+      +'<span class="ai-toggle-orig">show original</span>'
+    +'</div>'
+    +'<div class="ai-orig"></div>'
     +'<div class="ai-preview-actions">'
-    +'<button class="btn-accept" type="button">\u2713 Accept &amp; apply</button>'
-    +'<button class="btn-reject" type="button">\u2715 Dismiss</button>'
+      +'<button class="btn-accept" type="button">\u2713 Accept &amp; apply</button>'
+      +'<button class="btn-revert" type="button" disabled>\u21BA Revert to AI version</button>'
+      +'<button class="btn-reject" type="button">\u2715 Dismiss</button>'
     +'</div>';
   hintEl.insertAdjacentElement('afterend', box);
 
-  box.querySelector('.btn-accept').addEventListener('click',function(){
-    applyAIFix(err, fieldEl, original, suggestion);
-    box.remove();
-    // Hint state -> fixed by AI
-    hintEl.classList.add('q-hint-done');
-    var tag=el('span',{class:'q-hint-fixed-tag'},'\u2713 Fixed by AI');
-    hintEl.appendChild(tag);
+  var ta      = box.querySelector('.ai-preview-ta');
+  var phEl    = box.querySelector('.ai-ph');
+  var dirtyEl = box.querySelector('.ai-dirty');
+  var revBtn  = box.querySelector('.btn-revert');
+  var origEl  = box.querySelector('.ai-orig');
+  var togEl   = box.querySelector('.ai-toggle-orig');
+
+  origEl.innerHTML = '<b>Original:</b> ' + esc(original);
+  ta.value = suggestion;
+
+  // Whole-field grammar rewrites can be long \u2014 cap height and scroll inside
+  function autosize(){
+    ta.style.height='auto';
+    var h=ta.scrollHeight+2;
+    if(h>260){ ta.style.height='260px'; ta.style.overflowY='auto'; }
+    else { ta.style.height=h+'px'; ta.style.overflowY='hidden'; }
+  }
+
+  var hadPlaceholders = /\[[A-Za-z]\]/.test(suggestion);
+  function updateMeta(){
+    var val=ta.value;
+    var ph=val.match(/\[[A-Za-z]\]/g)||[];
+    if(ph.length){
+      phEl.className='ai-ph warn';
+      phEl.textContent='\u26A0 '+ph.length+' placeholder'+(ph.length>1?'s':'')+' to fill: '+ph.join(' ');
+    } else if(hadPlaceholders){
+      phEl.className='ai-ph ok';
+      phEl.textContent='\u2713 all placeholders filled';
+    } else { phEl.className='ai-ph'; phEl.textContent=''; }
+    var dirty = val !== suggestion;
+    dirtyEl.textContent = dirty ? 'edited by you' : '';
+    revBtn.disabled = !dirty;
+  }
+
+  autosize(); updateMeta();
+  ta.addEventListener('input', function(){ autosize(); updateMeta(); });
+  setTimeout(function(){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
+
+  togEl.addEventListener('click', function(){
+    var shown = origEl.classList.toggle('show');
+    togEl.textContent = shown ? 'hide original' : 'show original';
   });
+
+  revBtn.addEventListener('click', function(){
+    ta.value = suggestion; autosize(); updateMeta(); ta.focus();
+  });
+
+  box.querySelector('.btn-accept').addEventListener('click',function(){
+    var text=(ta.value||'').trim();
+    if(!text){ ta.style.borderColor='#DC2626'; ta.focus(); return; }
+    var ph=text.match(/\[[A-Za-z]\]/g)||[];
+    if(ph.length && !confirm('This still contains '+ph.length+' unfilled placeholder'
+        +(ph.length>1?'s':'')+' ('+ph.join(' ')+').\n\nApply anyway? The line stays flagged until you replace them with real numbers.')) return;
+
+    var edited = text !== suggestion;
+    var stillFlagged = (err.type==='context' && ph.length>0);
+    applyAIFix(err, fieldEl, original, text);   // apply what is IN THE BOX
+    box.remove();
+
+    if(stillFlagged){
+      // Text improved but the metric is still a placeholder \u2014 say so plainly
+      hintEl.querySelector('.q-hint-text').textContent =
+        'Text rewritten \u2014 now replace '+ph.join(' ')+' with your real numbers to clear this';
+      btn.style.display='inline-flex';
+      btn.disabled=false;
+      btn.textContent='\u2726 Fix by AI';
+    } else {
+      hintEl.classList.add('q-hint-done');
+      hintEl.appendChild(el('span',{class:'q-hint-fixed-tag'},
+        edited ? '\u2713 Applied (your edit)' : '\u2713 Fixed by AI'));
+    }
+  });
+
   box.querySelector('.btn-reject').addEventListener('click',function(){
     box.remove();
     btn.style.display='inline-flex';
@@ -1103,7 +1176,19 @@ function applyAIFix(err, fieldEl, original, suggestion){
   }
   // 2. Sync data model via the field's input pipeline
   fieldEl.dispatchEvent(new Event('input', {bubbles:true}));
-  // 3. Score up + UI refresh (markErrorFixed handles dashboard, rail, toast)
+
+  // 3. A context fix that still carries [X] placeholders is NOT a real fix \u2014
+  //    the line has no measurable impact until a real number replaces the bracket.
+  //    Keep it flagged and do not move the score.
+  if(err.type==='context' && /\[[A-Za-z]\]/.test(suggestion)){
+    err.line = suggestion.trim();          // re-target the error at the new text
+    fieldEl.innerHTML = markupWithErrors(qFieldText(fieldEl),
+      (fieldEl._qErrors||[]).filter(function(e){return !e.fixed;}));
+    fieldEl._qOrigLen = qFieldText(fieldEl).trim().length;
+    return;
+  }
+
+  // 4. Score up + UI refresh (markErrorFixed handles dashboard, rail, toast)
   markErrorFixed(err, fieldEl);
 }
 
