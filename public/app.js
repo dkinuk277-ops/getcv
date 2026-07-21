@@ -1802,12 +1802,25 @@ function listCard(key){
           read: ()=> item[tf]||'',
           write: (v)=>{ item[tf]=v; }
         } : null;
-        fw.appendChild(fieldHead(tlab, askSpec));
         const markKey = key+'_'+i+'_'+tf;
+        const blockId = key+'_'+i+'::'+tf;
+        const fh = fieldHead(tlab, askSpec);
+        // Aa Format sits beside Ask AI in the block header
+        const tools = fh.querySelector('.sec-askai');
+        if(tools) fh.insertBefore(formatToggleBtn(blockId), tools);
+        else fh.appendChild(formatToggleBtn(blockId));
+        fw.appendChild(fh);
+
         const mb = markBar(markKey, item[tf]||'');
         if(mb) fw.appendChild(mb);
+
         const fieldErrs = getFieldErrors(key+'_'+i);
-        if(fieldErrs.length > 0){
+        if(_fmtOpen === blockId){
+          // formatting mode: structured line rows replace the plain field
+          fw.appendChild(formatBlock(item, tf, blockId, function(){
+            R.quality_score = analyzeQualityScore();
+          }));
+        } else if(fieldErrs.length > 0){
           fw.appendChild(qualityField(item[tf]||'', fieldErrs, function(plain){ item[tf]=plain; }));
         } else {
           const ta = el('textarea',{'data-f':tf,rows:'4'});
@@ -2065,7 +2078,20 @@ ${headCSS}
 .gcv-job-head strong{font-weight:700;color:${t.dark}}
 .gcv-job-title{font-size:12.5px;font-weight:700;color:${t.main};margin:1px 0 2px}
 .gcv-dates{color:#666;font-size:11.5px;white-space:nowrap;font-weight:600}
-.gcv-sub{font-size:11.5px;font-weight:700;color:${t.dark};text-transform:uppercase;letter-spacing:.04em;margin:7px 0 2px}
+.gcv-sub{font-size:11.5px;font-weight:700;color:${t.dark};margin:7px 0 2px}
+.gcv-sub.h_bold{font-weight:700}
+.gcv-sub.h_under{font-weight:700;text-decoration:underline;text-underline-offset:2px}
+.gcv-sub.h_caps{font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.gcv-sub.h_rule{font-weight:700;border-bottom:1px solid ${t.dark};padding-bottom:2px}
+.gcv-sub.h_accent{font-weight:700;color:${t.main}}
+.gcv-sub.h_italic{font-weight:600;font-style:italic}
+.gcv-sub.h_boxed{font-weight:700;background:#EFF2EF;border-radius:3px;padding:2px 7px;display:inline-block}
+.gcv-sub.h_smallcaps{font-weight:700;font-variant:small-caps;letter-spacing:.04em}
+/* formatted bullet lists: glyph is a real character so Word and PDF keep it */
+.gcv-fl{list-style:none;margin:0 0 5px 0;padding:0}
+.gcv-fl li{display:flex;gap:6px;margin-bottom:2px;page-break-inside:avoid}
+.gcv-fl li .gcv-g{flex-shrink:0}
+.gcv-plain{margin:0 0 4px}
 .gcv-ul-head{margin-bottom:0;padding-bottom:0}
 .gcv-ul-cont{margin-top:0;padding-top:0}
 .gcv-page p,.gcv-page li{font-size:12.5px}
@@ -2272,7 +2298,7 @@ function resumeHTML(forExport=false){
         <span class="gcv-dates">${fmtDates(j, i===0)}</span>
       </div>
       <div class="gcv-job-title">${esc(j.title)}${j.location?' · '+esc(j.location):''}</div>
-      ${renderDesc(j.desc)}
+      ${renderDescFmt(j.desc, getFmt(j,'desc'))}
     </div>`).join('') : '';
 
   const extrasBlock = R.extra_sections.map(s=>`<h2>${esc(s.heading)}</h2><ul>${(s.items||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`).join('');
@@ -4163,4 +4189,454 @@ function markLineList(key, text){
     wrap.appendChild(row);
   });
   return wrap;
+}
+
+// ============================================================
+// LINE FORMAT MODEL
+// desc stays the canonical text (nothing breaks for saved resumes).
+// desc_fmt rides alongside it: per-block defaults + per-line kind/overrides.
+// If desc_fmt is missing or out of sync with the text, kinds are derived with
+// the same heuristics the preview used to apply, so old resumes look unchanged.
+// ============================================================
+var FMT_DEFAULTS = {font:"Inter, system-ui, sans-serif", size:10.5, lh:'1.55', glyph:'\u2022', head:'h_bold'};
+var FMT_FONTS = [
+  ['Serif', [["'Source Serif 4',Georgia,serif",'Source Serif'],["Georgia,'Times New Roman',serif",'Georgia'],
+             ["'EB Garamond',Garamond,serif",'Garamond'],["'Times New Roman',Times,serif",'Times New Roman']]],
+  ['Sans',  [["Inter, system-ui, sans-serif",'Inter'],["Arial,Helvetica,sans-serif",'Arial'],
+             ["Calibri,Candara,sans-serif",'Calibri'],["Lato,'Segoe UI',sans-serif",'Lato'],
+             ["Roboto,'Segoe UI',sans-serif",'Roboto'],["Verdana,Geneva,sans-serif",'Verdana']]]
+];
+var FMT_HEADS = [['h_bold','Bold'],['h_under','Underline'],['h_caps','Caps'],
+                 ['h_rule','Rule'],['h_accent','Accent'],['h_italic','Italic'],
+                 ['h_boxed','Boxed'],['h_smallcaps','Small caps']];
+var FMT_GLYPHS = [['\u2022','\u2022 dot'],['\u2013','\u2013 dash'],['\u25aa','\u25aa square'],
+                  ['\u25e6','\u25e6 hollow'],['\u203a','\u203a chevron'],['','none']];
+
+function descLines(text){
+  return String(text||'').split('\n').map(function(l){return l.trim();}).filter(Boolean);
+}
+
+// Legacy heuristics — used ONLY to seed kinds the first time a block is opened.
+// After that the stored kind wins, so the preview never re-guesses.
+function deriveKind(line){
+  var clean = stripBullets(line);
+  if(/^##\s+/.test(clean)) return 'sub';
+  if(/^[A-Za-z][A-Za-z0-9 ()/&,'-]{2,60}:$/.test(clean)) return 'sub';
+  if(/^[A-Z0-9 ()/&,'-]{4,60}$/.test(clean) && clean.split(' ').length <= 6 && !/\d{4}/.test(clean)) return 'sub';
+  return 'bullet';
+}
+
+// Get the format object for a block, creating/repairing it as needed.
+function getFmt(owner, field){
+  var key = field + '_fmt';
+  var lines = descLines(owner[field]);
+  var f = owner[key];
+  if(!f || !f.sec || !Array.isArray(f.lines)){
+    f = {sec: Object.assign({}, FMT_DEFAULTS), lines: []};
+  }
+  // keep line metadata index-aligned with the text
+  if(f.lines.length !== lines.length){
+    var rebuilt = [];
+    for(var i=0;i<lines.length;i++){
+      rebuilt.push(f.lines[i] && f.lines[i].k ? f.lines[i] : {k: deriveKind(lines[i]), s:{}});
+    }
+    f.lines = rebuilt;
+  }
+  f.lines.forEach(function(l){ if(!l.s) l.s = {}; });
+  owner[key] = f;
+  return f;
+}
+
+function fmtVal(f, i, prop){
+  var l = f.lines[i];
+  return (l && l.s && l.s[prop] !== undefined) ? l.s[prop] : f.sec[prop];
+}
+
+// Write text back, keeping line metadata aligned
+function setDescLines(owner, field, lines, meta){
+  owner[field] = lines.join('\n');
+  var f = getFmt(owner, field);
+  if(meta) f.lines = meta;
+}
+
+// ---- inline markup: **bold** *italic* __underline__ ----
+function fmtInline(s){
+  return esc(s)
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/__([^_]+)__/g,'<u>$1</u>')
+    .replace(/(^|[^*])\*([^*]+)\*/g,'$1<em>$2</em>');
+}
+
+// ---- the one renderer used by preview, PDF and Word ----
+function renderDescFmt(text, f){
+  var lines = descLines(text);
+  if(!lines.length) return '';
+  var html='', open=false;
+  lines.forEach(function(raw, i){
+    var kind = f.lines[i] ? f.lines[i].k : 'bullet';
+    var body = stripBullets(raw).replace(/^##\s+/,'');
+    if(!body) return;
+    var st = 'font-family:'+fmtVal(f,i,'font')+';font-size:'+fmtVal(f,i,'size')+'pt;line-height:'+fmtVal(f,i,'lh')+';';
+    if(kind==='bullet'){
+      if(!open){ html+='<ul class="gcv-fl">'; open=true; }
+      var g = fmtVal(f,i,'glyph');
+      html += '<li style="'+st+'">'+(g?'<span class="gcv-g">'+esc(g)+'</span>':'')
+           +  '<span>'+fmtInline(body)+'</span></li>';
+    } else {
+      if(open){ html+='</ul>'; open=false; }
+      html += (kind==='sub')
+        ? '<div class="gcv-sub '+fmtVal(f,i,'head')+'" style="'+st+'">'+fmtInline(body)+'</div>'
+        : '<p class="gcv-plain" style="'+st+'">'+fmtInline(body)+'</p>';
+    }
+  });
+  if(open) html+='</ul>';
+  return html;
+}
+
+// ---- repair helpers ----
+// A line looks like a wrapped fragment when the previous line does not end a
+// sentence and this one starts lowercase. Never applied automatically.
+function looksWrapped(lines, kinds, i){
+  if(i===0) return false;
+  if(kinds && (kinds[i]==='sub' || kinds[i-1]==='sub')) return false;
+  var p = (lines[i-1]||'').trim(), c = (lines[i]||'').trim();
+  if(!p || !c) return false;
+  return !/[.!?:;]$/.test(p) && /^[a-z]/.test(c);
+}
+function hasLeadingSpace(raw){ return /^\s/.test(raw); }
+
+// ============================================================
+// FORMAT TOOLBAR UI
+// Collapsed by default; one block in formatting mode at a time.
+// ============================================================
+var _fmtOpen = null;                 // block id currently in formatting mode
+var _fmtSel  = {block:null, i:null}; // selected line
+var _fmtScope= 'section';
+
+function fmtBlockId(owner, field, tag){ return tag+'::'+field; }
+
+// Build the whole editable stack for one text block.
+// owner[field] is the text; owner[field+'_fmt'] is the metadata.
+function formatBlock(owner, field, blockId, onChange){
+  var wrap = el('div',{class:'fmt-wrap'});
+  var f = getFmt(owner, field);
+  var isOpen = (_fmtOpen === blockId);
+
+  var toolHost = el('div',{class:'fmt-tools'+(isOpen?' show':'')});
+  var rowsHost = el('div',{class:'fmt-rows'+(isOpen?'':' plain')});
+  wrap.appendChild(toolHost);
+  wrap.appendChild(rowsHost);
+
+  function commit(){
+    if(onChange) onChange();
+    if(typeof schedulePreview==='function') schedulePreview();
+  }
+  function redraw(){
+    drawTools(); drawRows();
+  }
+
+  // ---- toolbar ----
+  function drawTools(){
+    toolHost.className = 'fmt-tools'+(_fmtOpen===blockId?' show':'');
+    if(_fmtOpen!==blockId){ toolHost.innerHTML=''; return; }
+    var lineMode = (_fmtSel.block===blockId && _fmtSel.i!==null && _fmtScope==='line');
+    var i = lineMode ? _fmtSel.i : null;
+    var v = function(p){ return lineMode ? fmtVal(f,i,p) : f.sec[p]; };
+    var ov = function(p){ return (lineMode && f.lines[i].s[p]!==undefined) ? ' ov' : ''; };
+    var curKind = lineMode ? f.lines[i].k : null;
+
+    var fontOpts = FMT_FONTS.map(function(g){
+      return '<optgroup label="'+g[0]+'">'+g[1].map(function(o){
+        return '<option value="'+o[0].replace(/"/g,'&quot;')+'"'+(v('font')===o[0]?' selected':'')+'>'+o[1]+'</option>';
+      }).join('')+'</optgroup>';
+    }).join('');
+
+    toolHost.innerHTML =
+      '<div class="fmt-scope">'
+       +'<span class="fs-lb">Applying to</span>'
+       +'<span class="fs-seg">'
+         +'<button type="button" data-a="scope-line"'+(lineMode?' class="on"':'')
+           +(_fmtSel.block===blockId&&_fmtSel.i!==null?'':' disabled')+'>This line</button>'
+         +'<button type="button" data-a="scope-sec"'+(lineMode?'':' class="on"')+'>Whole block</button>'
+       +'</span>'
+       +'<span class="fs-what">'+(lineMode?'\u2192 line '+(i+1)+' only':'\u2192 all lines here')+'</span>'
+       +'<button type="button" class="fs-reset" data-a="reset"'
+         +((lineMode&&Object.keys(f.lines[i].s).length)?'':' disabled')+'>\u21ba Reset line</button>'
+      +'</div>'
+      +'<div class="fmt-bar">'
+        +'<div class="fmt-row"><span class="fg">Line</span>'
+          +'<button type="button" class="fb'+(curKind==='bullet'?' on':'')+'" data-a="k-bullet" title="Bullet">\u2022</button>'
+          +'<button type="button" class="fb'+(curKind==='sub'?' on':'')+'" data-a="k-sub" title="Subheading">H</button>'
+          +'<button type="button" class="fb'+(curKind==='text'?' on':'')+'" data-a="k-text" title="Plain paragraph">\u00b6</button>'
+          +'<span class="fsep"></span>'
+          +'<button type="button" class="fb" data-a="w-b" title="Bold"><b>B</b></button>'
+          +'<button type="button" class="fb" data-a="w-i" title="Italic"><i>I</i></button>'
+          +'<button type="button" class="fb" data-a="w-u" title="Underline"><u>U</u></button>'
+          +'<span class="fsep"></span><span class="fg">Bullet</span>'
+          +'<select class="fsel'+ov('glyph')+'" data-a="glyph">'+FMT_GLYPHS.map(function(g){
+              return '<option value="'+g[0]+'"'+(v('glyph')===g[0]?' selected':'')+'>'+g[1]+'</option>';
+            }).join('')+'</select>'
+          +'<span class="fnote" data-a="cleanup-host"></span>'
+        +'</div>'
+        +'<div class="fmt-row"><span class="fg">Font</span>'
+          +'<select class="fsel'+ov('font')+'" data-a="font" style="min-width:118px">'+fontOpts+'</select>'
+          +'<span class="fsep"></span><span class="fg">Size</span>'
+          +'<span class="fstep"><button type="button" data-a="size-down">\u2212</button>'
+          +'<input class="fnum'+ov('size')+'" data-a="size" type="number" min="5" max="20" step="0.5" value="'+v('size')+'">'
+          +'<button type="button" data-a="size-up">+</button></span>'
+          +'<span class="fsep"></span><span class="fg">Spacing</span>'
+          +'<select class="fsel'+ov('lh')+'" data-a="lh">'
+            +[['1.35','Tight'],['1.55','Normal'],['1.8','Roomy']].map(function(o){
+              return '<option value="'+o[0]+'"'+(v('lh')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')
+          +'</select>'
+          +'<span class="fsep"></span>'
+          +'<button type="button" class="fb wide" data-a="cleanup" title="Trim spaces and stray bullet characters">\u232b Clean up</button>'
+        +'</div>'
+        +'<div class="fmt-row"><span class="fg">Heading</span>'
+          +FMT_HEADS.map(function(h){
+            return '<div class="fhs'+(v('head')===h[0]?' on':'')+'" data-a="head-'+h[0]+'">'
+              +'<div class="fsw '+h[0]+'">Aa</div><div class="fhl">'+h[1]+'</div></div>';
+          }).join('')
+        +'</div>'
+      +'</div>';
+
+    toolHost.querySelectorAll('[data-a]').forEach(function(elm){
+      var a = elm.dataset.a;
+      var evt = (elm.tagName==='SELECT'||elm.tagName==='INPUT') ? 'change' : 'click';
+      elm.addEventListener(evt, function(ev){ ev.stopPropagation(); act(a, elm); });
+      if(elm.tagName==='INPUT') elm.addEventListener('input', function(){ act('size', elm); });
+    });
+  }
+
+  function setProp(p, val){
+    if(_fmtScope==='line' && _fmtSel.block===blockId && _fmtSel.i!==null) f.lines[_fmtSel.i].s[p]=val;
+    else f.sec[p]=val;
+    commit(); redraw();
+  }
+
+  function act(a, elm){
+    var i = _fmtSel.i;
+    if(a==='scope-line'){ if(i!==null){ _fmtScope='line'; redraw(); } return; }
+    if(a==='scope-sec'){ _fmtScope='section'; redraw(); return; }
+    if(a==='reset'){ if(i!==null){ f.lines[i].s={}; commit(); redraw(); } return; }
+    if(a.indexOf('k-')===0){ if(i!==null){ f.lines[i].k=a.slice(2); commit(); redraw(); } return; }
+    if(a.indexOf('w-')===0){ wrapSelection(a.slice(2)); return; }
+    if(a.indexOf('head-')===0){ setProp('head', a.slice(5)); return; }
+    if(a==='glyph'||a==='font'||a==='lh'){ setProp(a, elm.value); return; }
+    if(a==='size'){ var n=parseFloat(elm.value); if(!isNaN(n)) setProp('size', Math.min(20,Math.max(5,n))); return; }
+    if(a==='size-up'||a==='size-down'){
+      var lm=(_fmtScope==='line'&&i!==null);
+      var cur=lm?fmtVal(f,i,'size'):f.sec.size;
+      var v2=Math.round((cur+(a==='size-up'?0.5:-0.5))*2)/2;
+      setProp('size', Math.min(20,Math.max(5,v2))); return;
+    }
+    if(a==='cleanup'){ cleanUp(); return; }
+  }
+
+  function wrapSelection(kind){
+    var i=_fmtSel.i; if(i===null) return;
+    var ta = rowsHost.querySelector('.fmt-text[data-i="'+i+'"]'); if(!ta) return;
+    var s=ta.selectionStart, e=ta.selectionEnd; if(s===e) return;
+    var mark = kind==='b'?'**':kind==='i'?'*':'__';
+    var lines = descLines(owner[field]);
+    var v = ta.value;
+    lines[i] = v.slice(0,s)+mark+v.slice(s,e)+mark+v.slice(e);
+    owner[field] = lines.join('\n');
+    commit(); redraw();
+  }
+
+  function cleanUp(){
+    var lines = String(owner[field]||'').split('\n');
+    var kept=[], meta=[];
+    lines.forEach(function(raw, idx){
+      var t = stripBullets(raw).replace(/\s+/g,' ').trim();
+      if(!t) return;
+      kept.push(t);
+      meta.push(f.lines[idx] || {k:deriveKind(t), s:{}});
+    });
+    setDescLines(owner, field, kept, meta);
+    commit(); redraw();
+  }
+
+  function mergeUp(i){
+    var lines = descLines(owner[field]);
+    if(i<=0 || i>=lines.length) return;
+    lines[i-1] = lines[i-1].trim() + ' ' + lines[i].trim();
+    var meta = f.lines.slice();
+    lines.splice(i,1); meta.splice(i,1);
+    setDescLines(owner, field, lines, meta);
+    _fmtSel={block:blockId, i:i-1};
+    commit(); redraw();
+  }
+
+  function delLine(i){
+    var lines = descLines(owner[field]);
+    var meta = f.lines.slice();
+    lines.splice(i,1); meta.splice(i,1);
+    setDescLines(owner, field, lines, meta);
+    _fmtSel={block:blockId, i:null};
+    commit(); redraw();
+  }
+
+  function moveLine(i,d){
+    var j=i+d;
+    var lines = descLines(owner[field]);
+    if(j<0||j>=lines.length) return;
+    var meta = f.lines.slice();
+    var tl=lines[i]; lines[i]=lines[j]; lines[j]=tl;
+    var tm=meta[i]; meta[i]=meta[j]; meta[j]=tm;
+    setDescLines(owner, field, lines, meta);
+    _fmtSel={block:blockId, i:j};
+    commit(); redraw();
+  }
+
+  // ---- rows ----
+  function drawRows(){
+    var open = (_fmtOpen===blockId);
+    rowsHost.className = 'fmt-rows'+(open?'':' plain');
+    var rawLines = String(owner[field]||'').split('\n');
+    var lines = descLines(owner[field]);
+    var kinds = f.lines.map(function(l){return l.k;});
+
+    // problem summary
+    var nWrap=0, nLead=0;
+    lines.forEach(function(_,i){ if(looksWrapped(lines,kinds,i)) nWrap++; });
+    rawLines.forEach(function(r){ if(r.trim() && hasLeadingSpace(r)) nLead++; });
+
+    var html='';
+    if(open && (nWrap||nLead)){
+      var bits=[];
+      if(nWrap) bits.push('<b>'+nWrap+' line'+(nWrap>1?'s':'')+'</b> look like wrapped fragments');
+      if(nLead) bits.push('<b>'+nLead+' line'+(nLead>1?'s':'')+'</b> start with hidden spaces');
+      html += '<div class="fmt-fix"><span>'+bits.join(' \u00b7 ')+'</span>'
+           +  '<button type="button" data-fix="all">Fix all</button></div>';
+    }
+
+    html += lines.map(function(l,i){
+      var kind = kinds[i]||'bullet';
+      var kc = kind==='sub'?'sub':kind==='bullet'?'bul':'txt';
+      var kt = kind==='sub'?'Subhead':kind==='bullet'?'Bullet':'Text';
+      var nOv = Object.keys(f.lines[i].s||{}).length;
+      var wrapd = looksWrapped(lines,kinds,i);
+      var isSel = (_fmtSel.block===blockId && _fmtSel.i===i);
+      return '<div class="fmt-row-line'+(isSel?' sel':'')+(kind==='sub'?' isSub':'')+(wrapd?' prob':'')+'">'
+        +(open?'<span class="fkind '+kc+'" data-cyc="'+i+'" title="Click to change type">'+kt+'</span>':'')
+        +'<textarea class="fmt-text" rows="1" data-i="'+i+'">'+esc(l)+'</textarea>'
+        +(wrapd?'<span class="fflag" data-merge="'+i+'" title="Join to the line above">wrapped? \u2934</span>':'')
+        +(nOv?'<span class="fov" data-clr="'+i+'" title="Clear line styling">styled \u00d7'+nOv+'</span>':'')
+        +(open?'<span class="fracts">'
+            +'<button type="button" class="fra" data-mv="'+i+'|-1">\u2191</button>'
+            +'<button type="button" class="fra" data-mv="'+i+'|1">\u2193</button>'
+            +'<button type="button" class="fra" data-del="'+i+'">\u2715</button>'
+          +'</span>':'')
+        +'</div>';
+    }).join('');
+
+    if(open){
+      html += '<div class="fmt-add">'
+        +'<button type="button" data-add="bullet">+ Bullet</button>'
+        +'<button type="button" data-add="sub">+ Subheading</button>'
+        +'<button type="button" data-add="text">+ Paragraph</button></div>';
+    }
+    rowsHost.innerHTML = html;
+
+    rowsHost.querySelectorAll('.fmt-text').forEach(function(ta){
+      autosizeFmt(ta);
+      ta.addEventListener('input', function(){
+        var ls = descLines(owner[field]);
+        ls[+ta.dataset.i] = ta.value;
+        owner[field] = ls.join('\n');
+        autosizeFmt(ta); commit();
+      });
+      ta.addEventListener('focus', function(){
+        _fmtSel={block:blockId, i:+ta.dataset.i};
+        if(_fmtOpen===blockId) _fmtScope='line';
+        drawTools();
+        rowsHost.querySelectorAll('.fmt-row-line').forEach(function(r,idx){
+          r.classList.toggle('sel', idx===(_fmtSel.i + (rowsHost.querySelector('.fmt-fix')?1:0)===idx?_fmtSel.i:-1));
+        });
+        markSelRows();
+      });
+    });
+    function markSelRows(){
+      var rows = rowsHost.querySelectorAll('.fmt-row-line');
+      rows.forEach(function(r,idx){ r.classList.toggle('sel', idx===_fmtSel.i); });
+    }
+    markSelRows();
+
+    rowsHost.querySelectorAll('[data-cyc]').forEach(function(e){
+      e.addEventListener('click', function(){
+        var i=+e.dataset.cyc;
+        _fmtSel={block:blockId,i:i}; _fmtScope='line';
+        var k=f.lines[i].k;
+        f.lines[i].k = k==='bullet'?'sub':k==='sub'?'text':'bullet';
+        commit(); redraw();
+      });
+    });
+    rowsHost.querySelectorAll('[data-merge]').forEach(function(e){
+      e.addEventListener('click', function(){ mergeUp(+e.dataset.merge); });
+    });
+    rowsHost.querySelectorAll('[data-clr]').forEach(function(e){
+      e.addEventListener('click', function(){
+        var i=+e.dataset.clr; f.lines[i].s={}; _fmtSel={block:blockId,i:i}; commit(); redraw();
+      });
+    });
+    rowsHost.querySelectorAll('[data-mv]').forEach(function(e){
+      e.addEventListener('click', function(){
+        var p=e.dataset.mv.split('|'); moveLine(+p[0], +p[1]);
+      });
+    });
+    rowsHost.querySelectorAll('[data-del]').forEach(function(e){
+      e.addEventListener('click', function(){ delLine(+e.dataset.del); });
+    });
+    rowsHost.querySelectorAll('[data-add]').forEach(function(e){
+      e.addEventListener('click', function(){
+        var lines2 = descLines(owner[field]);
+        var meta = f.lines.slice();
+        lines2.push('New line');
+        meta.push({k:e.dataset.add, s:{}});
+        setDescLines(owner, field, lines2, meta);
+        _fmtSel={block:blockId, i:lines2.length-1};
+        commit(); redraw();
+        var t = rowsHost.querySelector('.fmt-text[data-i="'+(lines2.length-1)+'"]');
+        if(t){ t.focus(); t.select(); }
+      });
+    });
+    var fixBtn = rowsHost.querySelector('[data-fix="all"]');
+    if(fixBtn) fixBtn.addEventListener('click', function(){
+      var ls = descLines(owner[field]);
+      var meta = f.lines.slice();
+      var ks = meta.map(function(m){return m.k;});
+      for(var i=ls.length-1;i>0;i--){
+        if(looksWrapped(ls,ks,i)){
+          ls[i-1]=ls[i-1].trim()+' '+ls[i].trim();
+          ls.splice(i,1); meta.splice(i,1); ks.splice(i,1);
+        }
+      }
+      ls = ls.map(function(t){ return stripBullets(t).replace(/\s+/g,' ').trim(); });
+      setDescLines(owner, field, ls, meta);
+      _fmtSel={block:blockId,i:null};
+      commit(); redraw();
+    });
+  }
+
+  drawTools(); drawRows();
+  wrap._fmtRedraw = redraw;
+  return wrap;
+}
+
+function autosizeFmt(ta){ ta.style.height='auto'; ta.style.height=(ta.scrollHeight)+'px'; }
+
+// The "Aa Format" toggle that lives next to Ask AI
+function formatToggleBtn(blockId){
+  var b = el('button',{type:'button',class:'btn-fmt'+(_fmtOpen===blockId?' on':''),
+    title:'Text and bullet formatting for this block'}, 'Aa Format');
+  b.addEventListener('click', function(ev){
+    ev.stopPropagation();
+    _fmtOpen = (_fmtOpen===blockId) ? null : blockId;
+    _fmtSel = {block:blockId, i:null};
+    _fmtScope = 'section';
+    var y=window.scrollY; buildEditor(); window.scrollTo(0,y);
+  });
+  return b;
 }
