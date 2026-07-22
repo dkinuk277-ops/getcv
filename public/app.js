@@ -327,12 +327,14 @@ async function askField(btn, field, getVal, setVal, context){
 }
 
 // Build a label + optional AI button
-function fieldHead(labelText, aiHandler){
+// label + (optional) standard Ask AI button that opens the popover.
+// askSpec = {key, label, read, write}  — nothing is applied without review.
+function fieldHead(labelText, askSpec){
   const wrap = el('div',{class:'field-head'});
   wrap.appendChild(el('label',{},labelText));
-  if(aiHandler){
-    const b = el('button',{type:'button',class:'mini-ai',title:'Ask AI to improve'}, '✦ Ask AI');
-    b.addEventListener('click', () => aiHandler(b));
+  if(askSpec){
+    const b = el('button',{type:'button',class:'sec-askai',title:'Ask AI about this block'}, '✦ Ask AI');
+    b.addEventListener('click', (ev) => { ev.stopPropagation(); toggleAskPop(b, askSpec); });
     wrap.appendChild(b);
   }
   return wrap;
@@ -650,7 +652,7 @@ function insightsCard(){
   const cInsights = el('div',{class:'card',id:'sec-insights','data-seckey':'insights'});
   cInsights.innerHTML = `
     <h2 style="position:relative">
-      <span class="titlec">📊 Career Insights</span>
+      <span class="titlec">Career Insights</span>
       <span class="tools-right">
         <label class="switch ${R.chart_prefs.timeline?'on':''}" title="Display in exported resume">
           <input type="checkbox" data-pref="timeline" ${R.chart_prefs.timeline?'checked':''}>
@@ -670,7 +672,7 @@ function insightsCard(){
   const cDomain = el('div',{class:'card collapsed',id:'sec-domain','data-seckey':'domain'});
   cDomain.innerHTML = `
     <h2 style="position:relative">
-      <span class="titlec">🎯 Domain Expertise</span>
+      <span class="titlec">Domain Expertise</span>
       <span class="tools-right">
         <label class="switch ${R.chart_prefs.domains?'on':''}" title="Display in exported resume">
           <input type="checkbox" data-pref="domains" ${R.chart_prefs.domains?'checked':''}>
@@ -690,7 +692,7 @@ function insightsCard(){
   const cTenure = el('div',{class:'card collapsed',id:'sec-tenure','data-seckey':'tenure'});
   cTenure.innerHTML = `
     <h2 style="position:relative">
-      <span class="titlec">📈 Tenure Ranking</span>
+      <span class="titlec">Tenure Ranking</span>
       <span class="tools-right">
         <label class="switch ${R.chart_prefs.tenure?'on':''}" title="Display in exported resume">
           <input type="checkbox" data-pref="tenure" ${R.chart_prefs.tenure?'checked':''}>
@@ -1051,22 +1053,95 @@ function showAIPreview(err, fieldEl, hintEl, btn, original, suggestion){
   if(old && old.classList.contains('ai-preview')) old.remove();
 
   var box=el('div',{class:'ai-preview'});
-  box.innerHTML='<div class="ai-preview-label">\u2726 AI suggested fix \u2014 review before applying</div>'
-    +'<div class="ai-preview-text">'+esc(suggestion)+'</div>'
+  box.innerHTML='<div class="ai-preview-label">\u2726 AI suggested fix \u2014 review and edit before applying'
+      +'<span class="ai-edit-pill">editable</span></div>'
+    +'<textarea class="ai-preview-ta" spellcheck="true"></textarea>'
+    +'<div class="ai-preview-meta">'
+      +'<span class="ai-ph"></span>'
+      +'<span class="ai-dirty"></span>'
+      +'<span class="ai-toggle-orig">show original</span>'
+    +'</div>'
+    +'<div class="ai-orig"></div>'
     +'<div class="ai-preview-actions">'
-    +'<button class="btn-accept" type="button">\u2713 Accept &amp; apply</button>'
-    +'<button class="btn-reject" type="button">\u2715 Dismiss</button>'
+      +'<button class="btn-accept" type="button">\u2713 Accept &amp; apply</button>'
+      +'<button class="btn-revert" type="button" disabled>\u21BA Revert to AI version</button>'
+      +'<button class="btn-reject" type="button">\u2715 Dismiss</button>'
     +'</div>';
   hintEl.insertAdjacentElement('afterend', box);
 
-  box.querySelector('.btn-accept').addEventListener('click',function(){
-    applyAIFix(err, fieldEl, original, suggestion);
-    box.remove();
-    // Hint state -> fixed by AI
-    hintEl.classList.add('q-hint-done');
-    var tag=el('span',{class:'q-hint-fixed-tag'},'\u2713 Fixed by AI');
-    hintEl.appendChild(tag);
+  var ta      = box.querySelector('.ai-preview-ta');
+  var phEl    = box.querySelector('.ai-ph');
+  var dirtyEl = box.querySelector('.ai-dirty');
+  var revBtn  = box.querySelector('.btn-revert');
+  var origEl  = box.querySelector('.ai-orig');
+  var togEl   = box.querySelector('.ai-toggle-orig');
+
+  origEl.innerHTML = '<b>Original:</b> ' + esc(original);
+  ta.value = suggestion;
+
+  // Whole-field grammar rewrites can be long \u2014 cap height and scroll inside
+  function autosize(){
+    ta.style.height='auto';
+    var h=ta.scrollHeight+2;
+    if(h>260){ ta.style.height='260px'; ta.style.overflowY='auto'; }
+    else { ta.style.height=h+'px'; ta.style.overflowY='hidden'; }
+  }
+
+  var hadPlaceholders = /\[[A-Za-z]\]/.test(suggestion);
+  function updateMeta(){
+    var val=ta.value;
+    var ph=val.match(/\[[A-Za-z]\]/g)||[];
+    if(ph.length){
+      phEl.className='ai-ph warn';
+      phEl.textContent='\u26A0 '+ph.length+' placeholder'+(ph.length>1?'s':'')+' to fill: '+ph.join(' ');
+    } else if(hadPlaceholders){
+      phEl.className='ai-ph ok';
+      phEl.textContent='\u2713 all placeholders filled';
+    } else { phEl.className='ai-ph'; phEl.textContent=''; }
+    var dirty = val !== suggestion;
+    dirtyEl.textContent = dirty ? 'edited by you' : '';
+    revBtn.disabled = !dirty;
+  }
+
+  autosize(); updateMeta();
+  ta.addEventListener('input', function(){ autosize(); updateMeta(); });
+  setTimeout(function(){ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
+
+  togEl.addEventListener('click', function(){
+    var shown = origEl.classList.toggle('show');
+    togEl.textContent = shown ? 'hide original' : 'show original';
   });
+
+  revBtn.addEventListener('click', function(){
+    ta.value = suggestion; autosize(); updateMeta(); ta.focus();
+  });
+
+  box.querySelector('.btn-accept').addEventListener('click',function(){
+    var text=(ta.value||'').trim();
+    if(!text){ ta.style.borderColor='#DC2626'; ta.focus(); return; }
+    var ph=text.match(/\[[A-Za-z]\]/g)||[];
+    if(ph.length && !confirm('This still contains '+ph.length+' unfilled placeholder'
+        +(ph.length>1?'s':'')+' ('+ph.join(' ')+').\n\nApply anyway? The line stays flagged until you replace them with real numbers.')) return;
+
+    var edited = text !== suggestion;
+    var stillFlagged = (err.type==='context' && ph.length>0);
+    applyAIFix(err, fieldEl, original, text);   // apply what is IN THE BOX
+    box.remove();
+
+    if(stillFlagged){
+      // Text improved but the metric is still a placeholder \u2014 say so plainly
+      hintEl.querySelector('.q-hint-text').textContent =
+        'Text rewritten \u2014 now replace '+ph.join(' ')+' with your real numbers to clear this';
+      btn.style.display='inline-flex';
+      btn.disabled=false;
+      btn.textContent='\u2726 Fix by AI';
+    } else {
+      hintEl.classList.add('q-hint-done');
+      hintEl.appendChild(el('span',{class:'q-hint-fixed-tag'},
+        edited ? '\u2713 Applied (your edit)' : '\u2713 Fixed by AI'));
+    }
+  });
+
   box.querySelector('.btn-reject').addEventListener('click',function(){
     box.remove();
     btn.style.display='inline-flex';
@@ -1103,7 +1178,19 @@ function applyAIFix(err, fieldEl, original, suggestion){
   }
   // 2. Sync data model via the field's input pipeline
   fieldEl.dispatchEvent(new Event('input', {bubbles:true}));
-  // 3. Score up + UI refresh (markErrorFixed handles dashboard, rail, toast)
+
+  // 3. A context fix that still carries [X] placeholders is NOT a real fix \u2014
+  //    the line has no measurable impact until a real number replaces the bracket.
+  //    Keep it flagged and do not move the score.
+  if(err.type==='context' && /\[[A-Za-z]\]/.test(suggestion)){
+    err.line = suggestion.trim();          // re-target the error at the new text
+    fieldEl.innerHTML = markupWithErrors(qFieldText(fieldEl),
+      (fieldEl._qErrors||[]).filter(function(e){return !e.fixed;}));
+    fieldEl._qOrigLen = qFieldText(fieldEl).trim().length;
+    return;
+  }
+
+  // 4. Score up + UI refresh (markErrorFixed handles dashboard, rail, toast)
   markErrorFixed(err, fieldEl);
 }
 
@@ -1265,6 +1352,7 @@ function buildEditor(){
   $('#startArea').classList.add('hidden');
   $('#fresherStart').classList.add('hidden');
   $('#editorWrap').classList.remove('hidden');
+  showAIBuilder();
   const ed = $('#editor');
   ed.classList.remove('hidden');
   ed.innerHTML = '';
@@ -1302,8 +1390,12 @@ function buildEditor(){
     + '<div class="qsub-detail" id="qdash-context-detail">'+cc+' issue'+(cc!==1?'s':'')+' remaining</div></div>'
     + '</div></div>';
   ed.appendChild(qCard);
-  
-  // Career insights at the very top (only if we have experience)
+
+  // AI Builder bar sits directly below the quality dashboard
+  var aiBar = document.getElementById('aiBuilderBar');
+  if(aiBar){ ed.appendChild(aiBar); aiBar.classList.remove('hidden'); }
+
+  // Career insights (only if we have experience)
   if(R.experience.length) ed.appendChild(insightsCard());
 
   // Always show every section — grouped: personal (pinned) → header credentials → resume body
@@ -1367,10 +1459,6 @@ function buildEditor(){
         `<button class="sec-arrow" type="button" data-dir="1" title="Move section down">▼</button>`;
     }
 
-    // header-credentials note appended to the title zone
-    if(key==='certifications' || key==='education'){
-      titleZone.appendChild(el('span',{class:'sec-note',title:'This section prints in the credentials area under your name — items reorder there'},'header credentials'));
-    }
 
     // RIGHT: In-resume switch + chevron
     const right = el('span',{class:'sec-tools-right'});
@@ -1384,6 +1472,19 @@ function buildEditor(){
         renderLivePreview();
       });
     }
+    // Ask AI — opens a popover pinned to this button, scoped to this section
+    if(ASKABLE.has(key)){
+      const askBtn = el('button',{class:'sec-askai',type:'button',
+        title:'Ask AI to change this section'},'\u2726 Ask AI');
+      askBtn.addEventListener('click', function(ev){
+        ev.stopPropagation();
+        toggleAskPop(askBtn, key, card);
+      });
+      right.appendChild(askBtn);
+    }
+
+    right.appendChild(el('span',{class:'sec-clickhint'},'click bar to expand'));
+
     const chev = el('button',{class:'sec-chev',type:'button',title:'Expand / collapse this section'},'▾');
     right.appendChild(chev);
 
@@ -1397,10 +1498,15 @@ function buildEditor(){
       const wasCollapsed = card.classList.contains('collapsed');
       card.classList.toggle('collapsed', !wasCollapsed);
       R.section_collapsed[key] = !wasCollapsed;
+      const hint = h2.querySelector('.sec-clickhint');
+      if(hint) hint.textContent = wasCollapsed ? 'click bar to collapse' : 'click bar to expand';
     };
+    // The whole bar is the button. Only real controls opt out — excluding the
+    // tool CONTAINERS made most of the bar dead space.
     h2.style.cursor = 'pointer';
+    h2.classList.add('sec-clickable');
     h2.addEventListener('click', e=>{
-      if(e.target.closest('.sec-tools-left, .sec-tools-right, button, label, input, .switch, .add-btn, .ai-btn')) return;
+      if(e.target.closest('button:not(.sec-chev), label, input, select, textarea, .switch, .sec-grip, .drag-handle, a')) return;
       toggleCollapse();
     });
     chev.addEventListener('click', e=>{ e.stopPropagation(); toggleCollapse(); });
@@ -1561,11 +1667,7 @@ function personalCard(){
   const grid = el('div',{class:'grid2'});
   FIELDS.forEach(([f,lab,ai])=>{
     const wrap = el('div',{class:'field'});
-    wrap.appendChild(fieldHead(lab, ai ? (btn)=>
-      askField(btn, f==='headline'?'Professional headline':lab,
-        ()=> R.personal[f],
-        v=>{ R.personal[f]=v; inp.value=v; },
-        `Person: ${R.personal.name}. Latest role: ${R.experience[0]?.title||''} at ${R.experience[0]?.company||''}`) : null));
+    wrap.appendChild(fieldHead(lab, null));
     const inp = el('input',{'data-p':f,value:R.personal[f]||''});
     inp.addEventListener('input',()=> R.personal[f]=inp.value);
     wrap.appendChild(inp);
@@ -1577,7 +1679,9 @@ function personalCard(){
 
 function summaryCard(){
   const c = el('div',{class:'card',id:'sec-summary'});
-  c.innerHTML = '<h2>Summary <button class="btn btn-ai" type="button">\u2726 AI enhance</button></h2>';
+  c.innerHTML = '<h2>Summary</h2>';
+  const mbS = markBar('summary', R.summary||'');
+  if(mbS) c.appendChild(mbS);
   const fieldErrs = getFieldErrors('summary');
   if(fieldErrs.length > 0){
     const qf = qualityField(R.summary||'', fieldErrs, function(plain){ R.summary = plain; });
@@ -1588,9 +1692,8 @@ function summaryCard(){
     ta.addEventListener('input', function(){ R.summary = ta.value; });
     c.appendChild(ta);
   }
-  c.querySelector('.btn-ai').addEventListener('click', function(e){
-    enhance(e.currentTarget, function(){return R.summary;}, function(v){ R.summary=v; buildEditor(); }, 'professional summary');
-  });
+  const mlS = markLineList('summary', R.summary||'');
+  if(mlS) c.appendChild(mlS);
   return c;
 }
 
@@ -1598,7 +1701,7 @@ function summaryCard(){
 const LIST_DEFS = {
   experience:{title:'Work experience', fields:[
     ['title','Job title'],['company','Company'],['location','Location'],
-    ['start','Start (e.g. Mar 2019)'],['end','End (or Present)']], text:['desc','Achievements / responsibilities'], ai:true,
+    ['start','Start (e.g. Mar 2019)'],['end','End (or Present)']], text:['desc','Responsibilities'], ai:true,
     blank:()=>({title:'',company:'',location:'',start:'',end:'',duration:0,desc:''})},
   education:{title:'Education', fields:[
     ['degree','Degree'],['institution','Institution'],['year','Year'],['grade','Grade / score']],
@@ -1684,10 +1787,7 @@ function listCard(key){
       const grid = el('div',{class:'grid2'});
       def.fields.forEach(([f,lab])=>{
         const fw = el('div',{class:'field'});
-        const canAI = AI_FIELDS[key]?.has(f);
-        fw.appendChild(fieldHead(lab, canAI ? (btn)=>
-          askField(btn, lab, ()=>item[f], v=>{ item[f]=v; inp.value=v; },
-            `${def.title} entry: ${JSON.stringify(item).slice(0,300)}`) : null));
+        fw.appendChild(fieldHead(lab, null));
         const inp = el('input',{'data-f':f,value:item[f]||''});
         inp.addEventListener('input',()=> item[f]=inp.value);
         fw.appendChild(inp);
@@ -1699,19 +1799,44 @@ function listCard(key){
         const [tf,tlab] = def.text;
         const fw = el('div',{class:'field'});
         const canAI = AI_FIELDS[key]?.has(tf);
-        fw.appendChild(fieldHead(tlab, canAI ? (btn)=>
-          askField(btn, tlab, ()=>item[tf], v=>{ item[tf]=v; buildEditor(); },
-            `${def.title} for ${item[def.fields[0][0]]||''}${key==='experience'?' at '+(item.company||''):''}`) : null));
+        const askSpec = canAI ? {
+          key: key+'_'+i+'_'+tf,
+          label: (item[def.fields[0][0]]||def.title) + (key==='experience' && item.company ? ' — '+item.company : ''),
+          scopeNote: 'Changes apply to this '+(key==='experience'?'role':'entry')+' only.',
+          hints: key==='experience'
+            ? ['Stronger, more senior tone','Make each line shorter','Add metric placeholders']
+            : ['Lead with the outcome','Make it shorter'],
+          read: ()=> item[tf]||'',
+          write: (v)=>{ item[tf]=v; }
+        } : null;
+        const markKey = key+'_'+i+'_'+tf;
+        const blockId = key+'_'+i+'::'+tf;
+        const fh = fieldHead(tlab, askSpec);
+        // Aa Format sits beside Ask AI in the block header
+        const tools = fh.querySelector('.sec-askai');
+        if(tools) fh.insertBefore(formatToggleBtn(blockId), tools);
+        else fh.appendChild(formatToggleBtn(blockId));
+        fw.appendChild(fh);
+
+        const mb = markBar(markKey, item[tf]||'');
+        if(mb) fw.appendChild(mb);
+
         const fieldErrs = getFieldErrors(key+'_'+i);
-        if(fieldErrs.length > 0){
-          const qf = qualityField(item[tf]||'', fieldErrs, function(plain){ item[tf]=plain; });
-          fw.appendChild(qf);
+        if(_fmtOpen === blockId){
+          // formatting mode: structured line rows replace the plain field
+          fw.appendChild(formatBlock(item, tf, blockId, function(){
+            R.quality_score = analyzeQualityScore();
+          }));
+        } else if(fieldErrs.length > 0){
+          fw.appendChild(qualityField(item[tf]||'', fieldErrs, function(plain){ item[tf]=plain; }));
         } else {
           const ta = el('textarea',{'data-f':tf,rows:'4'});
           ta.value = item[tf]||'';
           ta.addEventListener('input',()=> item[tf]=ta.value);
           fw.appendChild(ta);
         }
+        const mlist = markLineList(markKey, item[tf]||'');
+        if(mlist) fw.appendChild(mlist);
         en.appendChild(fw);
       }
 
@@ -1960,7 +2085,20 @@ ${headCSS}
 .gcv-job-head strong{font-weight:700;color:${t.dark}}
 .gcv-job-title{font-size:12.5px;font-weight:700;color:${t.main};margin:1px 0 2px}
 .gcv-dates{color:#666;font-size:11.5px;white-space:nowrap;font-weight:600}
-.gcv-sub{font-size:11.5px;font-weight:700;color:${t.dark};text-transform:uppercase;letter-spacing:.04em;margin:7px 0 2px}
+.gcv-sub{font-size:11.5px;font-weight:700;color:${t.dark};margin:7px 0 2px}
+.gcv-sub.h_bold{font-weight:700}
+.gcv-sub.h_under{font-weight:700;text-decoration:underline;text-underline-offset:2px}
+.gcv-sub.h_caps{font-weight:700;text-transform:uppercase;letter-spacing:.07em}
+.gcv-sub.h_rule{font-weight:700;border-bottom:1px solid ${t.dark};padding-bottom:2px}
+.gcv-sub.h_accent{font-weight:700;color:${t.main}}
+.gcv-sub.h_italic{font-weight:600;font-style:italic}
+.gcv-sub.h_boxed{font-weight:700;background:#EFF2EF;border-radius:3px;padding:2px 7px;display:inline-block}
+.gcv-sub.h_smallcaps{font-weight:700;font-variant:small-caps;letter-spacing:.04em}
+/* formatted bullet lists: glyph is a real character so Word and PDF keep it */
+.gcv-fl{list-style:none;margin:0 0 5px 0;padding:0}
+.gcv-fl li{display:flex;gap:6px;margin-bottom:2px;page-break-inside:avoid}
+.gcv-fl li .gcv-g{flex-shrink:0}
+.gcv-plain{margin:0 0 4px}
 .gcv-ul-head{margin-bottom:0;padding-bottom:0}
 .gcv-ul-cont{margin-top:0;padding-top:0}
 .gcv-page p,.gcv-page li{font-size:12.5px}
@@ -2167,7 +2305,7 @@ function resumeHTML(forExport=false){
         <span class="gcv-dates">${fmtDates(j, i===0)}</span>
       </div>
       <div class="gcv-job-title">${esc(j.title)}${j.location?' · '+esc(j.location):''}</div>
-      ${renderDesc(j.desc)}
+      ${renderDescFmt(j.desc, getFmt(j,'desc'))}
     </div>`).join('') : '';
 
   const extrasBlock = R.extra_sections.map(s=>`<h2>${esc(s.heading)}</h2><ul>${(s.items||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`).join('');
@@ -2462,6 +2600,15 @@ function showView(id){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
   const t = document.getElementById('view-'+id);
   if(t) t.classList.add('on');
+  // The splitter/preview-width logic needs a live grid to size, which only
+  // exists once a builder view is actually on-screen — re-run it here
+  // rather than once at page load, when neither 'pro' nor 'fresher' is on yet.
+  if(id==='pro' || id==='fresher'){
+    requestAnimationFrame(function(){
+      decoratePreviewHeader();
+      initPreviewSplitter();
+    });
+  }
   // Builder views: the footer rides at the END of the centre scroll column so
   // the workspace extends to the bottom of the screen. Everywhere else it
   // returns to its normal place at the bottom of the page.
@@ -2654,6 +2801,7 @@ function clearBuilder(){
   R = emptyResume();
   currentResumeId = null; currentResumeName = '';
   $('#editorWrap').classList.add('hidden');
+  hideAIBuilder();
   $('#editor').classList.add('hidden');
   $('#addSectionCard').classList.add('hidden');
   $('#startArea').classList.remove('hidden');
@@ -3385,3 +3533,1295 @@ function initLanding(){
 
 // Initial rail (nothing detected yet)
 renderRail();
+
+// ====== AI BUILDER FUNCTIONS ======
+// Show the AI builder bar when editor is active
+function showAIBuilder(){
+  // The bar is re-parented under the quality dashboard by buildEditor();
+  // this only fills the suggestion chips.
+  populateAIChips();
+}
+
+function hideAIBuilder(){
+  var bar = document.getElementById('aiBuilderBar');
+  if(bar) bar.classList.add('hidden');
+}
+
+function populateAIChips(){
+  var chips = document.getElementById('aiBuilderChips');
+  if(!chips) return;
+  chips.innerHTML = [
+    {text:'🔧 Fix all issues', cmd:'Fix all quality issues'},
+    {text:'+ Add skill', cmd:'Add Python and Docker to my skills'},
+    {text:'− Delete job', cmd:'Delete my last work experience'},
+    {text:'+ Add certification', cmd:'Add AWS certification from AWS, June 2024'}
+  ].map(c => '<span class="ai-chip" style="background:rgba(255,255,255,.8);border:1px solid rgba(11,74,49,.2);border-radius:20px;padding:5px 12px;font-size:10px;font-weight:600;color:#0B4A31;cursor:pointer;transition:all .15s" onclick="setAICommand(\''+c.cmd.replace(/'/g,"\\'")+'\')" onmouseover="this.style.background=\'#fff\';this.style.borderColor=\'#0FA968\';this.style.transform=\'translateY(-1px)\';" onmouseout="this.style.background=\'rgba(255,255,255,.8)\';this.style.borderColor=\'rgba(11,74,49,.2)\';this.style.transform=\'translateY(0)\'">'+c.text+'</span>').join('');
+}
+
+function setAICommand(cmd){
+  document.getElementById('aiBuilderInput').value = cmd;
+  document.getElementById('aiBuilderInput').focus();
+}
+
+function runAIBuilder(){
+  var inputEl=document.getElementById('aiBuilderInput');
+  var input=(inputEl.value||'').trim();
+  if(!input){ inputEl.focus(); return; }
+
+  var btn=document.getElementById('aiBuilderBtn');
+  btn.disabled=true; btn.textContent='\u23F3 Working\u2026';
+
+  var prog=document.getElementById('aiBuilderProgress');
+  prog.classList.remove('hidden'); prog.style.display='block';
+  document.getElementById('aiProgSpinner').style.display='';
+  document.getElementById('aiProgTitle').textContent='Reading your resume\u2026';
+  document.getElementById('aiProgFill').style.width='4%';
+  document.getElementById('aiProgSections').innerHTML='';
+
+  // Snapshot issue counts by type, so the log reports only what actually changed
+  var _pre=(analyzeQualityScore().errors||[]);
+  window._aiBefore=_pre.length;
+  window._aiBeforeByType={
+    vocab:_pre.filter(function(e){return e.type==='vocab';}).length,
+    grammar:_pre.filter(function(e){return e.type==='grammar';}).length,
+    context:_pre.filter(function(e){return e.type==='context';}).length
+  };
+
+  fetch('/api/ai-builder',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({command:input,resume:R})
+  })
+  .then(function(r){return r.json();})
+  .then(function(data){
+    if(!data.success) throw new Error(data.error||'Builder failed');
+    if(!data.units || !data.units.length){
+      document.getElementById('aiProgSpinner').style.display='none';
+      document.getElementById('aiProgTitle').textContent =
+        data.note==='no-fix-intent'
+          ? '\u2139 Try: "fix all issues", "fix grammar in summary", "fix vocabulary in experience"'
+          : '\u2139 Nothing to fix for that request.';
+      btn.disabled=false; btn.textContent='Run';
+      return;
+    }
+    applyAIUnits(data.units, data.placeholders||0);
+  })
+  .catch(function(err){
+    console.error('AI Builder error:',err);
+    document.getElementById('aiProgSpinner').style.display='none';
+    document.getElementById('aiProgTitle').textContent='\u2717 '+(err.message||'Something went wrong \u2014 try again');
+    btn.disabled=false; btn.textContent='Run';
+  });
+}
+
+// Write one unit back into R, preserving the exact data shape
+function writeAIUnit(u){
+  if(u.section==='summary'){ R.summary=u.fixed; return true; }
+  if(u.section==='experience'){
+    if(R.experience && R.experience[u.index]){ R.experience[u.index].desc=u.fixed; return true; }
+    return false;
+  }
+  if(u.section==='skills'){
+    var sk=u.fixed.split(/\n|,/).map(function(s){return s.trim();}).filter(Boolean);
+    if(sk.length){ R.skills=sk; return true; }
+    return false;
+  }
+  if(u.section==='accomplishments'){
+    var ac=u.fixed.split(/\n/).map(function(s){return s.trim();}).filter(Boolean);
+    if(ac.length){ R.accomplishments=ac; return true; }
+    return false;
+  }
+  return false;
+}
+
+function applyAIUnits(units, placeholders){
+  var fill=document.getElementById('aiProgFill');
+  var title=document.getElementById('aiProgTitle');
+  var log=document.getElementById('aiProgSections');
+
+  title.textContent='Working through your resume\u2026';
+  log.className='ai-prog-log';
+  log.innerHTML='';
+
+  var applied=0, skipped=0;
+
+  function logLine(html, busy){
+    var d=document.createElement('div');
+    d.className='ai-pl'+(busy?' busy':'');
+    d.innerHTML='<span class="ic">'+(busy?'!':'\u2713')+'</span><span>'+html+'</span>';
+    log.appendChild(d);
+    requestAnimationFrame(function(){ d.classList.add('in'); });
+  }
+
+  units.forEach(function(u,idx){
+    setTimeout(function(){
+      fill.style.width=(((idx+1)/units.length)*88)+'%';
+      if(u.unchanged || !u.fixed){ skipped++; }
+      else if(writeAIUnit(u)){ applied++; }
+      else { skipped++; }
+
+      R.quality_score = analyzeQualityScore();
+      refreshQualityDashboard();
+      renderRail();
+      if(typeof schedulePreview==='function') schedulePreview();
+    }, 600*idx + 200);
+  });
+
+  setTimeout(function(){
+    fill.style.width='100%';
+    document.getElementById('aiProgSpinner').style.display='none';
+
+    var scrollY=window.scrollY;
+    buildEditor();
+    window.scrollTo(0,scrollY);
+
+    // Report by what ACTUALLY changed, category by category
+    var after = (R.quality_score && R.quality_score.errors) ? R.quality_score.errors : [];
+    var before = window._aiBeforeByType || {vocab:0,grammar:0,context:0};
+    var afterBy = {
+      vocab:   after.filter(function(e){return e.type==='vocab';}).length,
+      grammar: after.filter(function(e){return e.type==='grammar';}).length,
+      context: after.filter(function(e){return e.type==='context';}).length
+    };
+
+    var LABEL={vocab:'vocabulary',grammar:'grammar &amp; punctuation',context:'context'};
+    var WORD ={vocab:'weak phrase',grammar:'grammar issue',context:'line'};
+    var total=0;
+    ['grammar','vocab'].forEach(function(t){
+      var n=before[t]-afterBy[t];
+      if(n>0){ total+=n; logLine('Fixed <b>'+LABEL[t]+'</b> \u2014 '+n+' '+WORD[t]+(n>1?'s':'')+' corrected'); }
+    });
+    var cFixed = before.context - afterBy.context;
+    if(cFixed>0){ total+=cFixed; logLine('Fixed <b>context</b> \u2014 '+cFixed+' line'+(cFixed>1?'s':'')+' now carry real metrics'); }
+    if(afterBy.context>0){
+      logLine('Reviewed <b>context</b> \u2014 '+afterBy.context+' line'+(afterBy.context>1?'s':'')
+        +' still need your real numbers', true);
+    }
+    if(skipped>0) logLine(skipped+' section'+(skipped>1?'s were':' was')+' left unchanged');
+    if(total===0 && afterBy.context===0 && skipped===0) logLine('Nothing needed changing \u2014 your resume is already clean');
+
+    title.innerHTML = total>0
+      ? '\u2713 Complete \u2014 '+total+' fix'+(total>1?'es':'')+' applied'
+        + (afterBy.context? ', '+afterBy.context+' line'+(afterBy.context>1?'s':'')+' awaiting your numbers' : '')
+      : (afterBy.context
+          ? '\u2713 Complete \u2014 text improved, '+afterBy.context+' line'+(afterBy.context>1?'s':'')+' awaiting your numbers'
+          : '\u2713 Complete');
+
+    var note=document.getElementById('aiPlaceholderNote');
+    if(note){
+      note.innerHTML = placeholders
+        ? '\u26A0\uFE0F <b>'+placeholders+' metric placeholder'+(placeholders===1?'':'s')+'</b> were inserted as <b>[X]</b> / <b>[Y]</b>. The AI cannot know your real numbers \u2014 replace every bracket before you export. Those lines stay flagged until you do.'
+        : 'No metric placeholders were inserted.';
+    }
+
+    setTimeout(function(){ document.getElementById('aiVerifyModal').classList.add('show'); }, 500);
+    var btn=document.getElementById('aiBuilderBtn');
+    btn.disabled=false; btn.textContent='Run';
+  }, 600*units.length + 700);
+}
+
+function dismissAIModal(){
+  document.getElementById('aiVerifyModal').classList.remove('show');
+  document.getElementById('aiBuilderInput').value = '';
+  var btn = document.getElementById('aiBuilderBtn');
+  btn.disabled = false;
+  btn.textContent = 'Run';
+}
+
+function confirmAIChanges(){
+  document.getElementById('aiVerifyModal').classList.remove('show');
+  
+  // Trigger save
+  if(typeof saveResume === 'function') saveResume();
+  
+  // Show toast
+  var toast = document.getElementById('aiDoneToast');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+  
+  // Reset
+  document.getElementById('aiBuilderInput').value = '';
+  var btn = document.getElementById('aiBuilderBtn');
+  btn.disabled = false;
+  btn.textContent = 'Run';
+  
+  // Refresh preview
+  if(typeof renderLivePreview === 'function') renderLivePreview();
+}
+
+
+// ====== ASK AI — per-section popover ======
+// Sections whose text we can safely read and write back as a block.
+var ASKABLE = new Set(['summary','skills','experience','accomplishments','certifications','education','projects','courses','languages']);
+
+var ASK_LABEL = {
+  summary:'Profile / Summary', skills:'Skills', experience:'Experience',
+  accomplishments:'Accomplishments', certifications:'Certifications',
+  education:'Education', projects:'Projects', courses:'Courses', languages:'Languages'
+};
+var ASK_HINTS = {
+  summary:['Make it two sentences','Lead with AI governance','Remove the first person'],
+  skills:['Group these by theme','Add Python and Docker','Drop the weakest three'],
+  experience:['Stronger, more senior tone','Make each line shorter','Add metric placeholders'],
+  accomplishments:['Make these outcome-focused','Add metric placeholders'],
+  certifications:['Order by seniority','Spell out the acronyms'],
+  education:['Shorten to one line each'],
+  projects:['Lead with the outcome'], courses:['Group by subject'], languages:['Add proficiency levels']
+};
+
+// Read a section as plain text
+function askReadSection(key){
+  if(key==='summary') return R.summary||'';
+  if(key==='skills') return (R.skills||[]).join('\n');
+  if(key==='accomplishments') return (R.accomplishments||[]).join('\n');
+  if(key==='experience'){
+    return (R.experience||[]).map(function(j,i){
+      return '['+(i+1)+'] '+(j.title||'')+(j.company?' — '+j.company:'')+'\n'+(j.desc||'');
+    }).join('\n\n');
+  }
+  var arr=R[key];
+  if(Array.isArray(arr)){
+    return arr.map(function(it){
+      if(typeof it==='string') return it;
+      return [it.name,it.title,it.issuer,it.school,it.degree,it.year,it.desc]
+        .filter(Boolean).join(' — ');
+    }).join('\n');
+  }
+  return '';
+}
+
+// Write a section back, preserving array shapes. Returns false if unsafe.
+function askWriteSection(key, text){
+  var t=(text||'').trim();
+  if(!t) return false;
+
+  if(key==='summary'){ R.summary=t; return true; }
+
+  if(key==='skills'){
+    var sk=t.split(/\n|,/).map(function(s){return s.trim();}).filter(Boolean);
+    if(!sk.length) return false;
+    R.skills=sk; return true;
+  }
+
+  if(key==='accomplishments'){
+    var ac=t.split(/\n/).map(function(s){return s.trim();}).filter(Boolean);
+    if(!ac.length) return false;
+    R.accomplishments=ac; return true;
+  }
+
+  if(key==='experience'){
+    // Split on the [n] markers we emitted; only the desc of each job is replaced,
+    // so title/company/dates/skills_used are never touched.
+    var blocks=t.split(/\n(?=\[\d+\]\s)/);
+    var wrote=0;
+    blocks.forEach(function(b){
+      var m=b.match(/^\[(\d+)\]/);
+      if(!m) return;
+      var idx=parseInt(m[1],10)-1;
+      if(!R.experience || !R.experience[idx]) return;
+      var lines=b.split('\n');
+      lines.shift();                       // drop the "[n] Title — Company" header line
+      var desc=lines.join('\n').trim();
+      if(desc){ R.experience[idx].desc=desc; wrote++; }
+    });
+    return wrote>0;
+  }
+
+  // Generic list sections: only accept if the model kept it as a list of lines
+  var arr=R[key];
+  if(Array.isArray(arr)){
+    var lines=t.split(/\n/).map(function(s){return s.trim();}).filter(Boolean);
+    if(!lines.length) return false;
+    if(arr.length && typeof arr[0]!=='string') return false;  // object rows: too risky to rebuild
+    R[key]=lines; return true;
+  }
+  return false;
+}
+
+// ---- popover ----
+// A spec is {key,label,scopeNote,hints,read,write}. Section headers build one
+// from the section key; per-role blocks pass their own read/write closures.
+var _askPop=null, _askSpec=null, _askBtn=null, _askAI='', _askPos=null;
+var _askMarks={};   // key -> {type:'new'|'edited', idx:[], anchor:int|null}
+
+function sectionAskSpec(key){
+  return {
+    key:key,
+    label:(ASK_LABEL[key]||key),
+    scopeNote:'Changes apply to this section only.',
+    hints:(ASK_HINTS[key]||[]),
+    read:function(){ return askReadSection(key); },
+    write:function(v){ return askWriteSection(key, v); },
+    section:true
+  };
+}
+
+function buildAskPop(){
+  if(_askPop) return _askPop;
+  var p=el('div',{class:'ask-pop',id:'askPop'});
+  p.innerHTML =
+    '<span class="ask-arrow"></span>'
+    +'<div class="ask-pop-h">\u2726 Ask AI <span class="ask-scope"></span>'
+      +'<span class="ask-x" title="Close">\u2715</span></div>'
+    +'<div class="ask-sub"></div>'
+    +'<textarea class="ask-in" placeholder="Ask for a change, or type a line to insert\u2026"></textarea>'
+    +'<div class="ask-kbd"><b>Enter</b> to ask AI \u00b7 <b>Shift+Enter</b> new line \u00b7 <b>Esc</b> to close</div>'
+    +'<div class="ask-hints"></div>'
+    +'<div class="ask-row">'
+      +'<button class="ask-go" type="button">\u2726 Ask AI</button>'
+      +'<button class="ask-ins" type="button">\u21b3 Insert this line</button>'
+    +'</div>'
+    +'<div class="ask-think"><span class="ask-sp"></span> Thinking\u2026</div>'
+    +'<div class="ask-err"></div>'
+    +'<div class="ask-res">'
+      +'<div class="ask-res-h">AI response <span class="ask-pill">editable</span></div>'
+      +'<textarea class="ask-out"></textarea>'
+      +'<div class="ask-meta"><span class="ask-ph"></span><span class="ask-dirty"></span></div>'
+      +'<div class="ask-acts">'
+        +'<button class="ask-apply" type="button">\u2713 Apply to section</button>'
+        +'<button class="ask-again" type="button">\u21bb Ask again</button>'
+      +'</div>'
+    +'</div>'
+    +'<div class="ask-insbox">'
+      +'<div class="ask-ins-h">Where should this line go?</div>'
+      +'<div class="ask-ins-sub"></div>'
+      +'<div class="ask-lines"></div>'
+      +'<div class="ask-ins-foot">'
+        +'<span class="ask-posnote">No position chosen</span>'
+        +'<button class="ask-do-ins" type="button" disabled>\u21b3 Insert here</button>'
+        +'<button class="ask-cancel-ins" type="button">\u2715 Cancel</button>'
+      +'</div>'
+    +'</div>';
+  document.body.appendChild(p);
+  _askPop=p;
+
+  var input=p.querySelector('.ask-in'), out=p.querySelector('.ask-out');
+  p.querySelector('.ask-x').addEventListener('click', closeAskPop);
+  p.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+  input.addEventListener('keydown', function(e){
+    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); runAsk(); }
+  });
+  out.addEventListener('input', function(){ askAutosize(); askMeta(); });
+  p.querySelector('.ask-go').addEventListener('click', runAsk);
+  p.querySelector('.ask-ins').addEventListener('click', openInsertPicker);
+  p.querySelector('.ask-again').addEventListener('click', function(){
+    p.querySelector('.ask-res').classList.remove('show'); input.focus(); input.select();
+  });
+  p.querySelector('.ask-apply').addEventListener('click', applyAsk);
+  p.querySelector('.ask-do-ins').addEventListener('click', doInsertLine);
+  p.querySelector('.ask-cancel-ins').addEventListener('click', function(){
+    p.querySelector('.ask-insbox').classList.remove('show');
+  });
+  return p;
+}
+
+function toggleAskPop(btn, spec){
+  if(typeof spec==='string') spec=sectionAskSpec(spec);
+  if(_askSpec && _askSpec.key===spec.key && _askPop && _askPop.classList.contains('show')) return closeAskPop();
+  openAskPop(btn, spec);
+}
+
+function openAskPop(btn, spec){
+  closeAskPop();
+  var p=buildAskPop();
+  _askSpec=spec; _askBtn=btn; _askAI=''; _askPos=null;
+  btn.classList.add('open');
+  // a fresh action supersedes the previous marker on this block
+  if(_askMarks[spec.key]){ delete _askMarks[spec.key]; }
+
+  p.querySelector('.ask-scope').textContent='\u00b7 '+spec.label;
+  p.querySelector('.ask-sub').textContent=spec.scopeNote||'Changes apply to this section only.';
+  p.querySelector('.ask-hints').innerHTML=(spec.hints||[]).map(function(h){
+    return '<span class="ask-h">'+esc(h)+'</span>';
+  }).join('');
+  p.querySelectorAll('.ask-h').forEach(function(h){
+    h.addEventListener('click', function(){
+      var i=p.querySelector('.ask-in'); i.value=h.textContent; i.focus();
+    });
+  });
+
+  // Insert only makes sense for a single block, not a whole multi-entry section
+  p.querySelector('.ask-ins').style.display = spec.section && spec.key==='experience' ? 'none' : '';
+
+  p.querySelector('.ask-in').value='';
+  p.querySelector('.ask-res').classList.remove('show');
+  p.querySelector('.ask-insbox').classList.remove('show');
+  p.querySelector('.ask-think').classList.remove('show');
+  p.querySelector('.ask-err').classList.remove('show');
+  p.classList.add('show');
+  positionAskPop(btn);
+  setTimeout(function(){ p.querySelector('.ask-in').focus(); }, 40);
+}
+
+// The popover is position:fixed, so it works in viewport coordinates only.
+// Anything else breaks the moment the editor scrolls inside its own container
+// rather than the window scrolling.
+function positionAskPop(btn){
+  if(!_askPop||!btn||!_askPop.classList.contains('show')) return;
+  var r=btn.getBoundingClientRect();
+
+  // If the anchor has scrolled out of its scroll container, hide rather than
+  // leave the popover pointing at nothing.
+  var holder = btn.closest('#editorWrap, .app-main, main') || null;
+  if(holder){
+    var h=holder.getBoundingClientRect();
+    var visible = r.bottom > h.top + 4 && r.top < h.bottom - 4;
+    _askPop.style.visibility = visible ? 'visible' : 'hidden';
+    if(!visible) return;
+  } else {
+    _askPop.style.visibility='visible';
+  }
+
+  var w=_askPop.offsetWidth||400, ht=_askPop.offsetHeight||260, gap=10;
+  var left=r.right-w;
+  left=Math.max(10, Math.min(left, window.innerWidth-w-14));
+
+  var top=r.bottom+gap, flip=false;
+  if(top+ht > window.innerHeight-10){
+    var above=r.top-gap-ht;
+    if(above>10){ top=above; flip=true; }
+    else top=Math.max(10, window.innerHeight-ht-10);
+  }
+  _askPop.style.left=left+'px';
+  _askPop.style.top=top+'px';
+  _askPop.classList.toggle('flip', flip);
+
+  // keep the arrow aimed at the button even when the box is clamped
+  var arrow=_askPop.querySelector('.ask-arrow');
+  if(arrow){
+    var ax=Math.min(Math.max(r.left+r.width/2-left-7, 10), w-24);
+    arrow.style.left=ax+'px';
+  }
+}
+
+function closeAskPop(){
+  if(_askPop) _askPop.classList.remove('show');
+  document.querySelectorAll('.sec-askai.open').forEach(function(b){b.classList.remove('open');});
+  _askSpec=null; _askBtn=null; _askPos=null;
+}
+
+function askAutosize(){
+  var o=_askPop&&_askPop.querySelector('.ask-out'); if(!o) return;
+  o.style.height='auto';
+  o.style.height=Math.min(o.scrollHeight+2, 210)+'px';
+}
+function askMeta(){
+  if(!_askPop) return;
+  var o=_askPop.querySelector('.ask-out');
+  var ph=o.value.match(/\[[A-Za-z]\]/g)||[];
+  var e=_askPop.querySelector('.ask-ph');
+  if(ph.length){ e.className='ask-ph warn'; e.textContent='\u26a0 fill '+ph.join(' '); }
+  else if(/\[[A-Za-z]\]/.test(_askAI)){ e.className='ask-ph ok'; e.textContent='\u2713 placeholders filled'; }
+  else { e.className='ask-ph'; e.textContent=''; }
+  _askPop.querySelector('.ask-dirty').textContent = (o.value!==_askAI) ? 'edited by you' : '';
+}
+
+function runAsk(){
+  if(!_askPop||!_askSpec) return;
+  var p=_askPop;
+  var req=(p.querySelector('.ask-in').value||'').trim();
+  if(!req){ p.querySelector('.ask-in').focus(); return; }
+
+  p.querySelector('.ask-insbox').classList.remove('show');
+  p.querySelector('.ask-think').classList.add('show');
+  p.querySelector('.ask-res').classList.remove('show');
+  p.querySelector('.ask-err').classList.remove('show');
+
+  var spec=_askSpec;
+  fetch('/api/ask-section',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({request:req, text:spec.read(), scope:spec.label})
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){
+    p.querySelector('.ask-think').classList.remove('show');
+    if(!d.success||!d.text) throw new Error(d.error||'No response');
+    _askAI=d.text;
+    var o=p.querySelector('.ask-out');
+    o.value=d.text;
+    p.querySelector('.ask-res').classList.add('show');
+    askAutosize(); askMeta();
+    o.focus(); o.setSelectionRange(o.value.length,o.value.length);
+  })
+  .catch(function(err){
+    p.querySelector('.ask-think').classList.remove('show');
+    var e=p.querySelector('.ask-err');
+    e.textContent='\u2717 '+(err.message||'Something went wrong \u2014 try rephrasing');
+    e.classList.add('show');
+  });
+}
+
+// Which line numbers differ between two blocks of text
+function diffLines(beforeText, afterText){
+  var b=(beforeText||'').split('\n').filter(function(l){return l.trim();});
+  var af=(afterText||'').split('\n').filter(function(l){return l.trim();});
+  var changed=[];
+  af.forEach(function(l,i){ if(b[i]===undefined || b[i]!==l) changed.push(i); });
+  return changed;
+}
+
+function applyAsk(){
+  if(!_askPop||!_askSpec) return;
+  var spec=_askSpec;
+  var val=(_askPop.querySelector('.ask-out').value||'').trim();
+  if(!val){ _askPop.querySelector('.ask-out').focus(); return; }
+
+  var edited = val!==_askAI;
+  var before = spec.read();
+  if(spec.write(val)===false){
+    var e=_askPop.querySelector('.ask-err');
+    e.textContent='\u2717 Could not apply safely \u2014 the structure changed too much. Edit the section directly instead.';
+    e.classList.add('show');
+    return;
+  }
+
+  var changed=diffLines(before, val);
+  if(changed.length) _askMarks[spec.key]={type:'edited', idx:changed, anchor:null};
+  else delete _askMarks[spec.key];
+
+  var key=spec.key;
+  closeAskPop();
+  R.quality_score = analyzeQualityScore();
+  var y=window.scrollY;
+  buildEditor();
+  window.scrollTo(0,y);
+  if(typeof renderLivePreview==='function') renderLivePreview();
+  if(typeof toast==='function') toast(edited ? 'Applied your edited version' : 'Applied to section');
+  setTimeout(function(){ jumpToMark(key); }, 160);
+}
+
+// ---- Insert: pick the exact position ----
+function openInsertPicker(){
+  if(!_askPop||!_askSpec) return;
+  var p=_askPop;
+  var line=(p.querySelector('.ask-in').value||'').trim();
+  if(!line){
+    var i=p.querySelector('.ask-in');
+    i.focus(); i.style.borderColor='#DC2626';
+    setTimeout(function(){ i.style.borderColor=''; }, 900);
+    return;
+  }
+  p.querySelector('.ask-res').classList.remove('show');
+  _askPos=null;
+
+  var lines=(_askSpec.read()||'').split('\n').filter(function(l){return l.trim();});
+  var box=p.querySelector('.ask-lines');
+  var h=slotHtml(0,'Insert at the top');
+  lines.forEach(function(l,i){
+    h+='<div class="ask-ln"><span class="num">'+(i+1)+'</span>'+esc(l)+'</div>';
+    h+=slotHtml(i+1, i===lines.length-1 ? 'Insert at the end' : 'Insert after line '+(i+1));
+  });
+  box.innerHTML=h;
+
+  box.querySelectorAll('.ask-slot').forEach(function(s){
+    s.addEventListener('click', function(){
+      _askPos=parseInt(s.dataset.p,10);
+      box.querySelectorAll('.ask-slot').forEach(function(x){x.classList.remove('on');});
+      box.querySelectorAll('.ask-gh').forEach(function(g){ g.remove(); });
+      s.classList.add('on');
+      var g=document.createElement('div');
+      g.className='ask-gh';
+      g.innerHTML='<span class="tg">NEW</span>'+esc(line);
+      s.insertAdjacentElement('afterend', g);
+      p.querySelector('.ask-posnote').textContent =
+        _askPos===0 ? 'Will become line 1' : 'Will become line '+(_askPos+1)+', after line '+_askPos;
+      p.querySelector('.ask-do-ins').disabled=false;
+    });
+  });
+
+  p.querySelector('.ask-ins-sub').textContent='Click a position \u2014 the green row shows exactly where it lands.';
+  p.querySelector('.ask-posnote').textContent='No position chosen';
+  p.querySelector('.ask-do-ins').disabled=true;
+  p.querySelector('.ask-insbox').classList.add('show');
+}
+
+function slotHtml(p,label){
+  return '<div class="ask-slot" data-p="'+p+'"><span class="bar"></span>'
+    +'<span class="lbl">'+esc(label)+'</span><span class="bar"></span></div>';
+}
+
+function doInsertLine(){
+  if(_askPos===null || !_askSpec) return;
+  var spec=_askSpec;
+  var line=(_askPop.querySelector('.ask-in').value||'').trim();
+  if(!line) return;
+
+  var lines=(spec.read()||'').split('\n').filter(function(l){return l.trim();});
+  lines.splice(_askPos, 0, line);
+  var joined=lines.join('\n');
+
+  if(spec.write(joined)===false){
+    var e=_askPop.querySelector('.ask-err');
+    e.textContent='\u2717 Could not insert into this section safely.';
+    e.classList.add('show');
+    return;
+  }
+
+  _askMarks[spec.key]={type:'new', idx:[_askPos], anchor:_askPos>0?_askPos-1:null};
+
+  var key=spec.key, at=_askPos;
+  closeAskPop();
+  R.quality_score = analyzeQualityScore();
+  var y=window.scrollY;
+  buildEditor();
+  window.scrollTo(0,y);
+  if(typeof renderLivePreview==='function') renderLivePreview();
+  if(typeof toast==='function') toast('Inserted as line '+(at+1));
+  setTimeout(function(){ jumpToMark(key); }, 160);
+}
+
+function jumpToMark(key){
+  var bar=document.querySelector('[data-markbar="'+key+'"]');
+  if(bar && bar.scrollIntoView) bar.scrollIntoView({behavior:'smooth',block:'center'});
+  var row=document.querySelector('[data-markrow="'+key+'"]');
+  if(row){ row.classList.remove('mark-flash'); void row.offsetWidth; row.classList.add('mark-flash'); }
+}
+
+function clearAskMark(key){
+  delete _askMarks[key];
+  var y=window.scrollY; buildEditor(); window.scrollTo(0,y);
+}
+
+// Build the "what changed and where" bar shown above a field
+function markBar(key, currentText){
+  var m=_askMarks[key];
+  if(!m) return null;
+  var lines=(currentText||'').split('\n').filter(function(l){return l.trim();});
+  var bar=el('div',{class:'mark-bar'+(m.type==='edited'?' amber':''),'data-markbar':key});
+  var txt;
+  if(m.type==='new'){
+    var anchorTxt = (m.anchor!==null && lines[m.anchor]!==undefined)
+      ? ', after \u201c'+esc(lines[m.anchor].slice(0,40))+(lines[m.anchor].length>40?'\u2026':'')+'\u201d'
+      : ', at the very top';
+    txt='<b>1 line inserted</b> at line '+(m.idx[0]+1)+anchorTxt;
+  } else {
+    txt='<b>'+m.idx.length+' line'+(m.idx.length>1?'s':'')+' rewritten by AI</b> \u2014 line'
+      +(m.idx.length>1?'s ':' ')+m.idx.map(function(i){return i+1;}).join(', ');
+  }
+  bar.innerHTML='<span>'+txt+'</span>'
+    +'<button class="mark-jump" type="button">Jump to it</button>'
+    +'<button class="mark-dis" type="button">Dismiss</button>';
+  bar.querySelector('.mark-jump').addEventListener('click', function(){ jumpToMark(key); });
+  bar.querySelector('.mark-dis').addEventListener('click', function(){ clearAskMark(key); });
+  return bar;
+}
+
+document.addEventListener('mousedown', function(e){
+  if(!_askPop||!_askPop.classList.contains('show')) return;
+  if(e.target.closest && e.target.closest('.sec-askai')) return;
+  closeAskPop();
+});
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeAskPop(); });
+window.addEventListener('resize', function(){ if(_askBtn) positionAskPop(_askBtn); });
+// capture:true so scrolling an inner pane re-anchors the popover too
+window.addEventListener('scroll', function(){ if(_askBtn) positionAskPop(_askBtn); }, true);
+
+// Numbered map of a block, marking exactly which line was inserted or rewritten.
+// Rendered under the field so it never interferes with editing or error highlights.
+function markLineList(key, text){
+  var m=_askMarks[key];
+  if(!m) return null;
+  var lines=(text||'').split('\n').filter(function(l){return l.trim();});
+  if(!lines.length) return null;
+
+  var wrap=el('div',{class:'mark-lines'});
+  lines.forEach(function(l,i){
+    var isMark=m.idx.indexOf(i)>=0;
+    var isAnchor=(m.type==='new' && m.anchor===i);
+    var cls='mark-ln'+(isMark?(m.type==='new'?' new':' edited'):'')+(isAnchor?' anchor':'');
+    var row=el('div',{class:cls});
+    if(isMark) row.setAttribute('data-markrow',key);
+    var badge='';
+    if(isMark){
+      badge='<span class="mark-badge '+(m.type==='new'?'new':'edit')+'">'
+        +(m.type==='new'?'\u25b8 New \u00b7 line '+(i+1):'\u270e Edited \u00b7 line '+(i+1))+'</span>';
+    }
+    var anchorTag = isAnchor ? '<span class="mark-anchor-tag">\u2193 new line added below</span>' : '';
+    row.innerHTML='<span class="n">'+(i+1)+'</span><span class="t">'+esc(l)+badge+anchorTag+'</span>';
+    wrap.appendChild(row);
+  });
+  return wrap;
+}
+
+// ============================================================
+// LINE FORMAT MODEL
+// desc stays the canonical text (nothing breaks for saved resumes).
+// desc_fmt rides alongside it: per-block defaults + per-line kind/overrides.
+// If desc_fmt is missing or out of sync with the text, kinds are derived with
+// the same heuristics the preview used to apply, so old resumes look unchanged.
+// ============================================================
+var FMT_DEFAULTS = {font:"Inter, system-ui, sans-serif", size:10.5, lh:'1.55', glyph:'\u2022', head:'h_bold'};
+var FMT_FONTS = [
+  ['Serif', [["'Source Serif 4',Georgia,serif",'Source Serif'],["Georgia,'Times New Roman',serif",'Georgia'],
+             ["'EB Garamond',Garamond,serif",'Garamond'],["'Times New Roman',Times,serif",'Times New Roman']]],
+  ['Sans',  [["Inter, system-ui, sans-serif",'Inter'],["Arial,Helvetica,sans-serif",'Arial'],
+             ["Calibri,Candara,sans-serif",'Calibri'],["Lato,'Segoe UI',sans-serif",'Lato'],
+             ["Roboto,'Segoe UI',sans-serif",'Roboto'],["Verdana,Geneva,sans-serif",'Verdana']]]
+];
+var FMT_HEADS = [['h_bold','Bold'],['h_under','Underline'],['h_caps','Caps'],
+                 ['h_rule','Rule'],['h_accent','Accent'],['h_italic','Italic'],
+                 ['h_boxed','Boxed'],['h_smallcaps','Small caps']];
+var FMT_GLYPHS = [['\u2022','\u2022 dot'],['\u2013','\u2013 dash'],['\u25aa','\u25aa square'],
+                  ['\u25e6','\u25e6 hollow'],['\u203a','\u203a chevron'],['','none']];
+
+function descLines(text){
+  return String(text||'').split('\n').map(function(l){return l.trim();}).filter(Boolean);
+}
+
+// Legacy heuristics — used ONLY to seed kinds the first time a block is opened.
+// After that the stored kind wins, so the preview never re-guesses.
+function deriveKind(line){
+  var clean = stripBullets(line);
+  if(/^##\s+/.test(clean)) return 'sub';
+  if(/^[A-Za-z][A-Za-z0-9 ()/&,'-]{2,60}:$/.test(clean)) return 'sub';
+  if(/^[A-Z0-9 ()/&,'-]{4,60}$/.test(clean) && clean.split(' ').length <= 6 && !/\d{4}/.test(clean)) return 'sub';
+  return 'bullet';
+}
+
+// Get the format object for a block, creating/repairing it as needed.
+function getFmt(owner, field){
+  var key = field + '_fmt';
+  var lines = descLines(owner[field]);
+  var f = owner[key];
+  if(!f || !f.sec || !Array.isArray(f.lines)){
+    f = {sec: Object.assign({}, FMT_DEFAULTS), lines: []};
+  }
+  // keep line metadata index-aligned with the text
+  if(f.lines.length !== lines.length){
+    var rebuilt = [];
+    for(var i=0;i<lines.length;i++){
+      rebuilt.push(f.lines[i] && f.lines[i].k ? f.lines[i] : {k: deriveKind(lines[i]), s:{}});
+    }
+    f.lines = rebuilt;
+  }
+  f.lines.forEach(function(l){ if(!l.s) l.s = {}; });
+  owner[key] = f;
+  return f;
+}
+
+function fmtVal(f, i, prop){
+  var l = f.lines[i];
+  return (l && l.s && l.s[prop] !== undefined) ? l.s[prop] : f.sec[prop];
+}
+
+// Write text back, keeping line metadata aligned
+function setDescLines(owner, field, lines, meta){
+  owner[field] = lines.join('\n');
+  var f = getFmt(owner, field);
+  if(meta) f.lines = meta;
+}
+
+// ---- inline markup: **bold** *italic* __underline__ ----
+function fmtInline(s){
+  return esc(s)
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/__([^_]+)__/g,'<u>$1</u>')
+    .replace(/(^|[^*])\*([^*]+)\*/g,'$1<em>$2</em>');
+}
+
+// ---- the one renderer used by preview, PDF and Word ----
+function renderDescFmt(text, f){
+  var lines = descLines(text);
+  if(!lines.length) return '';
+  var html='', open=false;
+  lines.forEach(function(raw, i){
+    var kind = f.lines[i] ? f.lines[i].k : 'bullet';
+    var body = stripBullets(raw).replace(/^##\s+/,'');
+    if(!body) return;
+    var st = 'font-family:'+fmtVal(f,i,'font')+';font-size:'+fmtVal(f,i,'size')+'pt;line-height:'+fmtVal(f,i,'lh')+';';
+    if(kind==='bullet'){
+      if(!open){ html+='<ul class="gcv-fl">'; open=true; }
+      var g = fmtVal(f,i,'glyph');
+      html += '<li style="'+st+'">'+(g?'<span class="gcv-g">'+esc(g)+'</span>':'')
+           +  '<span>'+fmtInline(body)+'</span></li>';
+    } else {
+      if(open){ html+='</ul>'; open=false; }
+      html += (kind==='sub')
+        ? '<div class="gcv-sub '+fmtVal(f,i,'head')+'" style="'+st+'">'+fmtInline(body)+'</div>'
+        : '<p class="gcv-plain" style="'+st+'">'+fmtInline(body)+'</p>';
+    }
+  });
+  if(open) html+='</ul>';
+  return html;
+}
+
+// ---- repair helpers ----
+// A line looks like a wrapped fragment when the previous line does not end a
+// sentence and this one starts lowercase. Never applied automatically.
+function looksWrapped(lines, kinds, i){
+  if(i===0) return false;
+  if(kinds && (kinds[i]==='sub' || kinds[i-1]==='sub')) return false;
+  var p = (lines[i-1]||'').trim(), c = (lines[i]||'').trim();
+  if(!p || !c) return false;
+  return !/[.!?:;]$/.test(p) && /^[a-z]/.test(c);
+}
+function hasLeadingSpace(raw){ return /^\s/.test(raw); }
+
+// ============================================================
+// FORMAT TOOLBAR UI
+// Collapsed by default; one block in formatting mode at a time.
+// ============================================================
+var _fmtOpen = null;                 // block id currently in formatting mode
+var _fmtSel  = {block:null, i:null}; // selected line
+var _fmtScope= 'section';
+
+function fmtBlockId(owner, field, tag){ return tag+'::'+field; }
+
+// Build the whole editable stack for one text block.
+// owner[field] is the text; owner[field+'_fmt'] is the metadata.
+function formatBlock(owner, field, blockId, onChange){
+  var wrap = el('div',{class:'fmt-wrap'});
+  var f = getFmt(owner, field);
+  var isOpen = (_fmtOpen === blockId);
+
+  var toolHost = el('div',{class:'fmt-tools'+(isOpen?' show':'')});
+  var rowsHost = el('div',{class:'fmt-rows'+(isOpen?'':' plain')});
+  wrap.appendChild(toolHost);
+  wrap.appendChild(rowsHost);
+
+  function commit(){
+    if(onChange) onChange();
+    if(typeof schedulePreview==='function') schedulePreview();
+  }
+  function redraw(){
+    drawTools(); drawRows();
+  }
+
+  // ---- toolbar ----
+  function drawTools(){
+    toolHost.className = 'fmt-tools'+(_fmtOpen===blockId?' show':'');
+    if(_fmtOpen!==blockId){ toolHost.innerHTML=''; return; }
+    var lineMode = (_fmtSel.block===blockId && _fmtSel.i!==null && _fmtScope==='line');
+    var i = lineMode ? _fmtSel.i : null;
+    var v = function(p){ return lineMode ? fmtVal(f,i,p) : f.sec[p]; };
+    var ov = function(p){ return (lineMode && f.lines[i].s[p]!==undefined) ? ' ov' : ''; };
+    var curKind = lineMode ? f.lines[i].k : null;
+
+    var fontOpts = FMT_FONTS.map(function(g){
+      return '<optgroup label="'+g[0]+'">'+g[1].map(function(o){
+        return '<option value="'+o[0].replace(/"/g,'&quot;')+'"'+(v('font')===o[0]?' selected':'')+'>'+o[1]+'</option>';
+      }).join('')+'</optgroup>';
+    }).join('');
+
+    toolHost.innerHTML =
+      '<div class="fmt-scope">'
+       +'<span class="fs-lb">Applying to</span>'
+       +'<span class="fs-seg">'
+         +'<button type="button" data-a="scope-line"'+(lineMode?' class="on"':'')
+           +(_fmtSel.block===blockId&&_fmtSel.i!==null?'':' disabled')+'>This line</button>'
+         +'<button type="button" data-a="scope-sec"'+(lineMode?'':' class="on"')+'>Whole block</button>'
+       +'</span>'
+       +'<span class="fs-what">'+(lineMode?'\u2192 line '+(i+1)+' only':'\u2192 all lines here')+'</span>'
+       +'<button type="button" class="fs-reset" data-a="reset"'
+         +((lineMode&&Object.keys(f.lines[i].s).length)?'':' disabled')+'>\u21ba Reset line</button>'
+      +'</div>'
+      +'<div class="fmt-bar">'
+        +'<div class="fmt-row"><span class="fg">Line</span>'
+          +'<button type="button" class="fb'+(curKind==='bullet'?' on':'')+'" data-a="k-bullet" title="Bullet">\u2022</button>'
+          +'<button type="button" class="fb'+(curKind==='sub'?' on':'')+'" data-a="k-sub" title="Subheading">H</button>'
+          +'<button type="button" class="fb'+(curKind==='text'?' on':'')+'" data-a="k-text" title="Plain paragraph">\u00b6</button>'
+          +'<span class="fsep"></span>'
+          +'<button type="button" class="fb" data-a="w-b" title="Bold"><b>B</b></button>'
+          +'<button type="button" class="fb" data-a="w-i" title="Italic"><i>I</i></button>'
+          +'<button type="button" class="fb" data-a="w-u" title="Underline"><u>U</u></button>'
+          +'<span class="fsep"></span><span class="fg">Bullet</span>'
+          +'<select class="fsel'+ov('glyph')+'" data-a="glyph">'+FMT_GLYPHS.map(function(g){
+              return '<option value="'+g[0]+'"'+(v('glyph')===g[0]?' selected':'')+'>'+g[1]+'</option>';
+            }).join('')+'</select>'
+          +'<span class="fnote" data-a="cleanup-host"></span>'
+        +'</div>'
+        +'<div class="fmt-row"><span class="fg">Font</span>'
+          +'<select class="fsel'+ov('font')+'" data-a="font" style="min-width:118px">'+fontOpts+'</select>'
+          +'<span class="fsep"></span><span class="fg">Size</span>'
+          +'<span class="fstep"><button type="button" data-a="size-down">\u2212</button>'
+          +'<input class="fnum'+ov('size')+'" data-a="size" type="number" min="5" max="20" step="0.5" value="'+v('size')+'">'
+          +'<button type="button" data-a="size-up">+</button></span>'
+          +'<span class="fsep"></span><span class="fg">Spacing</span>'
+          +'<select class="fsel'+ov('lh')+'" data-a="lh">'
+            +[['1.35','Tight'],['1.55','Normal'],['1.8','Roomy']].map(function(o){
+              return '<option value="'+o[0]+'"'+(v('lh')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')
+          +'</select>'
+          +'<span class="fsep"></span>'
+          +'<button type="button" class="fb wide" data-a="cleanup" title="Trim spaces and stray bullet characters">\u232b Clean up</button>'
+        +'</div>'
+        +'<div class="fmt-row"><span class="fg">Heading</span>'
+          +FMT_HEADS.map(function(h){
+            return '<div class="fhs'+(v('head')===h[0]?' on':'')+'" data-a="head-'+h[0]+'">'
+              +'<div class="fsw '+h[0]+'">Aa</div><div class="fhl">'+h[1]+'</div></div>';
+          }).join('')
+        +'</div>'
+      +'</div>';
+
+    toolHost.querySelectorAll('[data-a]').forEach(function(elm){
+      var a = elm.dataset.a;
+      var evt = (elm.tagName==='SELECT'||elm.tagName==='INPUT') ? 'change' : 'click';
+      elm.addEventListener(evt, function(ev){ ev.stopPropagation(); act(a, elm); });
+      if(elm.tagName==='INPUT') elm.addEventListener('input', function(){ act('size', elm); });
+    });
+  }
+
+  function setProp(p, val){
+    if(_fmtScope==='line' && _fmtSel.block===blockId && _fmtSel.i!==null) f.lines[_fmtSel.i].s[p]=val;
+    else f.sec[p]=val;
+    commit(); redraw();
+  }
+
+  function act(a, elm){
+    var i = _fmtSel.i;
+    if(a==='scope-line'){ if(i!==null){ _fmtScope='line'; redraw(); } return; }
+    if(a==='scope-sec'){ _fmtScope='section'; redraw(); return; }
+    if(a==='reset'){ if(i!==null){ f.lines[i].s={}; commit(); redraw(); } return; }
+    if(a.indexOf('k-')===0){ if(i!==null){ f.lines[i].k=a.slice(2); commit(); redraw(); } return; }
+    if(a.indexOf('w-')===0){ wrapSelection(a.slice(2)); return; }
+    if(a.indexOf('head-')===0){ setProp('head', a.slice(5)); return; }
+    if(a==='glyph'||a==='font'||a==='lh'){ setProp(a, elm.value); return; }
+    if(a==='size'){ var n=parseFloat(elm.value); if(!isNaN(n)) setProp('size', Math.min(20,Math.max(5,n))); return; }
+    if(a==='size-up'||a==='size-down'){
+      var lm=(_fmtScope==='line'&&i!==null);
+      var cur=lm?fmtVal(f,i,'size'):f.sec.size;
+      var v2=Math.round((cur+(a==='size-up'?0.5:-0.5))*2)/2;
+      setProp('size', Math.min(20,Math.max(5,v2))); return;
+    }
+    if(a==='cleanup'){ cleanUp(); return; }
+  }
+
+  function wrapSelection(kind){
+    var i=_fmtSel.i; if(i===null) return;
+    var ta = rowsHost.querySelector('.fmt-text[data-i="'+i+'"]'); if(!ta) return;
+    var s=ta.selectionStart, e=ta.selectionEnd; if(s===e) return;
+    var mark = kind==='b'?'**':kind==='i'?'*':'__';
+    var lines = descLines(owner[field]);
+    var v = ta.value;
+    lines[i] = v.slice(0,s)+mark+v.slice(s,e)+mark+v.slice(e);
+    owner[field] = lines.join('\n');
+    commit(); redraw();
+  }
+
+  function cleanUp(){
+    var lines = String(owner[field]||'').split('\n');
+    var kept=[], meta=[];
+    lines.forEach(function(raw, idx){
+      var t = stripBullets(raw).replace(/\s+/g,' ').trim();
+      if(!t) return;
+      kept.push(t);
+      meta.push(f.lines[idx] || {k:deriveKind(t), s:{}});
+    });
+    setDescLines(owner, field, kept, meta);
+    commit(); redraw();
+  }
+
+  function mergeUp(i){
+    var lines = descLines(owner[field]);
+    if(i<=0 || i>=lines.length) return;
+    lines[i-1] = lines[i-1].trim() + ' ' + lines[i].trim();
+    var meta = f.lines.slice();
+    lines.splice(i,1); meta.splice(i,1);
+    setDescLines(owner, field, lines, meta);
+    _fmtSel={block:blockId, i:i-1};
+    commit(); redraw();
+  }
+
+  function delLine(i){
+    var lines = descLines(owner[field]);
+    var meta = f.lines.slice();
+    lines.splice(i,1); meta.splice(i,1);
+    setDescLines(owner, field, lines, meta);
+    _fmtSel={block:blockId, i:null};
+    commit(); redraw();
+  }
+
+  function moveLine(i,d){
+    var j=i+d;
+    var lines = descLines(owner[field]);
+    if(j<0||j>=lines.length) return;
+    var meta = f.lines.slice();
+    var tl=lines[i]; lines[i]=lines[j]; lines[j]=tl;
+    var tm=meta[i]; meta[i]=meta[j]; meta[j]=tm;
+    setDescLines(owner, field, lines, meta);
+    _fmtSel={block:blockId, i:j};
+    commit(); redraw();
+  }
+
+  // ---- rows ----
+  function drawRows(){
+    var open = (_fmtOpen===blockId);
+    rowsHost.className = 'fmt-rows'+(open?'':' plain');
+    var rawLines = String(owner[field]||'').split('\n');
+    var lines = descLines(owner[field]);
+    var kinds = f.lines.map(function(l){return l.k;});
+
+    // problem summary
+    var nWrap=0, nLead=0;
+    lines.forEach(function(_,i){ if(looksWrapped(lines,kinds,i)) nWrap++; });
+    rawLines.forEach(function(r){ if(r.trim() && hasLeadingSpace(r)) nLead++; });
+
+    var html='';
+    if(open && (nWrap||nLead)){
+      var bits=[];
+      if(nWrap) bits.push('<b>'+nWrap+' line'+(nWrap>1?'s':'')+'</b> look like wrapped fragments');
+      if(nLead) bits.push('<b>'+nLead+' line'+(nLead>1?'s':'')+'</b> start with hidden spaces');
+      html += '<div class="fmt-fix"><span>'+bits.join(' \u00b7 ')+'</span>'
+           +  '<button type="button" data-fix="all">Fix all</button></div>';
+    }
+
+    html += lines.map(function(l,i){
+      var kind = kinds[i]||'bullet';
+      var kc = kind==='sub'?'sub':kind==='bullet'?'bul':'txt';
+      var kt = kind==='sub'?'Subhead':kind==='bullet'?'Bullet':'Text';
+      var nOv = Object.keys(f.lines[i].s||{}).length;
+      var wrapd = looksWrapped(lines,kinds,i);
+      var isSel = (_fmtSel.block===blockId && _fmtSel.i===i);
+      return '<div class="fmt-row-line'+(isSel?' sel':'')+(kind==='sub'?' isSub':'')+(wrapd?' prob':'')+'">'
+        +(open?'<span class="fkind '+kc+'" data-cyc="'+i+'" title="Click to change type">'+kt+'</span>':'')
+        +'<textarea class="fmt-text" rows="1" data-i="'+i+'">'+esc(l)+'</textarea>'
+        +(wrapd?'<span class="fflag" data-merge="'+i+'" title="Join to the line above">wrapped? \u2934</span>':'')
+        +(nOv?'<span class="fov" data-clr="'+i+'" title="Clear line styling">styled \u00d7'+nOv+'</span>':'')
+        +(open?'<span class="fracts">'
+            +'<button type="button" class="fra" data-mv="'+i+'|-1">\u2191</button>'
+            +'<button type="button" class="fra" data-mv="'+i+'|1">\u2193</button>'
+            +'<button type="button" class="fra" data-del="'+i+'">\u2715</button>'
+          +'</span>':'')
+        +'</div>';
+    }).join('');
+
+    if(open){
+      html += '<div class="fmt-add">'
+        +'<button type="button" data-add="bullet">+ Bullet</button>'
+        +'<button type="button" data-add="sub">+ Subheading</button>'
+        +'<button type="button" data-add="text">+ Paragraph</button></div>';
+    }
+    rowsHost.innerHTML = html;
+
+    rowsHost.querySelectorAll('.fmt-text').forEach(function(ta){
+      autosizeFmt(ta);
+      ta.addEventListener('input', function(){
+        var ls = descLines(owner[field]);
+        ls[+ta.dataset.i] = ta.value;
+        owner[field] = ls.join('\n');
+        autosizeFmt(ta); commit();
+      });
+      ta.addEventListener('focus', function(){
+        _fmtSel={block:blockId, i:+ta.dataset.i};
+        if(_fmtOpen===blockId) _fmtScope='line';
+        drawTools();
+        rowsHost.querySelectorAll('.fmt-row-line').forEach(function(r,idx){
+          r.classList.toggle('sel', idx===(_fmtSel.i + (rowsHost.querySelector('.fmt-fix')?1:0)===idx?_fmtSel.i:-1));
+        });
+        markSelRows();
+      });
+    });
+    function markSelRows(){
+      var rows = rowsHost.querySelectorAll('.fmt-row-line');
+      rows.forEach(function(r,idx){ r.classList.toggle('sel', idx===_fmtSel.i); });
+    }
+    markSelRows();
+
+    rowsHost.querySelectorAll('[data-cyc]').forEach(function(e){
+      e.addEventListener('click', function(){
+        var i=+e.dataset.cyc;
+        _fmtSel={block:blockId,i:i}; _fmtScope='line';
+        var k=f.lines[i].k;
+        f.lines[i].k = k==='bullet'?'sub':k==='sub'?'text':'bullet';
+        commit(); redraw();
+      });
+    });
+    rowsHost.querySelectorAll('[data-merge]').forEach(function(e){
+      e.addEventListener('click', function(){ mergeUp(+e.dataset.merge); });
+    });
+    rowsHost.querySelectorAll('[data-clr]').forEach(function(e){
+      e.addEventListener('click', function(){
+        var i=+e.dataset.clr; f.lines[i].s={}; _fmtSel={block:blockId,i:i}; commit(); redraw();
+      });
+    });
+    rowsHost.querySelectorAll('[data-mv]').forEach(function(e){
+      e.addEventListener('click', function(){
+        var p=e.dataset.mv.split('|'); moveLine(+p[0], +p[1]);
+      });
+    });
+    rowsHost.querySelectorAll('[data-del]').forEach(function(e){
+      e.addEventListener('click', function(){ delLine(+e.dataset.del); });
+    });
+    rowsHost.querySelectorAll('[data-add]').forEach(function(e){
+      e.addEventListener('click', function(){
+        var lines2 = descLines(owner[field]);
+        var meta = f.lines.slice();
+        lines2.push('New line');
+        meta.push({k:e.dataset.add, s:{}});
+        setDescLines(owner, field, lines2, meta);
+        _fmtSel={block:blockId, i:lines2.length-1};
+        commit(); redraw();
+        var t = rowsHost.querySelector('.fmt-text[data-i="'+(lines2.length-1)+'"]');
+        if(t){ t.focus(); t.select(); }
+      });
+    });
+    var fixBtn = rowsHost.querySelector('[data-fix="all"]');
+    if(fixBtn) fixBtn.addEventListener('click', function(){
+      var ls = descLines(owner[field]);
+      var meta = f.lines.slice();
+      var ks = meta.map(function(m){return m.k;});
+      for(var i=ls.length-1;i>0;i--){
+        if(looksWrapped(ls,ks,i)){
+          ls[i-1]=ls[i-1].trim()+' '+ls[i].trim();
+          ls.splice(i,1); meta.splice(i,1); ks.splice(i,1);
+        }
+      }
+      ls = ls.map(function(t){ return stripBullets(t).replace(/\s+/g,' ').trim(); });
+      setDescLines(owner, field, ls, meta);
+      _fmtSel={block:blockId,i:null};
+      commit(); redraw();
+    });
+  }
+
+  drawTools(); drawRows();
+  wrap._fmtRedraw = redraw;
+  return wrap;
+}
+
+function autosizeFmt(ta){ ta.style.height='auto'; ta.style.height=(ta.scrollHeight)+'px'; }
+
+// The "Aa Format" toggle that lives next to Ask AI
+function formatToggleBtn(blockId){
+  var b = el('button',{type:'button',class:'btn-fmt'+(_fmtOpen===blockId?' on':''),
+    title:'Text and bullet formatting for this block'});
+  b.innerHTML='<span class="aa">Aa</span> Format';
+  b.addEventListener('click', function(ev){
+    ev.stopPropagation();
+    _fmtOpen = (_fmtOpen===blockId) ? null : blockId;
+    _fmtSel = {block:blockId, i:null};
+    _fmtScope = 'section';
+    var y=window.scrollY; buildEditor(); window.scrollTo(0,y);
+  });
+  return b;
+}
+
+// ============================================================
+// RESIZABLE PREVIEW SPLITTER
+// Width lives in a CSS variable on the grid, and persists per browser.
+// ============================================================
+var PV_MIN_CENTRE = 360;   // the editor never shrinks below this
+var PV_MIN_WIDTH  = 300;   // below this the preview snaps shut
+var PV_DEFAULT    = 470;
+var _pvLast = PV_DEFAULT;
+
+// Deterministic: return the grid belonging to whichever view is ACTUALLY
+// active, never "whichever matching element happens to come first in the
+// DOM" — that ambiguity is what set --pvw on a hidden container while the
+// visible one silently fell back to a conflicting hardcoded rule.
+function pvGrid(){
+  var pro = document.getElementById('view-pro');
+  if(pro && pro.classList.contains('on')) return pro.querySelector('.container');
+  var fr = document.getElementById('view-fresher');
+  if(fr && fr.classList.contains('on')) return fr.querySelector('.fr-grid') || fr.querySelector('.container');
+  return null;   // neither builder view is open — nothing to size yet
+}
+
+function pvMaxWidth(grid){
+  // total minus rail, splitter, gaps, and the editor's minimum
+  var w = grid.clientWidth;
+  return Math.max(0, w - 180 - 10 - 28 - PV_MIN_CENTRE);
+}
+
+function setPreviewWidth(px, persist){
+  var grid = pvGrid(); if(!grid) return;
+  var max = pvMaxWidth(grid);
+  px = Math.max(0, Math.min(px, max));
+  if(px > 0 && px < PV_MIN_WIDTH) px = (px < PV_MIN_WIDTH/2) ? 0 : PV_MIN_WIDTH;
+
+  grid.style.setProperty('--pvw', px+'px');
+  // only touch the preview belonging to THIS grid, not every .pv-live in the DOM
+  var pv = grid.querySelector('.pv-live');
+  if(pv) pv.style.display = px===0 ? 'none' : '';
+  if(px > 0) _pvLast = px;
+
+  var tag = document.querySelector('.pv-widthtag');
+  if(tag){
+    var pct = max>0 ? Math.round((px/(px + grid.clientWidth-180-10-28-px))*100) : 0;
+    tag.textContent = px===0 ? 'preview hidden' : 'preview '+Math.max(1,pct)+'%';
+  }
+  var cb = document.querySelector('.pv-collapse');
+  if(cb) cb.textContent = px===0 ? '\u21e4' : '\u21e5';
+
+  if(persist){ try{ localStorage.setItem('reeve_pvw', String(px)); }catch(e){} }
+  if(_askBtn) positionAskPop(_askBtn);   // popover follows the reflow
+}
+
+function togglePreviewPane(){
+  var grid=pvGrid(); if(!grid) return;
+  var cur=parseInt(getComputedStyle(grid).getPropertyValue('--pvw'),10)||0;
+  setPreviewWidth(cur===0 ? (_pvLast||PV_DEFAULT) : 0, true);
+}
+
+function initPreviewSplitter(){
+  var grid=pvGrid(); if(!grid) return;
+
+  // restore the last width this browser used
+  var saved=null;
+  try{ saved=parseInt(localStorage.getItem('reeve_pvw'),10); }catch(e){}
+  setPreviewWidth((!isNaN(saved) && saved!==null) ? saved : PV_DEFAULT, false);
+
+  document.querySelectorAll('.pv-split').forEach(function(sp){
+    if(sp._wired) return;
+    sp._wired = true;
+    var dragging=false;
+
+    sp.addEventListener('pointerdown', function(e){
+      dragging=true; sp.classList.add('drag');
+      sp.setPointerCapture(e.pointerId);
+      document.body.style.userSelect='none';
+      document.body.style.cursor='col-resize';
+    });
+    sp.addEventListener('pointermove', function(e){
+      if(!dragging) return;
+      var g=pvGrid(); if(!g) return;
+      var right=g.getBoundingClientRect().right;
+      setPreviewWidth(right - e.clientX - 5, false);
+    });
+    function stopDrag(e){
+      if(!dragging) return;
+      dragging=false; sp.classList.remove('drag');
+      try{ sp.releasePointerCapture(e.pointerId); }catch(err){}
+      document.body.style.userSelect='';
+      document.body.style.cursor='';
+      var g=pvGrid();
+      if(g) setPreviewWidth(parseInt(getComputedStyle(g).getPropertyValue('--pvw'),10)||0, true);
+    }
+    sp.addEventListener('pointerup', stopDrag);
+    sp.addEventListener('pointercancel', stopDrag);
+    sp.addEventListener('dblclick', function(){ setPreviewWidth(PV_DEFAULT, true); });
+
+    // keyboard accessible
+    sp.setAttribute('tabindex','0');
+    sp.setAttribute('role','separator');
+    sp.setAttribute('aria-label','Resize preview panel');
+    sp.addEventListener('keydown', function(e){
+      var g=pvGrid(); if(!g) return;
+      var cur=parseInt(getComputedStyle(g).getPropertyValue('--pvw'),10)||0;
+      if(e.key==='ArrowLeft'){ e.preventDefault(); setPreviewWidth(cur+24, true); }
+      if(e.key==='ArrowRight'){ e.preventDefault(); setPreviewWidth(cur-24, true); }
+      if(e.key==='Home'){ e.preventDefault(); setPreviewWidth(PV_DEFAULT, true); }
+    });
+  });
+
+  window.addEventListener('resize', function(){
+    var g=pvGrid(); if(!g) return;
+    setPreviewWidth(parseInt(getComputedStyle(g).getPropertyValue('--pvw'),10)||PV_DEFAULT, false);
+  });
+}
+
+// add the width tag + collapse button into the preview header, once
+function decoratePreviewHeader(){
+  document.querySelectorAll('.pv-live').forEach(function(pane){
+    var head = pane.querySelector('.pv-live-head, .pv-head, h2, header');
+    if(!head || head.querySelector('.pv-collapse')) return;
+    var wrap = el('span',{style:'margin-left:auto;display:flex;align-items:center;gap:5px'});
+    wrap.appendChild(el('span',{class:'pv-widthtag'},''));
+    var btn = el('button',{class:'pv-panebtn pv-collapse',type:'button',title:'Collapse / expand preview'},'\u21e5');
+    btn.addEventListener('click', function(e){ e.stopPropagation(); togglePreviewPane(); });
+    wrap.appendChild(btn);
+    head.appendChild(wrap);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  decoratePreviewHeader(); initPreviewSplitter();
+});
+if(document.readyState !== 'loading'){ decoratePreviewHeader(); initPreviewSplitter(); }
