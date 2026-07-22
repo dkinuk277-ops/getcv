@@ -4696,6 +4696,11 @@ function formatToggleBtn(blockId){
 var PV_MIN_CENTRE = 360;   // the editor never shrinks below this
 var PV_MIN_WIDTH  = 300;   // below this the preview snaps shut
 var PV_DEFAULT    = 470;
+var PV_MIN_ZOOM   = 0.42;  // zoom at the narrowest usable preview width
+var PV_MAX_ZOOM   = 1.35;  // zoom at the widest the splitter can reach \u2014
+                            // deliberately past true size, since the whole
+                            // point of dragging all the way is to read it
+                            // more easily, not just to stop at "actual size"
 var _pvLast = PV_DEFAULT;
 
 function pvGrid(){
@@ -4722,6 +4727,21 @@ function setPreviewWidth(px, persist){
   var pv = grid.querySelector('.pv-live') || grid.parentElement.querySelector('.pv-live');
   if(pv) pv.style.display = px===0 ? 'none' : '';
   if(px > 0) _pvLast = px;
+
+  // Zoom the resume page itself as the pane widens, so widening the preview
+  // actually makes the page easier to read rather than just showing more
+  // whitespace around a fixed-size page. Mapped against pvMaxWidth(), the
+  // SAME true, live ceiling used for clamping \u2014 not a hardcoded number,
+  // which is what made an earlier version of this stop scaling partway
+  // through the drag on wider screens.
+  if(pv && px > 0){
+    var pane = pv.querySelector('[data-livepane]');
+    if(pane){
+      var t = max > PV_MIN_WIDTH ? Math.max(0, Math.min(1, (px-PV_MIN_WIDTH)/(max-PV_MIN_WIDTH))) : 1;
+      var zoom = PV_MIN_ZOOM + t*(PV_MAX_ZOOM-PV_MIN_ZOOM);
+      pane.style.zoom = zoom.toFixed(3);
+    }
+  }
 
   var tag = grid.parentElement ? grid.parentElement.querySelector('.pv-widthtag') : null;
   if(!tag) tag = document.querySelector('.pv-widthtag');
