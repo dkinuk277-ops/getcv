@@ -100,8 +100,7 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
 .mbtns{display:flex;gap:8px;flex-wrap:wrap}
 .workspace{background:var(--paper);color:var(--ink);border-radius:14px;padding:22px}
 .container{display:grid;grid-template-columns:210px 1fr;gap:22px}
-.fr-grid{display:grid;gap:22px}
-@media(max-width:860px){.container{grid-template-columns:1fr}.fr-grid{grid-template-columns:1fr}}
+@media(max-width:860px){.container{grid-template-columns:1fr}}
 
 /* ---------- Section rail (signature) ---------- */
 .rail{align-self:start}
@@ -333,10 +332,8 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 
 /* ---------- Live split-screen preview ---------- */
 #view-pro,#view-fresher{max-width:1560px}
-/* NOTE: grid-template-columns for .container / .fr-grid is defined ONCE,
-   above, in the #view-pro.on / #view-fresher.on rules. Do not add a second
-   unscoped rule here — two rules setting the same property on the same
-   element is exactly what broke the preview column before. */
+#view-pro .container{grid-template-columns:200px minmax(0,1fr) 470px}
+.fr-grid{display:grid;grid-template-columns:200px minmax(0,1fr) 470px;gap:22px}
 .pv-live{position:sticky;top:128px;align-self:start;background:var(--card);border:1px solid var(--line);
   border-radius:12px;overflow:hidden;display:flex;flex-direction:column;
   max-height:calc(100vh - 148px);box-shadow:var(--shadow)}
@@ -350,8 +347,8 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .pv-live-inner .gcv-page{margin:0 auto}
 .pv-live-empty{background:var(--card);border:1.5px dashed var(--line);border-radius:10px;
   padding:36px 20px;text-align:center;font-size:13px;color:var(--ink-soft);zoom:1.6}
-/* the <1280px collapse is already handled in the #view-pro.on / #view-fresher.on
-   media query above — nothing further needed here */
+@media(max-width:1280px){.pv-live{display:none}#view-pro .container{grid-template-columns:200px 1fr}.fr-grid{grid-template-columns:200px 1fr}}
+@media(max-width:860px){.fr-grid{grid-template-columns:1fr}}
 
 /* ---------- Preview: inline template strip ---------- */
 .pv-tpl-strip{display:none;border:1.5px solid var(--accent-soft);border-radius:10px;

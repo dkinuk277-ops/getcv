@@ -2600,15 +2600,6 @@ function showView(id){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
   const t = document.getElementById('view-'+id);
   if(t) t.classList.add('on');
-  // The splitter/preview-width logic needs a live grid to size, which only
-  // exists once a builder view is actually on-screen — re-run it here
-  // rather than once at page load, when neither 'pro' nor 'fresher' is on yet.
-  if(id==='pro' || id==='fresher'){
-    requestAnimationFrame(function(){
-      decoratePreviewHeader();
-      initPreviewSplitter();
-    });
-  }
   // Builder views: the footer rides at the END of the centre scroll column so
   // the workspace extends to the bottom of the screen. Everywhere else it
   // returns to its normal place at the bottom of the page.
@@ -4702,17 +4693,7 @@ var PV_MIN_WIDTH  = 300;   // below this the preview snaps shut
 var PV_DEFAULT    = 470;
 var _pvLast = PV_DEFAULT;
 
-// Deterministic: return the grid belonging to whichever view is ACTUALLY
-// active, never "whichever matching element happens to come first in the
-// DOM" — that ambiguity is what set --pvw on a hidden container while the
-// visible one silently fell back to a conflicting hardcoded rule.
-function pvGrid(){
-  var pro = document.getElementById('view-pro');
-  if(pro && pro.classList.contains('on')) return pro.querySelector('.container');
-  var fr = document.getElementById('view-fresher');
-  if(fr && fr.classList.contains('on')) return fr.querySelector('.fr-grid') || fr.querySelector('.container');
-  return null;   // neither builder view is open — nothing to size yet
-}
+function pvGrid(){ return document.querySelector('#view-pro.on .container, #view-fresher.on .fr-grid, #view-pro .container, .fr-grid'); }
 
 function pvMaxWidth(grid){
   // total minus rail, splitter, gaps, and the editor's minimum
@@ -4727,9 +4708,9 @@ function setPreviewWidth(px, persist){
   if(px > 0 && px < PV_MIN_WIDTH) px = (px < PV_MIN_WIDTH/2) ? 0 : PV_MIN_WIDTH;
 
   grid.style.setProperty('--pvw', px+'px');
-  // only touch the preview belonging to THIS grid, not every .pv-live in the DOM
-  var pv = grid.querySelector('.pv-live');
-  if(pv) pv.style.display = px===0 ? 'none' : '';
+  document.querySelectorAll('.pv-live').forEach(function(p){
+    p.style.display = px===0 ? 'none' : '';
+  });
   if(px > 0) _pvLast = px;
 
   var tag = document.querySelector('.pv-widthtag');
