@@ -1355,6 +1355,17 @@ function buildEditor(){
   showAIBuilder();
   const ed = $('#editor');
   ed.classList.remove('hidden');
+
+  // The AI Builder bar is a single persistent, listener-bound node that gets
+  // MOVED into #editor (not recreated) each time it's shown. If it's already
+  // inside ed from a previous render, the innerHTML='' below would destroy
+  // it permanently — not just hide it — and getElementById would return null
+  // on every render after the first. Park it somewhere the wipe can't reach.
+  const aiBarPark = document.getElementById('aiBuilderBar');
+  if(aiBarPark && aiBarPark.parentElement === ed){
+    document.body.appendChild(aiBarPark);
+  }
+
   ed.innerHTML = '';
   
   // Calculate quality score for this resume
