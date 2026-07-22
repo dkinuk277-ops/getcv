@@ -2593,6 +2593,15 @@ function showView(id){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
   const t = document.getElementById('view-'+id);
   if(t) t.classList.add('on');
+  // The splitter/preview-width logic needs a live grid to size, which only
+  // exists once a builder view is actually on-screen — re-run it here
+  // rather than once at page load, when neither 'pro' nor 'fresher' is on yet.
+  if(id==='pro' || id==='fresher'){
+    requestAnimationFrame(function(){
+      decoratePreviewHeader();
+      initPreviewSplitter();
+    });
+  }
   // Builder views: the footer rides at the END of the centre scroll column so
   // the workspace extends to the bottom of the screen. Everywhere else it
   // returns to its normal place at the bottom of the page.
@@ -3843,7 +3852,8 @@ function buildAskPop(){
   if(_askPop) return _askPop;
   var p=el('div',{class:'ask-pop',id:'askPop'});
   p.innerHTML =
-    '<div class="ask-pop-h">\u2726 Ask AI <span class="ask-scope"></span>'
+    '<span class="ask-arrow"></span>'
+    +'<div class="ask-pop-h">\u2726 Ask AI <span class="ask-scope"></span>'
       +'<span class="ask-x" title="Close">\u2715</span></div>'
     +'<div class="ask-sub"></div>'
     +'<textarea class="ask-in" placeholder="Ask for a change, or type a line to insert\u2026"></textarea>'
@@ -3935,14 +3945,49 @@ function openAskPop(btn, spec){
   setTimeout(function(){ p.querySelector('.ask-in').focus(); }, 40);
 }
 
+// The popover is position:fixed, so it must work in viewport coordinates
+// only. Anything using window.scrollX/Y breaks the moment the popover's
+// anchor scrolls inside its OWN container rather than the whole window
+// scrolling \u2014 which is exactly how the editor pane works here.
 function positionAskPop(btn){
-  if(!_askPop||!btn) return;
-  var r=btn.getBoundingClientRect(), w=_askPop.offsetWidth||400;
-  var left=r.right+window.scrollX-w;
+  if(!_askPop||!btn||!_askPop.classList.contains('show')) return;
+  var r=btn.getBoundingClientRect();
+
+  // If the button has scrolled out of its scroll container, hide rather
+  // than leave the popover pointing at empty space.
+  var holder = btn.closest('#editorWrap, .app-main, main') || null;
+  if(holder){
+    var h=holder.getBoundingClientRect();
+    var visible = r.bottom > h.top + 4 && r.top < h.bottom - 4;
+    _askPop.style.visibility = visible ? 'visible' : 'hidden';
+    if(!visible) return;
+  } else {
+    _askPop.style.visibility='visible';
+  }
+
+  var w=_askPop.offsetWidth||400, ht=_askPop.offsetHeight||260, gap=10;
+  var left=r.right-w;
   left=Math.max(10, Math.min(left, window.innerWidth-w-14));
+
+  var top=r.bottom+gap, flip=false;
+  if(top+ht > window.innerHeight-10){
+    var above=r.top-gap-ht;
+    if(above>10){ top=above; flip=true; }
+    else top=Math.max(10, window.innerHeight-ht-10);
+  }
   _askPop.style.left=left+'px';
-  _askPop.style.top=(r.bottom+window.scrollY+10)+'px';
+  _askPop.style.top=top+'px';
+  _askPop.classList.toggle('flip', flip);
+
+  var arrow=_askPop.querySelector('.ask-arrow');
+  if(arrow){
+    var ax=Math.min(Math.max(r.left+r.width/2-left-7, 10), w-24);
+    arrow.style.left=ax+'px';
+  }
 }
+// re-anchor on scroll from ANY container (capture:true), and on resize
+window.addEventListener('scroll', function(){ if(_askBtn) positionAskPop(_askBtn); }, true);
+window.addEventListener('resize', function(){ if(_askBtn) positionAskPop(_askBtn); });
 
 function closeAskPop(){
   if(_askPop) _askPop.classList.remove('show');
@@ -4162,7 +4207,6 @@ document.addEventListener('mousedown', function(e){
   closeAskPop();
 });
 document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeAskPop(); });
-window.addEventListener('resize', function(){ if(_askBtn) positionAskPop(_askBtn); });
 
 // Numbered map of a block, marking exactly which line was inserted or rewritten.
 // Rendered under the field so it never interferes with editing or error highlights.
@@ -4639,4 +4683,133 @@ function formatToggleBtn(blockId){
     var y=window.scrollY; buildEditor(); window.scrollTo(0,y);
   });
   return b;
+}
+
+// ============================================================
+// RESIZABLE PREVIEW SPLITTER
+// Width lives in a CSS variable on the active grid, persisted per browser.
+// pvGrid() is deliberately NOT a comma-separated selector list \u2014 that
+// approach picks whichever matching element comes first in raw DOM order,
+// not whichever view is actually visible, and silently sizes the wrong
+// (hidden) grid while the real one falls back to a stale rule.
+// ============================================================
+var PV_MIN_CENTRE = 360;   // the editor never shrinks below this
+var PV_MIN_WIDTH  = 300;   // below this the preview snaps shut
+var PV_DEFAULT    = 470;
+var _pvLast = PV_DEFAULT;
+
+function pvGrid(){
+  var pro = document.getElementById('view-pro');
+  if(pro && pro.classList.contains('on')) return pro.querySelector('.container');
+  var fr = document.getElementById('view-fresher');
+  if(fr && fr.classList.contains('on')) return fr.querySelector('.fr-grid') || fr.querySelector('.container');
+  return null;   // neither builder view is open — nothing to size yet
+}
+
+function pvMaxWidth(grid){
+  var w = grid.clientWidth;
+  return Math.max(0, w - 180 - 10 - 28 - PV_MIN_CENTRE);
+}
+
+function setPreviewWidth(px, persist){
+  var grid = pvGrid(); if(!grid) return;
+  var max = pvMaxWidth(grid);
+  px = Math.max(0, Math.min(px, max));
+  if(px > 0 && px < PV_MIN_WIDTH) px = (px < PV_MIN_WIDTH/2) ? 0 : PV_MIN_WIDTH;
+
+  grid.style.setProperty('--pvw', px+'px');
+  // only touch the preview belonging to THIS grid, not every .pv-live in the DOM
+  var pv = grid.querySelector('.pv-live') || grid.parentElement.querySelector('.pv-live');
+  if(pv) pv.style.display = px===0 ? 'none' : '';
+  if(px > 0) _pvLast = px;
+
+  var tag = grid.parentElement ? grid.parentElement.querySelector('.pv-widthtag') : null;
+  if(!tag) tag = document.querySelector('.pv-widthtag');
+  if(tag){
+    var pct = max>0 ? Math.round((px/max)*100) : 0;
+    tag.textContent = px===0 ? 'preview hidden' : 'preview '+Math.max(1,Math.min(100,pct))+'%';
+  }
+  var cb = document.querySelector('.pv-collapse');
+  if(cb) cb.textContent = px===0 ? '\u21e4' : '\u21e5';
+
+  if(persist){ try{ localStorage.setItem('reeve_pvw', String(px)); }catch(e){} }
+  if(typeof _askBtn !== 'undefined' && _askBtn) positionAskPop(_askBtn);   // popover follows the reflow
+}
+
+function togglePreviewPane(){
+  var grid=pvGrid(); if(!grid) return;
+  var cur=parseInt(getComputedStyle(grid).getPropertyValue('--pvw'),10)||0;
+  setPreviewWidth(cur===0 ? (_pvLast||PV_DEFAULT) : 0, true);
+}
+
+function initPreviewSplitter(){
+  var grid=pvGrid(); if(!grid) return;
+
+  var saved=null;
+  try{ saved=parseInt(localStorage.getItem('reeve_pvw'),10); }catch(e){}
+  setPreviewWidth((!isNaN(saved) && saved!==null) ? saved : PV_DEFAULT, false);
+
+  document.querySelectorAll('.pv-split').forEach(function(sp){
+    if(sp._wired) return;
+    sp._wired = true;
+    var dragging=false;
+
+    sp.addEventListener('pointerdown', function(e){
+      dragging=true; sp.classList.add('drag');
+      sp.setPointerCapture(e.pointerId);
+      document.body.style.userSelect='none';
+      document.body.style.cursor='col-resize';
+    });
+    sp.addEventListener('pointermove', function(e){
+      if(!dragging) return;
+      var g=pvGrid(); if(!g) return;
+      var right=g.getBoundingClientRect().right;
+      setPreviewWidth(right - e.clientX - 5, false);
+    });
+    function stopDrag(e){
+      if(!dragging) return;
+      dragging=false; sp.classList.remove('drag');
+      try{ sp.releasePointerCapture(e.pointerId); }catch(err){}
+      document.body.style.userSelect='';
+      document.body.style.cursor='';
+      var g=pvGrid();
+      if(g) setPreviewWidth(parseInt(getComputedStyle(g).getPropertyValue('--pvw'),10)||0, true);
+    }
+    sp.addEventListener('pointerup', stopDrag);
+    sp.addEventListener('pointercancel', stopDrag);
+    sp.addEventListener('dblclick', function(){ setPreviewWidth(PV_DEFAULT, true); });
+
+    sp.setAttribute('tabindex','0');
+    sp.setAttribute('role','separator');
+    sp.setAttribute('aria-label','Resize preview panel');
+    sp.addEventListener('keydown', function(e){
+      var g=pvGrid(); if(!g) return;
+      var cur=parseInt(getComputedStyle(g).getPropertyValue('--pvw'),10)||0;
+      if(e.key==='ArrowLeft'){ e.preventDefault(); setPreviewWidth(cur+24, true); }
+      if(e.key==='ArrowRight'){ e.preventDefault(); setPreviewWidth(cur-24, true); }
+      if(e.key==='Home'){ e.preventDefault(); setPreviewWidth(PV_DEFAULT, true); }
+    });
+  });
+
+  if(!initPreviewSplitter._resizeHooked){
+    initPreviewSplitter._resizeHooked = true;
+    window.addEventListener('resize', function(){
+      var g=pvGrid(); if(!g) return;
+      setPreviewWidth(parseInt(getComputedStyle(g).getPropertyValue('--pvw'),10)||PV_DEFAULT, false);
+    });
+  }
+}
+
+// add the width tag + collapse button into the preview header, once
+function decoratePreviewHeader(){
+  document.querySelectorAll('.pv-live').forEach(function(pane){
+    var head = pane.querySelector('.pv-live-head');
+    if(!head || head.querySelector('.pv-collapse')) return;
+    var wrap = el('span',{style:'margin-left:auto;display:flex;align-items:center;gap:5px'});
+    wrap.appendChild(el('span',{class:'pv-widthtag'},''));
+    var btn = el('button',{class:'pv-panebtn pv-collapse',type:'button',title:'Collapse / expand preview'},'\u21e5');
+    btn.addEventListener('click', function(e){ e.stopPropagation(); togglePreviewPane(); });
+    wrap.appendChild(btn);
+    head.appendChild(wrap);
+  });
 }

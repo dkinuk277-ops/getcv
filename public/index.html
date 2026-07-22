@@ -304,11 +304,14 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 #view-pro.on .container, #view-fresher.on .fr-grid, #view-fresher.on .container{
   flex:1; min-height:0; margin-top:12px; gap:14px;
 }
-#view-pro.on .container{ grid-template-columns:180px minmax(0,1fr) 470px; }
-#view-fresher.on .fr-grid{ grid-template-columns:180px minmax(0,1fr) 470px; }
+#view-pro.on .container{ grid-template-columns:180px minmax(0,1fr) 10px var(--pvw,470px); }
+#view-fresher.on .fr-grid{ grid-template-columns:180px minmax(0,1fr) 10px var(--pvw,470px); }
 @media(max-width:1280px){
   #view-pro.on .container{ grid-template-columns:180px 1fr; }
   #view-fresher.on .fr-grid{ grid-template-columns:180px 1fr; }
+  /* no room to split on narrow screens */
+  .pv-split{ display:none; }
+  #view-pro.on .pv-live, #view-fresher.on .pv-live{ display:none; }
 }
 /* zone 1: centre editor scrolls */
 #view-pro.on .container > main, #view-fresher.on .fr-grid > main, #view-fresher.on .container > main{
@@ -330,8 +333,11 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 
 /* ---------- Live split-screen preview ---------- */
 #view-pro,#view-fresher{max-width:1560px}
-#view-pro .container{grid-template-columns:200px minmax(0,1fr) 470px}
-.fr-grid{display:grid;grid-template-columns:200px minmax(0,1fr) 470px;gap:22px}
+.fr-grid{display:grid;gap:22px}
+/* NOTE: grid-template-columns for .container / .fr-grid is defined ONCE,
+   above, in the #view-pro.on / #view-fresher.on rules. A second unscoped
+   rule setting the same property on the same element caused an intermittent
+   layout bug before \u2014 do not reintroduce it. */
 .pv-live{position:sticky;top:128px;align-self:start;background:var(--card);border:1px solid var(--line);
   border-radius:12px;overflow:hidden;display:flex;flex-direction:column;
   max-height:calc(100vh - 148px);box-shadow:var(--shadow)}
@@ -345,7 +351,6 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .pv-live-inner .gcv-page{margin:0 auto}
 .pv-live-empty{background:var(--card);border:1.5px dashed var(--line);border-radius:10px;
   padding:36px 20px;text-align:center;font-size:13px;color:var(--ink-soft);zoom:1.6}
-@media(max-width:1280px){.pv-live{display:none}#view-pro .container{grid-template-columns:200px 1fr}.fr-grid{grid-template-columns:200px 1fr}}
 @media(max-width:860px){.fr-grid{grid-template-columns:1fr}}
 
 /* ---------- Preview: inline template strip ---------- */
@@ -1253,12 +1258,13 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   padding:3px 10px;font-size:9.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap}
 .sec-askai:hover{background:#F7E3C6}
 .sec-askai.open{background:#B45309;color:#fff;border-color:#B45309}
-.ask-pop{position:absolute;z-index:400;width:390px;max-width:calc(100vw - 24px);background:#fff;
+.ask-pop{position:fixed;z-index:600;width:390px;max-width:calc(100vw - 24px);background:#fff;
   border:1.5px solid #F0D3A8;border-radius:11px;box-shadow:0 12px 34px rgba(26,32,40,.22);padding:12px;display:none}
 .ask-pop.show{display:block;animation:askIn .18s ease-out}
 @keyframes askIn{from{opacity:0;transform:translateY(-6px) scale(.985)}to{opacity:1;transform:none}}
-.ask-pop::before{content:'';position:absolute;top:-8px;right:22px;width:14px;height:14px;background:#fff;
+.ask-arrow{position:absolute;top:-7.5px;width:13px;height:13px;background:#fff;
   border-left:1.5px solid #F0D3A8;border-top:1.5px solid #F0D3A8;transform:rotate(45deg)}
+.ask-pop.flip .ask-arrow{top:auto;bottom:-7.5px;transform:rotate(225deg)}
 .ask-pop-h{display:flex;align-items:center;gap:6px;font-size:9px;font-weight:800;color:#B45309;
   text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
 .ask-x{margin-left:auto;font-size:12px;color:#B9A88E;cursor:pointer;font-weight:400}
@@ -1462,6 +1468,21 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 .fmt-add button{background:#fff;border:1px dashed #C7CDC5;border-radius:6px;padding:4px 9px;font-family:inherit;
   font-size:9px;font-weight:700;color:var(--ink-soft);cursor:pointer}
 .fmt-add button:hover{border-color:var(--main);color:#0B8A55;background:#F0FDF9}
+
+/* ---------- Resizable preview splitter ---------- */
+.pv-split{width:10px;flex-shrink:0;cursor:col-resize;position:relative;display:flex;align-items:center;
+  justify-content:center;background:transparent;touch-action:none;z-index:20}
+.pv-split::before{content:'';width:3px;height:100%;background:rgba(11,74,49,.16);border-radius:2px;transition:background .15s}
+.pv-split:hover::before,.pv-split.drag::before{background:var(--main,#0FA968)}
+.pv-split .pv-grip{position:absolute;width:18px;height:44px;border-radius:5px;background:#fff;border:1px solid #C9D6CE;
+  box-shadow:0 1px 4px rgba(0,0,0,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.pv-split .pv-grip i{width:2px;height:2px;border-radius:50%;background:#8FA398;display:block}
+.pv-split:hover .pv-grip{border-color:var(--main,#0FA968)}
+.pv-widthtag{font-size:8.5px;font-weight:800;color:var(--ink-soft,#4A5B76);background:#fff;border:1px solid #D6DED8;
+  border-radius:5px;padding:2px 7px}
+.pv-panebtn{background:#fff;border:1px solid #D6DED8;border-radius:5px;width:22px;height:22px;font-family:inherit;
+  font-size:10px;font-weight:800;cursor:pointer;color:var(--ink-soft,#4A5B76);display:inline-flex;align-items:center;justify-content:center}
+.pv-panebtn:hover{border-color:var(--main,#0FA968);color:#0B8A55}
 
 /* Verification Modal */
 .ai-verify-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:500;backdrop-filter:blur(2px)}
@@ -1867,7 +1888,9 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <!-- Shared editor slot -->
         <div id="editorSlotPro"></div>
       </main>
-      <aside class="pv-live">
+      <div class="pv-split" title="Drag to resize · double-click to reset"><span class="pv-grip"><i></i><i></i><i></i></span></div>
+      <div class="pv-split" title="Drag to resize · double-click to reset"><span class="pv-grip"><i></i><i></i><i></i></span></div>
+    <aside class="pv-live">
         <div class="pv-live-head">
           <span><b>Live Preview</b> <span class="pv-live-tpl" data-livetpl></span></span>
           <span class="pv-live-btns">
