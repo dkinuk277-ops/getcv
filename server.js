@@ -700,6 +700,130 @@ ${resumeText}`;
 
 // ---- 2. Enhance a section of text --------------------------
 // ---- Quality fix: AI-repair a single flagged line/word --------
+// ---- AI Builder: command-driven fixes, unit by unit --------
+// A "unit" is one addressable piece of text: the summary, one job's
+// description, one skill, one accomplishment. Fixing unit-by-unit means the
+// resume's array shapes can never be mangled by a bad split.
+app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
+  try {
+    const { command, resume } = req.body;
+    if (!requireKey(res)) return;
+    if (!command || !resume) return res.status(400).json({ error: 'Missing command or resume' });
+
+    const cmd = String(command).toLowerCase();
+
+    // Which error types is the user asking about?
+    const all    = /\bfix all\b|\ball issues\b|\beverything\b/.test(cmd);
+    const wantV  = all || /vocab|wording|weak word|active voice/.test(cmd);
+    const wantG  = all || /grammar|spell|punctuat|tense|full stop|typo/.test(cmd);
+    const wantC  = all || /context|metric|number|measurab|impact/.test(cmd);
+    if (!wantV && !wantG && !wantC) {
+      return res.json({ success: true, units: [], note: 'no-fix-intent' });
+    }
+
+    // Which sections? Default = all; narrow if the user named one.
+    let secs = ['summary', 'experience', 'skills', 'accomplishments'];
+    const named = secs.filter(s => cmd.includes(s === 'summary' ? 'summary' : s));
+    if (cmd.includes('profile')) named.push('summary');
+    if (named.length) secs = [...new Set(named)];
+
+    // Build the unit list
+    const units = [];
+    if (secs.includes('summary') && resume.summary && String(resume.summary).trim()) {
+      units.push({ section: 'summary', index: -1, text: String(resume.summary) });
+    }
+    if (secs.includes('experience') && Array.isArray(resume.experience)) {
+      resume.experience.forEach((job, i) => {
+        if (job && job.desc && String(job.desc).trim()) {
+          units.push({ section: 'experience', index: i, text: String(job.desc),
+                       label: job.title || ('Job ' + (i + 1)) });
+        }
+      });
+    }
+    if (secs.includes('skills') && Array.isArray(resume.skills) && resume.skills.length) {
+      units.push({ section: 'skills', index: -1, text: resume.skills.join('\n') });
+    }
+    if (secs.includes('accomplishments') && Array.isArray(resume.accomplishments) && resume.accomplishments.length) {
+      units.push({ section: 'accomplishments', index: -1, text: resume.accomplishments.join('\n') });
+    }
+    if (!units.length) return res.json({ success: true, units: [] });
+
+    const asks = [];
+    if (wantV) asks.push('Replace weak or passive wording with strong active resume verbs (e.g. "responsible for" becomes "Led"/"Owned"/"Delivered").');
+    if (wantG) asks.push('Fix grammar, spelling, punctuation and spacing. Every line must end with a full stop. Use past tense consistently throughout.');
+    if (wantC) asks.push('Where a line states no measurable impact, append a metric using BRACKETED PLACEHOLDERS the candidate must fill in, e.g. "[X] staff", "[Y]%", "[Z] audits". NEVER invent a specific number.');
+
+    const rules = [
+      'Keep the SAME NUMBER OF LINES as the input. One line in, one line out.',
+      'Never invent employers, dates, technologies or achievements.',
+      'Keep the candidate\'s original language (do not translate).',
+      'Return ONLY the corrected text. No preamble, no commentary, no bullet characters that were not already there.'
+    ];
+
+    const out = [];
+    for (const u of units) {
+      const prompt =
+        'You are correcting one section of a resume.\n\nDO THIS:\n' +
+        asks.map(a => '- ' + a).join('\n') +
+        '\n\nRULES:\n' + rules.map(r => '- ' + r).join('\n') +
+        '\n\nTEXT:\n' + u.text.slice(0, 3000);
+
+      let fixed;
+      try {
+        fixed = (await claudeText(prompt, 1200) || '').trim();
+      } catch (e) {
+        console.error('ai-builder unit failed:', u.section, e.message);
+        out.push({ ...u, fixed: u.text, unchanged: true, error: 'AI call failed' });
+        continue;
+      }
+
+      // Guard: if the model returned nothing usable, or dropped more than half
+      // the lines, keep the original rather than damaging the resume.
+      const inLines  = u.text.split('\n').filter(l => l.trim()).length;
+      const outLines = fixed.split('\n').filter(l => l.trim()).length;
+      if (!fixed || outLines < Math.ceil(inLines / 2)) {
+        out.push({ ...u, fixed: u.text, unchanged: true, error: 'rejected unsafe rewrite' });
+      } else {
+        out.push({ ...u, fixed, unchanged: fixed === u.text });
+      }
+    }
+
+    const placeholders = out.reduce((n, u) => n + ((u.fixed.match(/\[[A-Z]\]/g) || []).length), 0);
+    res.json({ success: true, units: out, placeholders });
+  } catch (err) {
+    console.error('ai-builder error:', err.message);
+    res.status(500).json({ error: err.message || 'Build failed' });
+  }
+});
+
+// ---- Ask AI about one section: free-text request scoped to a block ----
+app.post('/api/ask-section', aiLimiter, requireAuth, async (req, res) => {
+  try {
+    const { request, text, scope } = req.body;
+    if (!requireKey(res)) return;
+    if (!request || !String(request).trim()) return res.status(400).json({ error: 'No request provided' });
+
+    const prompt =
+      'You are editing ONE section of a resume. The user has asked for a specific change.\n\n' +
+      'USER REQUEST:\n' + String(request).slice(0, 800) + '\n\n' +
+      'CURRENT ' + (scope ? String(scope).toUpperCase().slice(0, 60) : 'SECTION') + ' TEXT:\n' +
+      String(text || '').slice(0, 3000) + '\n\n' +
+      'RULES:\n' +
+      '- Do exactly what was asked, nothing more. Leave untouched anything the request did not mention.\n' +
+      '- Never invent employers, dates, qualifications or achievements.\n' +
+      '- If a metric is needed and you cannot know it, use a bracketed placeholder such as [X] or [Y].\n' +
+      '- Keep the candidate\'s original language (do not translate).\n' +
+      '- Return ONLY the full updated section text. No preamble, no commentary, no quotes around it.';
+
+    const out = (await claudeText(prompt, 1200) || '').trim();
+    if (!out) return res.status(502).json({ error: 'Empty response — try rephrasing' });
+    res.json({ success: true, text: out });
+  } catch (err) {
+    console.error('ask-section error:', err.message);
+    res.status(500).json({ error: err.message || 'Request failed' });
+  }
+});
+
 app.post('/api/quality-fix', aiLimiter, requireAuth, async (req, res) => {
   try {
     const { text, errorType, errorDesc } = req.body;
