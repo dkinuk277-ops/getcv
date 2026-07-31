@@ -3,7 +3,7 @@
 // Endpoints:
 //   POST /api/parse-resume   (multipart file: PDF or DOCX)
 //   POST /api/enhance        (JSON: { text, context })
-//   POST /api/fresher-build  (JSON: { name, field, education, skills })
+//   POST /api/fresher-build  (JSON: { name, field, institution, course, specialization, year, courses, projects, skills })
 //   GET  /api/health
 // Serves frontend from /public
 // ============================================================
@@ -877,17 +877,29 @@ ${text.slice(0, 4000)}`;
 // ---- 3. Build a fresher resume from scratch -----------------
 app.post('/api/fresher-build', aiLimiter, requireAuth, async (req, res) => {
   try {
-    const { name, field, education, skills } = req.body;
+    const { name, field, education, institution, course, specialization, year, courses, projects, skills } = req.body;
     if (!requireKey(res)) return;
     if (!field) return res.status(400).json({ error: 'Field/domain is required' });
+
+    // Support the older single free-text "education" field as a fallback
+    // for callers that haven't moved to the structured fields yet.
+    const degreeLine = course || education || 'not specified';
+    const hasOwnProjects = projects && projects.trim();
 
     const prompt = `Create a starter resume for a fresher (no work experience) in JSON.
 Candidate name: ${name || 'Candidate'}
 Target field: ${field}
-Education: ${education || 'not specified'}
+Degree/course: ${degreeLine}
+Specialization: ${specialization || 'not specified'}
+Institution: ${institution || 'not specified'}
+Year graduated: ${year || 'not specified'}
+Key courses/subjects: ${courses || 'suggest relevant coursework for this field'}
 Known skills: ${skills || 'suggest relevant beginner skills'}
+${hasOwnProjects ? `Candidate's own projects (use these, do not replace them): ${projects}` : 'Suggest 2 sample academic/personal projects appropriate for this field.'}
 
-Write a strong summary, suggest 6-10 relevant skills, and 2 sample academic/personal projects appropriate for this field. Do not invent work experience.
+Write a strong summary tailored to the target field and education above. Suggest 6-10 relevant skills (include any known skills verbatim, then add complementary ones).
+${hasOwnProjects ? 'Write a short, specific description for each of the candidate\u2019s own projects listed above — do not invent additional projects.' : ''}
+Do not invent work experience. Do not invent an institution, year, or specialization if not specified — leave those fields blank rather than guessing.
 Respond ONLY with JSON matching:
 {
   "personal": { "name": "", "email": "", "phone": "", "location": "", "linkedin": "", "website": "" },
