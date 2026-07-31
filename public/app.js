@@ -348,29 +348,167 @@ function countSections(){
 }
 
 // ============================================================
-// Fresher flow
+// Fresher flow — rolling one-question wizard
 // ============================================================
+const FR_QUESTIONS = [
+  {key:'name', title:'Your name', sub:'Basics first.', placeholder:'e.g. Priya Sharma', required:false},
+  {key:'field', title:'Target field', sub:'What role or field are you aiming for?', placeholder:'e.g. Cyber security, Data analysis', required:true},
+  {key:'institution', title:'College or university', sub:'Where did you study?', placeholder:'e.g. VTU, Bengaluru', required:false},
+  {key:'course', title:'Course or degree', sub:'Your degree name.', placeholder:'e.g. BSc Computer Science', required:false},
+  {key:'specialization', title:'Specialization', sub:'Major or focus area, if any.', placeholder:'e.g. Artificial Intelligence', required:false},
+  {key:'year', title:'Year graduated', sub:'When did you, or will you, graduate?', placeholder:'e.g. 2025', required:false},
+  {key:'courses', title:'Key courses', sub:'Subjects worth highlighting, comma separated.', placeholder:'e.g. Data Structures, DBMS, OS', required:false},
+  {key:'projects', title:'Projects worked on', sub:'List 1 to 3 projects, comma separated.', placeholder:'e.g. Chatbot using Python, Portfolio website', required:false},
+  {key:'skills', title:'Skills you have', sub:'Tools, languages, frameworks.', placeholder:'e.g. Python, Excel, SQL', required:false}
+];
+let frAns = {};
+let frIdx = 0;
+
+function frSplitList(s){
+  return (s||'').split(',').map(x=>x.trim()).filter(Boolean);
+}
+
+function frRenderDots(){
+  const dots = $('#frDots');
+  dots.innerHTML = '';
+  FR_QUESTIONS.forEach((q,i)=>{
+    const d = el('i',{});
+    if(i < frIdx) d.classList.add('done');
+    else if(i === frIdx) d.classList.add('on');
+    dots.appendChild(d);
+  });
+}
+
+function frRenderQuestion(){
+  const q = FR_QUESTIONS[frIdx];
+  $('#frStepLabel').textContent = 'Question ' + (frIdx+1) + ' of ' + FR_QUESTIONS.length;
+  $('#frQTitle').textContent = q.title;
+  $('#frQSub').textContent = q.sub;
+  const input = $('#frInput');
+  input.placeholder = q.placeholder;
+  input.value = frAns[q.key] || '';
+  input.style.borderColor = '';
+  $('#frErr').textContent = '';
+  $('#frBack').style.visibility = frIdx === 0 ? 'hidden' : 'visible';
+  $('#frNext').textContent = frIdx === FR_QUESTIONS.length - 1 ? 'Review' : 'Continue';
+  $('#frSkipNote').textContent = q.required ? '' : 'Optional — you can skip this one.';
+  frRenderDots();
+  input.focus();
+}
+
+function frGoNext(){
+  const q = FR_QUESTIONS[frIdx];
+  const val = $('#frInput').value.trim();
+  if(q.required && !val){
+    $('#frInput').style.borderColor = '#B3261E';
+    $('#frErr').textContent = 'This one is needed to continue.';
+    return;
+  }
+  frAns[q.key] = val;
+  if(frIdx < FR_QUESTIONS.length - 1){
+    frIdx++;
+    frRenderQuestion();
+  } else {
+    frShowReview();
+  }
+}
+
+function frGoBack(){
+  if(frIdx === 0) return;
+  frAns[FR_QUESTIONS[frIdx].key] = $('#frInput').value.trim();
+  frIdx--;
+  frRenderQuestion();
+}
+
+$('#frInput').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); frGoNext(); } });
+$('#frNext').addEventListener('click', frGoNext);
+$('#frBack').addEventListener('click', frGoBack);
+
+function frShowReview(){
+  $('#frWizard').classList.add('hidden');
+  $('#frReview').style.display = '';
+  const a = frAns;
+  const lines = [];
+  lines.push(a.name || 'Candidate');
+  lines.push('Target role: ' + (a.field || '—'));
+  lines.push('');
+  lines.push('EDUCATION');
+  lines.push((a.course || '—') + (a.specialization ? ', ' + a.specialization : ''));
+  lines.push((a.institution || '—') + (a.year ? ' · ' + a.year : ''));
+  if(a.courses) lines.push('Key courses: ' + a.courses);
+  lines.push('');
+  if(a.projects){
+    lines.push('PROJECTS');
+    frSplitList(a.projects).forEach(p => lines.push('- ' + p));
+    lines.push('');
+  }
+  if(a.skills) lines.push('SKILLS: ' + a.skills);
+  $('#frReviewConsole').textContent = lines.join('\n');
+}
+
+// Reset the wizard back to question 1 with a blank slate — called whenever
+// the fresher start screen becomes visible again (refresh, logout, etc.)
+function frReset(){
+  frAns = {}; frIdx = 0;
+  if($('#frReview')) $('#frReview').style.display = 'none';
+  if($('#frWizard')) $('#frWizard').classList.remove('hidden');
+  if($('#frInput')) frRenderQuestion();
+}
+
+$('#frEdit').addEventListener('click', ()=>{
+  $('#frReview').style.display = 'none';
+  $('#frWizard').classList.remove('hidden');
+  frIdx = 0;
+  frRenderQuestion();
+});
+
 $('#btnFresher').addEventListener('click', async ()=>{
-  const field = $('#frField').value.trim();
-  if(!field) return toast('Please enter your target field');
   const btn = $('#btnFresher');
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Building…';
   try{
     const out = await api('/api/fresher-build', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        name: $('#frName').value.trim(),
-        field, education: $('#frEdu').value.trim(), skills: $('#frSkills').value.trim()
+        name: frAns.name || '', field: frAns.field || '',
+        institution: frAns.institution || '', course: frAns.course || '',
+        specialization: frAns.specialization || '', year: frAns.year || '',
+        courses: frAns.courses || '', projects: frAns.projects || '', skills: frAns.skills || ''
       })
     });
     R = normalize(out.data);
-    if($('#frName').value.trim()) R.personal.name = $('#frName').value.trim();
+    if(frAns.name) R.personal.name = frAns.name;
+
+    // The graduate's own education details take priority over anything the AI guessed
+    if(frAns.institution || frAns.course || frAns.year || frAns.specialization){
+      const existing = R.education[0] || {};
+      const degree = frAns.course + (frAns.specialization ? ' (' + frAns.specialization + ')' : '');
+      const edu = {
+        degree: degree.trim() || existing.degree || '',
+        institution: frAns.institution || existing.institution || '',
+        year: frAns.year || existing.year || '',
+        grade: existing.grade || ''
+      };
+      R.education = [edu].concat(R.education.slice(1));
+    }
+
+    // Key courses/subjects the graduate named go into the Courses section
+    if(frAns.courses){
+      R.courses = frSplitList(frAns.courses).map(name => ({name, provider:'', year: frAns.year || ''}));
+    }
+
+    // Real projects the graduate names take priority over AI-suggested placeholders
+    if(frAns.projects){
+      R.projects = frSplitList(frAns.projects).map(name => ({name, desc:''}));
+    }
+
     moveEditorTo('fresher');
     buildEditor();
     toast('Starter resume created — fill in your details');
   }catch(err){ toast('Build failed: ' + err.message, 6000); }
-  btn.disabled = false; btn.textContent = 'Build my starter resume';
+  btn.disabled = false; btn.innerHTML = '✦ Build my starter resume';
 });
+
+frRenderQuestion();
 
 // ============================================================
 // Editor rendering
@@ -2810,6 +2948,7 @@ function clearBuilder(){
   $('#addSectionCard').classList.add('hidden');
   $('#startArea').classList.remove('hidden');
   $('#fresherStart').classList.remove('hidden');
+  frReset();
   resetProgress();
   renderRail();
   renderLivePreview();
@@ -2926,6 +3065,7 @@ $('#btnConfirmDelete').addEventListener('click', async ()=>{
     if($('#editor')) $('#editor').classList.add('hidden');
     if($('#startArea')) $('#startArea').classList.remove('hidden');
     if($('#fresherStart')) $('#fresherStart').classList.remove('hidden');
+    frReset();
     showView('landing');
     initLanding();
     toast('Your account has been permanently deleted.', 6000);

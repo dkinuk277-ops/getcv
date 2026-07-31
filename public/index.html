@@ -331,6 +331,22 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
   border:1px solid rgba(91,200,245,.25);
 }
 
+/* ---------- Fresher onboarding wizard ---------- */
+.fr-wizard-dots{display:flex;gap:6px;margin-bottom:16px}
+.fr-wizard-dots i{height:4px;flex:1;border-radius:2px;background:var(--line);display:block}
+.fr-wizard-dots i.done{background:var(--accent)}
+.fr-wizard-dots i.on{background:var(--accent-soft);box-shadow:inset 0 0 0 1.5px var(--accent)}
+.fr-wizard-step{font-size:11px;letter-spacing:.06em;color:var(--ink-soft);text-transform:uppercase;font-weight:700;margin:0 0 6px}
+.fr-wizard-q{font-size:20px;font-weight:800;color:var(--ink);margin:0 0 4px}
+.fr-wizard-sub{font-size:13px;color:var(--ink-soft);margin:0 0 16px}
+.fr-wizard-err{font-size:12px;color:#B3261E;margin:6px 0 0;min-height:14px}
+.fr-wizard-skip{font-size:12px;color:var(--ink-soft);margin:12px 0 0;text-align:center}
+.fr-wizard-actions{display:flex;gap:10px;margin-top:4px}
+.fr-wizard-actions .btn-dline{flex:0 0 auto}
+.fr-wizard-actions .btn-primary{flex:1;justify-content:center}
+.fr-review-console{background:#0F1A14;border-radius:10px;padding:16px 18px;font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-size:12.5px;line-height:1.7;color:#C9E8D4;white-space:pre-wrap;max-height:360px;overflow-y:auto;margin-bottom:16px}
+
 /* ---------- Live split-screen preview ---------- */
 #view-pro,#view-fresher{max-width:1560px}
 .fr-grid{display:grid;gap:22px}
@@ -1930,15 +1946,28 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
     </nav>
     <main>
     <div id="fresherStart">
-      <div class="card" style="max-width:640px;margin:0 auto">
+      <div class="card" id="frWizard" style="max-width:640px;margin:0 auto">
         <h2>Tell us about yourself</h2>
-        <div class="grid2">
-          <div class="field"><label for="frName">Your name</label><input id="frName" placeholder="e.g. Priya Sharma"></div>
-          <div class="field"><label for="frField">Target field *</label><input id="frField" placeholder="e.g. Cyber security, Data analysis"></div>
-          <div class="field"><label for="frEdu">Education</label><input id="frEdu" placeholder="e.g. BSc Computer Science, 2025"></div>
-          <div class="field"><label for="frSkills">Skills you have</label><input id="frSkills" placeholder="e.g. Python, Excel (optional)"></div>
+        <div class="fr-wizard-dots" id="frDots"></div>
+        <p class="fr-wizard-step" id="frStepLabel">Question 1 of 9</p>
+        <p class="fr-wizard-q" id="frQTitle">Your name</p>
+        <p class="fr-wizard-sub" id="frQSub">Basics first.</p>
+        <div class="field"><input id="frInput" placeholder="e.g. Priya Sharma"></div>
+        <p class="fr-wizard-err" id="frErr"></p>
+        <div class="fr-wizard-actions">
+          <button class="btn btn-dline" id="frBack" type="button">← Back</button>
+          <button class="btn btn-primary" id="frNext" type="button">Continue</button>
         </div>
-        <button class="btn btn-primary" id="btnFresher">✦ Build my starter resume</button>
+        <p class="fr-wizard-skip" id="frSkipNote"></p>
+      </div>
+
+      <div class="card" id="frReview" style="max-width:640px;margin:0 auto;display:none">
+        <h2>Review your details</h2>
+        <div class="fr-review-console" id="frReviewConsole"></div>
+        <div class="fr-wizard-actions">
+          <button class="btn btn-dline" id="frEdit" type="button">Edit answers</button>
+          <button class="btn btn-primary" id="btnFresher" type="button">✦ Build my starter resume</button>
+        </div>
       </div>
     </div>
     <!-- Shared editor slot -->
