@@ -3738,16 +3738,28 @@ function runAIBuilder(){
   .then(function(r){return r.json();})
   .then(function(data){
     if(!data.success) throw new Error(data.error||'Builder failed');
+    if(data.mode==='add' || data.mode==='delete' || data.mode==='update'){
+      applyStructuralChange(data);
+      return;
+    }
     if(!data.units || !data.units.length){
       document.getElementById('aiProgSpinner').style.display='none';
       document.getElementById('aiProgTitle').textContent =
         data.note==='no-fix-intent'
-          ? '\u2139 Try: "fix all issues", "fix grammar in summary", "fix vocabulary in experience"'
-          : '\u2139 Nothing to fix for that request.';
+          ? '\u2139 Try: "fix all issues", "fix grammar in summary", "write more about risk and data under experience"'
+          : data.note==='no-target-content'
+            ? '\u2139 That section is empty — add some content first.'
+            : data.note==='no-target-section'
+              ? '\u2139 Which section? Try "add a skill: Python" or "delete my last job".'
+              : data.note==='no-item-detected'
+                ? '\u2139 I couldn\u2019t tell what to add — try being more specific, e.g. "add skill: Kubernetes".'
+                : (data.note==='ambiguous-delete' || data.note==='ambiguous-update')
+                  ? '\u2139 Not sure which one you mean — try naming it, or say "last" / "first".'
+                  : '\u2139 Nothing to fix for that request.';
       btn.disabled=false; btn.textContent='Run';
       return;
     }
-    applyAIUnits(data.units, data.placeholders||0);
+    applyAIUnits(data.units, data.placeholders||0, data.mode, data.topic);
   })
   .catch(function(err){
     console.error('AI Builder error:',err);
@@ -3777,7 +3789,7 @@ function writeAIUnit(u){
   return false;
 }
 
-function applyAIUnits(units, placeholders){
+function applyAIUnits(units, placeholders, mode, topic){
   var fill=document.getElementById('aiProgFill');
   var title=document.getElementById('aiProgTitle');
   var log=document.getElementById('aiProgSections');
@@ -3818,6 +3830,25 @@ function applyAIUnits(units, placeholders){
     buildEditor();
     window.scrollTo(0,scrollY);
 
+    if(mode === 'expand'){
+      units.forEach(function(u){
+        if(!u.unchanged && u.fixed){
+          logLine('Added new content to <b>'+esc(u.label||u.section)+'</b>');
+        }
+      });
+      if(skipped>0) logLine(skipped+' section'+(skipped>1?'s were':' was')+' left unchanged');
+
+      title.innerHTML = applied>0
+        ? '\u2713 Complete \u2014 added content about "'+esc(topic||'')+'" to '+applied+' section'+(applied>1?'s':'')
+        : '\u2139 No new content was added \u2014 try rephrasing your request';
+
+      var noteEl=document.getElementById('aiPlaceholderNote');
+      if(noteEl){
+        noteEl.innerHTML = placeholders
+          ? '\u26A0\uFE0F <b>'+placeholders+' metric placeholder'+(placeholders===1?'':'s')+'</b> were inserted as <b>[X]</b> / <b>[Y]</b>. The AI cannot know your real numbers \u2014 replace every bracket before you export.'
+          : 'No metric placeholders were inserted.';
+      }
+    } else {
     // Report by what ACTUALLY changed, category by category
     var after = (R.quality_score && R.quality_score.errors) ? R.quality_score.errors : [];
     var before = window._aiBeforeByType || {vocab:0,grammar:0,context:0};
@@ -3856,11 +3887,92 @@ function applyAIUnits(units, placeholders){
         ? '\u26A0\uFE0F <b>'+placeholders+' metric placeholder'+(placeholders===1?'':'s')+'</b> were inserted as <b>[X]</b> / <b>[Y]</b>. The AI cannot know your real numbers \u2014 replace every bracket before you export. Those lines stay flagged until you do.'
         : 'No metric placeholders were inserted.';
     }
+    }
 
     setTimeout(function(){ document.getElementById('aiVerifyModal').classList.add('show'); }, 500);
     var btn=document.getElementById('aiBuilderBtn');
     btn.disabled=false; btn.textContent='Run';
   }, 600*units.length + 700);
+}
+
+// Apply a structural add/delete/update returned by /api/ai-builder.
+// Unlike applyAIUnits (many text-fix units, animated one by one), this is a
+// single direct mutation to R — the section array itself changes shape.
+function applyStructuralChange(data){
+  var fill=document.getElementById('aiProgFill');
+  var title=document.getElementById('aiProgTitle');
+  var log=document.getElementById('aiProgSections');
+  title.textContent='Applying your change\u2026';
+  log.className='ai-prog-log';
+  log.innerHTML='';
+  fill.style.width='40%';
+
+  function logLine(html){
+    var d=document.createElement('div');
+    d.className='ai-pl';
+    d.innerHTML='<span class="ic">\u2713</span><span>'+html+'</span>';
+    log.appendChild(d);
+    requestAnimationFrame(function(){ d.classList.add('in'); });
+  }
+
+  setTimeout(function(){
+    var ok = false, summary = '';
+    var sec = data.section;
+
+    if(data.mode === 'add'){
+      if(!Array.isArray(R[sec])) R[sec] = [];
+      if(Array.isArray(data.items)){
+        var added = [];
+        data.items.forEach(function(it){
+          var exists = R[sec].some(function(x){ return String(x).toLowerCase() === String(it).toLowerCase(); });
+          if(!exists){ R[sec].push(it); added.push(it); }
+        });
+        ok = added.length > 0;
+        summary = ok
+          ? ('Added <b>'+esc(added.join(', '))+'</b> to '+esc(sec))
+          : ('Already had '+esc(data.items.join(', '))+' in '+esc(sec));
+      } else if(data.item){
+        R[sec].push(data.item);
+        ok = true;
+        var addLabel = data.item.name || data.item.title || data.item.degree || 'entry';
+        summary = 'Added <b>'+esc(addLabel)+'</b> to '+esc(sec);
+      }
+    } else if(data.mode === 'delete'){
+      if(Array.isArray(R[sec]) && data.index >= 0 && data.index < R[sec].length){
+        R[sec].splice(data.index, 1);
+        ok = true;
+        summary = 'Deleted <b>'+esc(data.label||'item')+'</b> from '+esc(sec);
+      }
+    } else if(data.mode === 'update'){
+      if(Array.isArray(R[sec]) && data.index >= 0 && data.index < R[sec].length){
+        if(data.field === 'value'){ R[sec][data.index] = data.value; }
+        else { R[sec][data.index][data.field] = data.value; }
+        ok = true;
+        summary = 'Updated <b>'+esc(data.label||'item')+'</b> \u2014 '+esc(data.field)+' set to \u201c'+esc(data.value)+'\u201d';
+      }
+    }
+
+    fill.style.width='100%';
+    document.getElementById('aiProgSpinner').style.display='none';
+    logLine(ok ? summary : 'Could not apply that change \u2014 try again with more detail');
+    title.innerHTML = ok ? '\u2713 Complete' : '\u2717 Nothing changed';
+
+    var noteEl=document.getElementById('aiPlaceholderNote');
+    if(noteEl) noteEl.innerHTML = 'This was applied directly \u2014 double-check the details before you export.';
+
+    if(ok){
+      var scrollY=window.scrollY;
+      R.quality_score = analyzeQualityScore();
+      buildEditor();
+      window.scrollTo(0,scrollY);
+      renderRail();
+      if(typeof schedulePreview==='function') schedulePreview();
+      setTimeout(function(){ document.getElementById('aiVerifyModal').classList.add('show'); }, 400);
+    }
+
+    var btn=document.getElementById('aiBuilderBtn');
+    btn.disabled=false; btn.textContent='Run';
+  }, 400);
 }
 
 function dismissAIModal(){
