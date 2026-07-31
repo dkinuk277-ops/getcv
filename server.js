@@ -710,9 +710,212 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
     if (!requireKey(res)) return;
     if (!command || !resume) return res.status(400).json({ error: 'Missing command or resume' });
 
-    const cmd = String(command).toLowerCase();
+    const rawCmd = String(command);
+    const cmd = rawCmd.toLowerCase();
 
-    // Which error types is the user asking about?
+    // Which sections is the user targeting? Default = all; narrow if named.
+    // Shared between the "fix" and "expand" flows below.
+    function targetSections() {
+      let secs = ['summary', 'experience', 'skills', 'accomplishments'];
+      const named = secs.filter(s => cmd.includes(s === 'summary' ? 'summary' : s));
+      if (cmd.includes('profile')) named.push('summary');
+      if (named.length) secs = [...new Set(named)];
+      return secs;
+    }
+
+    function buildUnits(secs) {
+      const units = [];
+      if (secs.includes('summary') && resume.summary && String(resume.summary).trim()) {
+        units.push({ section: 'summary', index: -1, text: String(resume.summary), label: 'Summary' });
+      }
+      if (secs.includes('experience') && Array.isArray(resume.experience)) {
+        resume.experience.forEach((job, i) => {
+          if (job && job.desc && String(job.desc).trim()) {
+            units.push({ section: 'experience', index: i, text: String(job.desc),
+                         label: job.title || ('Job ' + (i + 1)) });
+          }
+        });
+      }
+      if (secs.includes('skills') && Array.isArray(resume.skills) && resume.skills.length) {
+        units.push({ section: 'skills', index: -1, text: resume.skills.join('\n'), label: 'Skills' });
+      }
+      if (secs.includes('accomplishments') && Array.isArray(resume.accomplishments) && resume.accomplishments.length) {
+        units.push({ section: 'accomplishments', index: -1, text: resume.accomplishments.join('\n'), label: 'Accomplishments' });
+      }
+      return units;
+    }
+
+    // ---- "Write/add more about X under <section>" — expand existing content ----
+    const EXPAND_RE = /\b(write more|add more|say more|expand|elaborate|add (?:detail|content|information)|include more|talk more)\b/;
+    if (EXPAND_RE.test(cmd)) {
+      // Topic = whatever follows "on"/"about", stopping before a trailing "under <section>" clause.
+      const topicMatch =
+        rawCmd.match(/\bon\s+(.+?)\s+under\b/i) ||
+        rawCmd.match(/\babout\s+(.+?)\s+under\b/i) ||
+        rawCmd.match(/\bon\s+(.+)$/i) ||
+        rawCmd.match(/\babout\s+(.+)$/i);
+      const topic = topicMatch ? topicMatch[1].trim().replace(/[.?!]+$/, '') : rawCmd.trim();
+
+      const secs = targetSections();
+      const units = buildUnits(secs);
+      if (!units.length) {
+        return res.json({ success: true, units: [], note: 'no-target-content' });
+      }
+
+      const out = [];
+      for (const u of units) {
+        const prompt =
+          'You are adding new content to one section of a resume, without touching the existing lines.\n\n' +
+          'TASK: Write 1 to 2 new resume bullet lines about: ' + topic + '.\n' +
+          'Match the existing tone, tense and bullet style. Start each new line with a strong action verb. ' +
+          'Do not invent employers, dates or specific numbers — if a metric would help, use a bracketed placeholder like "[X]%".\n\n' +
+          'RULES:\n' +
+          '- Return the FULL section text: the existing lines UNCHANGED, followed by the new line(s).\n' +
+          '- Do not remove, reorder or rewrite any existing line.\n' +
+          '- No preamble, no commentary — return only the final text.\n\n' +
+          'EXISTING TEXT:\n' + u.text.slice(0, 3000);
+
+        let fixed;
+        try {
+          fixed = (await claudeText(prompt, 1200) || '').trim();
+        } catch (e) {
+          console.error('ai-builder expand unit failed:', u.section, e.message);
+          out.push({ ...u, fixed: u.text, unchanged: true, error: 'AI call failed' });
+          continue;
+        }
+
+        const inLines  = u.text.split('\n').filter(l => l.trim()).length;
+        const outLines = fixed.split('\n').filter(l => l.trim()).length;
+        if (!fixed || outLines <= inLines) {
+          out.push({ ...u, fixed: u.text, unchanged: true, error: 'no new content generated' });
+        } else {
+          out.push({ ...u, fixed, unchanged: false });
+        }
+      }
+
+      const placeholders = out.reduce((n, u) => n + ((u.fixed.match(/\[[A-Z]\]/g) || []).length), 0);
+      return res.json({ success: true, units: out, placeholders, mode: 'expand', topic });
+    }
+
+    // ---- "Add / delete / update <item>" — structural changes to list sections ----
+    const SECTION_KEYWORDS = {
+      skills: ['skill'],
+      certifications: ['certification', 'cert'],
+      languages: ['language'],
+      projects: ['project'],
+      accomplishments: ['accomplishment', 'achievement'],
+      courses: ['course'],
+      experience: ['experience', 'job', 'role', 'employment', 'work history'],
+      education: ['education', 'degree', 'university', 'college']
+    };
+    const FLAT_SECTIONS = new Set(['skills', 'languages', 'accomplishments']);
+    const ITEM_SHAPES = {
+      certifications: { name: '', issuer: '', year: '' },
+      courses: { name: '', provider: '', year: '' },
+      projects: { name: '', desc: '' },
+      education: { degree: '', institution: '', year: '', grade: '' },
+      experience: { title: '', company: '', location: '', start: '', end: '', desc: '' }
+    };
+    const PRIMARY_FIELD = { certifications: 'name', courses: 'name', projects: 'name', education: 'degree', experience: 'title' };
+
+    function detectListSection(text) {
+      for (const [sec, kws] of Object.entries(SECTION_KEYWORDS)) {
+        if (kws.some(k => text.includes(k))) return sec;
+      }
+      return null;
+    }
+    const labelOf = (sec, it) => FLAT_SECTIONS.has(sec) ? String(it) : (it[PRIMARY_FIELD[sec]] || 'item');
+
+    const DELETE_RE = /\b(delete|remove|drop|take out|get rid of)\b/;
+    const ADD_RE    = /\b(add|include|insert|put in)\b/;
+    const UPDATE_RE = /\b(change|update|rename|amend|edit|replace)\b/;
+
+    const structSection = detectListSection(cmd);
+    const isDelete = DELETE_RE.test(cmd), isAdd = ADD_RE.test(cmd), isUpdate = UPDATE_RE.test(cmd);
+
+    // Only intercept when a concrete list-type section was named — otherwise
+    // fall through to the fix flow below (e.g. "correct the grammar in my summary").
+    if (structSection && (isDelete || isAdd || isUpdate)) {
+      const list = Array.isArray(resume[structSection]) ? resume[structSection] : [];
+
+      if (isDelete) {
+        if (!list.length) return res.json({ success: true, units: [], note: 'no-target-content' });
+        let index = -1;
+        if (list.length === 1) {
+          index = 0;
+        } else if (/\b(last|latest|most recent|newest)\b/.test(cmd)) {
+          index = list.length - 1;
+        } else if (/\b(first|oldest|earliest)\b/.test(cmd)) {
+          index = 0;
+        } else {
+          const listing = list.map((it, i) => i + ': ' + labelOf(structSection, it)).join('\n');
+          const prompt = 'A user wants to delete one item from a resume ' + structSection + ' list.\n' +
+            'ITEMS (index: label):\n' + listing + '\n\nUSER REQUEST: "' + rawCmd + '"\n\n' +
+            'Respond ONLY with JSON: {"index": <the integer index to delete, or -1 if you cannot confidently tell which one>}';
+          try {
+            const resolved = await claudeJSON(prompt, 200);
+            index = Number.isInteger(resolved.index) ? resolved.index : -1;
+          } catch (e) { index = -1; }
+        }
+        if (index < 0 || index >= list.length) {
+          return res.json({ success: true, units: [], note: 'ambiguous-delete', section: structSection,
+            candidates: list.map(it => labelOf(structSection, it)) });
+        }
+        return res.json({ success: true, mode: 'delete', section: structSection, index, label: labelOf(structSection, list[index]) });
+      }
+
+      if (isAdd) {
+        if (FLAT_SECTIONS.has(structSection)) {
+          const prompt = 'Extract the new ' + structSection + ' item(s) to add, from this instruction:\n"' + rawCmd + '"\n\n' +
+            'Respond ONLY with JSON: {"items": ["...", "..."]} \u2014 one short string per item. Do not invent items that were not mentioned.';
+          let items = [];
+          try {
+            const resolved = await claudeJSON(prompt, 300);
+            items = Array.isArray(resolved.items) ? resolved.items.map(String).map(s => s.trim()).filter(Boolean) : [];
+          } catch (e) { /* leave empty */ }
+          if (!items.length) return res.json({ success: true, units: [], note: 'no-item-detected' });
+          return res.json({ success: true, mode: 'add', section: structSection, items });
+        } else {
+          const shape = ITEM_SHAPES[structSection];
+          const prompt = 'Extract the details for one new ' + structSection + ' entry from this instruction:\n"' + rawCmd + '"\n\n' +
+            'Respond ONLY with JSON matching exactly this shape (empty string for anything not mentioned \u2014 never invent facts):\n' +
+            JSON.stringify(shape);
+          let item;
+          try { item = await claudeJSON(prompt, 400); }
+          catch (e) { return res.json({ success: true, units: [], note: 'no-item-detected' }); }
+          const clean = {};
+          Object.keys(shape).forEach(k => { clean[k] = (item && item[k] != null) ? String(item[k]) : ''; });
+          if (!Object.values(clean).some(v => v.trim())) {
+            return res.json({ success: true, units: [], note: 'no-item-detected' });
+          }
+          return res.json({ success: true, mode: 'add', section: structSection, item: clean });
+        }
+      }
+
+      if (isUpdate) {
+        if (!list.length) return res.json({ success: true, units: [], note: 'no-target-content' });
+        const listing = list.map((it, i) => i + ': ' + JSON.stringify(it)).join('\n');
+        const fieldHint = FLAT_SECTIONS.has(structSection)
+          ? '"field" must be "value"'
+          : '"field" must be one of: ' + Object.keys(ITEM_SHAPES[structSection]).join(', ');
+        const prompt = 'A user wants to change one field of one item in a resume ' + structSection + ' list.\n' +
+          'ITEMS (index: JSON):\n' + listing + '\n\nUSER REQUEST: "' + rawCmd + '"\n\n' +
+          'Respond ONLY with JSON: {"index": <integer, or -1 if unclear>, "field": "<field name>", "value": "<new text>"}. ' + fieldHint;
+        let resolved;
+        try { resolved = await claudeJSON(prompt, 300); }
+        catch (e) { return res.json({ success: true, units: [], note: 'ambiguous-update' }); }
+        const index = Number.isInteger(resolved.index) ? resolved.index : -1;
+        const field = FLAT_SECTIONS.has(structSection) ? 'value' : String(resolved.field || '');
+        const value = String(resolved.value || '').trim();
+        const validField = FLAT_SECTIONS.has(structSection) || ITEM_SHAPES[structSection].hasOwnProperty(field);
+        if (index < 0 || index >= list.length || !value || !validField) {
+          return res.json({ success: true, units: [], note: 'ambiguous-update' });
+        }
+        return res.json({ success: true, mode: 'update', section: structSection, index, field, value, label: labelOf(structSection, list[index]) });
+      }
+    }
+
+    // ---- Fix flow: grammar / vocabulary / context corrections ----
     const all    = /\bfix all\b|\ball issues\b|\beverything\b/.test(cmd);
     const wantV  = all || /vocab|wording|weak word|active voice/.test(cmd);
     const wantG  = all || /grammar|spell|punctuat|tense|full stop|typo/.test(cmd);
@@ -721,31 +924,8 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
       return res.json({ success: true, units: [], note: 'no-fix-intent' });
     }
 
-    // Which sections? Default = all; narrow if the user named one.
-    let secs = ['summary', 'experience', 'skills', 'accomplishments'];
-    const named = secs.filter(s => cmd.includes(s === 'summary' ? 'summary' : s));
-    if (cmd.includes('profile')) named.push('summary');
-    if (named.length) secs = [...new Set(named)];
-
-    // Build the unit list
-    const units = [];
-    if (secs.includes('summary') && resume.summary && String(resume.summary).trim()) {
-      units.push({ section: 'summary', index: -1, text: String(resume.summary) });
-    }
-    if (secs.includes('experience') && Array.isArray(resume.experience)) {
-      resume.experience.forEach((job, i) => {
-        if (job && job.desc && String(job.desc).trim()) {
-          units.push({ section: 'experience', index: i, text: String(job.desc),
-                       label: job.title || ('Job ' + (i + 1)) });
-        }
-      });
-    }
-    if (secs.includes('skills') && Array.isArray(resume.skills) && resume.skills.length) {
-      units.push({ section: 'skills', index: -1, text: resume.skills.join('\n') });
-    }
-    if (secs.includes('accomplishments') && Array.isArray(resume.accomplishments) && resume.accomplishments.length) {
-      units.push({ section: 'accomplishments', index: -1, text: resume.accomplishments.join('\n') });
-    }
+    const secs = targetSections();
+    const units = buildUnits(secs);
     if (!units.length) return res.json({ success: true, units: [] });
 
     const asks = [];
