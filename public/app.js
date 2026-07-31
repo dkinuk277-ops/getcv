@@ -4,7 +4,7 @@
 const API = ''; // same origin; set to full URL if frontend hosted separately
 
 // ---------- State ----------
-const DEFAULT_SECTION_ORDER = ['skills','certifications','languages','projects','accomplishments','courses','summary','experience','education'];
+const DEFAULT_SECTION_ORDER = ['skills','summary','projects','experience','certifications','languages','accomplishments','courses','education'];
 const CRED_KEYS = ['certifications','education']; // print in the header credentials area — grouped at top of the editor
 
 let R = emptyResume();
@@ -950,7 +950,7 @@ function insightsCard(){
 const SEC_COLOURS = ['#0F766E','#4338CA','#BE185D','#B45309','#166534','#7C3AED','#0E7490','#9F1239','#0284C7'];
 
 // New order: header info → skills-band-ish → projects → summary → experience → education → the rest
-const EDITOR_ORDER = ['personal','skills','certifications','languages','projects','accomplishments','courses','summary','experience','education'];
+const EDITOR_ORDER = ['personal','skills','summary','projects','experience','certifications','languages','accomplishments','courses','education'];
 
 
 
