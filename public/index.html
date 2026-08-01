@@ -26,7 +26,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none}
 input,textarea,select{font-family:inherit;font-size:14px;color:var(--ink);background:var(--card);
   border:1px solid var(--line);border-radius:8px;padding:9px 12px;width:100%;outline:none;transition:border-color .15s}
 input:focus,textarea:focus{border-color:var(--accent)}
-textarea{resize:vertical;min-height:80px}
+textarea{resize:vertical;min-height:80px;overflow-wrap:break-word;word-break:break-word}
 label{font-size:12px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
 
 /* ---------- Layout: dark Decompliance chrome ---------- */
@@ -589,7 +589,7 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 /* ---------- Experience / repeatable entries ---------- */
 .entry{border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px;background:#FCFCFB}
 .entry-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.entry-head strong{font-size:14px}
+.entry-head strong{font-size:14px;min-width:0;overflow-wrap:break-word;word-break:break-word}
 
 /* ---------- Skill tags ---------- */
 .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
@@ -1377,7 +1377,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   border-bottom:1px solid #F6F7F5;position:relative}
 .mark-ln:last-child{border-bottom:none}
 .mark-ln .n{font-size:8.5px;font-weight:800;color:#C3C9C0;min-width:13px;padding-top:3px;flex-shrink:0}
-.mark-ln .t{flex:1}
+.mark-ln .t{flex:1;min-width:0;overflow-wrap:break-word;word-break:break-word}
 .mark-ln.new{background:#ECFDF5;border-left-color:#0FA968}
 .mark-ln.new .n{color:#0FA968}
 .mark-ln.new .t{font-weight:600;color:#065F46}
