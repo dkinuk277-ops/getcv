@@ -2202,7 +2202,8 @@ function templateCSS(t){
 
   return `
 .gcv-page{font-family:Inter,'Segoe UI',Arial,sans-serif;color:#26292e;background:#fff;
-  ${borderCSS}padding:32px 36px;max-width:820px;margin:0 auto;line-height:1.5}
+  ${borderCSS}padding:32px 36px;max-width:820px;margin:0 auto;line-height:1.5;box-sizing:border-box}
+.gcv-page, .gcv-page *{overflow-wrap:break-word;word-break:break-word}
 .gcv-head{border-bottom:3px solid ${t.main};padding-bottom:12px;margin-bottom:12px}
 ${headCSS}
 .gcv-name{font-size:27px;font-weight:800;color:${t.dark};letter-spacing:.01em;margin:0;font-family:${nameFont}}
