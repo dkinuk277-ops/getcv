@@ -15,7 +15,7 @@ let R = emptyResume();
 const TEMPLATES = [
   {id:'exec-navy',   name:'Executive Navy',      main:'#1E3A8A', soft:'#E3E9F8', dark:'#172B63', border:'double',   header:'split',  serif:true },
   {id:'classic-teal',name:'Classic Teal',        main:'#0F766E', soft:'#E6F2F0', dark:'#134E4A', border:'double',   header:'split',  serif:true },
-  {id:'modern-indigo',name:'Modern Indigo',      main:'#4338CA', soft:'#EAE8FB', dark:'#312E81', border:'topband',  header:'center', serif:false},
+  {id:'modern-indigo',name:'Modern Indigo',      main:'#4338CA', soft:'#EAE8FB', dark:'#312E81', border:'topband',  header:'left',   serif:false},
   {id:'minimal-slate',name:'Minimal Slate',      main:'#334155', soft:'#EAEEF3', dark:'#1E293B', border:'hairline', header:'left',   serif:false},
   {id:'bold-burgundy',name:'Bold Burgundy',      main:'#9F1239', soft:'#FBE7EC', dark:'#6E0B26', border:'solid',    header:'split',  serif:true },
   {id:'forest-pro',  name:'Forest Professional', main:'#166534', soft:'#E4F3E9', dark:'#0F4A25', border:'double',   header:'split',  serif:true },
@@ -23,9 +23,9 @@ const TEMPLATES = [
   {id:'graphite',    name:'Graphite Mono',       main:'#111827', soft:'#F3F4F6', dark:'#030712', border:'hairline', header:'left',   serif:false},
   {id:'ocean-blue',  name:'Ocean Blue',          main:'#0369A1', soft:'#E0F2FE', dark:'#075985', border:'topband',  header:'split',  serif:false},
   {id:'amber-accent',name:'Amber Accent',        main:'#B45309', soft:'#FBEEDC', dark:'#7C3A06', border:'solid',    header:'split',  serif:true },
-  {id:'rose-quartz', name:'Rose Quartz',         main:'#BE185D', soft:'#FCE7F3', dark:'#831843', border:'hairline', header:'center', serif:true },
+  {id:'rose-quartz', name:'Rose Quartz',         main:'#BE185D', soft:'#FCE7F3', dark:'#831843', border:'hairline', header:'left',   serif:true },
   {id:'emerald',     name:'Emerald Clean',       main:'#059669', soft:'#D1FAE5', dark:'#065F46', border:'topband',  header:'left',   serif:false},
-  {id:'royal-purple',name:'Royal Purple',        main:'#7C3AED', soft:'#F3E8FF', dark:'#5B21B6', border:'double',   header:'center', serif:true },
+  {id:'royal-purple',name:'Royal Purple',        main:'#7C3AED', soft:'#F3E8FF', dark:'#5B21B6', border:'double',   header:'left',   serif:true },
   {id:'steel-corp',  name:'Steel Corporate',     main:'#475569', soft:'#E2E8F0', dark:'#334155', border:'solid',    header:'split',  serif:false},
   {id:'crimson',     name:'Crimson Impact',      main:'#B91C1C', soft:'#FEE2E2', dark:'#7F1D1D', border:'sideband', header:'left',   serif:false},
   // 5 structural templates — different layouts, not just colours
