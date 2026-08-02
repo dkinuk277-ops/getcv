@@ -324,12 +324,6 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 #view-pro.on .pv-live, #view-fresher.on .pv-live{
   position:static; align-self:stretch; height:100%; max-height:100%; min-height:0;
 }
-/* workspace runs to the very bottom edge; footer rides inside the centre scroll */
-#view-pro.on .workspace, #view-fresher.on .workspace{ padding-bottom:0; }
-#view-pro.on main .app-footer, #view-fresher.on main .app-footer{
-  margin:18px 0 14px; padding:16px 20px; border-radius:10px;
-  border:1px solid rgba(91,200,245,.25);
-}
 
 /* ---------- Fresher onboarding wizard ---------- */
 .fr-wizard-dots{display:flex;gap:6px;margin-bottom:16px}
@@ -1948,7 +1942,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
     <div class="rail-split" title="Drag to resize · double-click to reset"><span class="pv-grip"><i></i><i></i><i></i></span></div>
     <main>
     <div id="fresherStart">
-      <div class="card" id="frWizard" style="max-width:640px;margin:0 auto">
+      <div class="card" id="frWizard">
         <h2>Tell us about yourself</h2>
         <div class="fr-wizard-dots" id="frDots"></div>
         <p class="fr-wizard-step" id="frStepLabel">Question 1 of 9</p>
@@ -1963,7 +1957,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <p class="fr-wizard-skip" id="frSkipNote"></p>
       </div>
 
-      <div class="card" id="frReview" style="max-width:640px;margin:0 auto;display:none">
+      <div class="card" id="frReview" style="display:none">
         <h2>Review your details</h2>
         <div class="fr-review-console" id="frReviewConsole"></div>
         <div class="fr-wizard-actions">
