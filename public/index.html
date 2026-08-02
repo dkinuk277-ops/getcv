@@ -318,7 +318,7 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
   overflow-y:auto; min-height:0; padding-right:5px; scrollbar-width:thin;
 }
 /* zone 2: rail scrolls only if its own content overflows */
-#view-pro.on .rail, #view-fresher.on .rail{ overflow-y:auto; min-height:0; }
+#view-pro.on .rail, #view-fresher.on .rail{ overflow-y:auto; min-height:0; align-self:stretch; }
 /* zone 3: live preview fills column height; its BODY scrolls independently
    (.pv-live-body already has overflow:auto + flex:1) */
 #view-pro.on .pv-live, #view-fresher.on .pv-live{
@@ -381,10 +381,10 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .pv-tpl-applied b{color:var(--accent)}
 
 /* ---------- App footer ---------- */
-.app-footer{margin-top:36px;padding:22px 24px;
+.app-footer{margin-top:0;padding:10px 24px;
   background:linear-gradient(180deg,#1A2C4A 0%,#0E1B31 45%,#0A1526 100%);
   border-top:1px solid rgba(91,200,245,.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
-  text-align:center;font-size:12.5px;color:#B9C9DF}
+  text-align:center;font-size:11px;line-height:1.5;color:#B9C9DF}
 .app-footer a{color:var(--dc-blue);text-decoration:none;font-weight:600}
 .app-footer .sep{color:var(--dc-line)}
 .app-footer a:hover{text-decoration:underline}
