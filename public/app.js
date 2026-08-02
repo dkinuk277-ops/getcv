@@ -2753,18 +2753,10 @@ function showView(id){
       initRailSplitter();
     });
   }
-  // Builder views: the footer rides at the END of the centre scroll column so
-  // the workspace extends to the bottom of the screen. Everywhere else it
-  // returns to its normal place at the bottom of the page.
+  // The footer always stays at the true bottom of the page — it's hidden
+  // entirely on the landing view (see the body:has(#view-landing.on) rule).
   const foot = document.querySelector('.app-footer');
-  if(foot){
-    if(id === 'pro' || id === 'fresher'){
-      const main = document.querySelector('#view-' + id + ' main');
-      if(main && foot.parentElement !== main) main.appendChild(foot);
-    } else if(foot.parentElement !== document.body){
-      document.body.appendChild(foot);
-    }
-  }
+  if(foot && foot.parentElement !== document.body) document.body.appendChild(foot);
   window.scrollTo({top:0});
 }
 
