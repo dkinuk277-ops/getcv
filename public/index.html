@@ -117,7 +117,7 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
 .rail-item::before{content:'';width:12px;min-width:12px;text-align:center;font-size:10px;font-weight:900;transition:all .2s;position:relative;display:inline-block}
 .rail-item.detected::before{content:'✓';color:var(--main);font-size:11px;font-weight:900}
 .rail-item.has-issues::before{content:''}
-@media(max-width:860px){.rail{display:none}}
+@media(max-width:860px){.rail{display:none}.rail-split{display:none}}
 
 /* ---------- Tailor for Job ---------- */
 .btn-gold{background:var(--dc-gold);color:#231A02;border:none;font-size:13px;font-weight:700;
@@ -304,11 +304,11 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 #view-pro.on .container, #view-fresher.on .fr-grid, #view-fresher.on .container{
   flex:1; min-height:0; margin-top:12px; gap:14px;
 }
-#view-pro.on .container{ grid-template-columns:180px minmax(0,1fr) 10px var(--pvw,470px); }
-#view-fresher.on .fr-grid{ grid-template-columns:180px minmax(0,1fr) 10px var(--pvw,470px); }
+#view-pro.on .container{ grid-template-columns:var(--railw,180px) 10px minmax(0,1fr) 10px var(--pvw,470px); }
+#view-fresher.on .fr-grid{ grid-template-columns:var(--railw,180px) 10px minmax(0,1fr) 10px var(--pvw,470px); }
 @media(max-width:1280px){
-  #view-pro.on .container{ grid-template-columns:180px 1fr; }
-  #view-fresher.on .fr-grid{ grid-template-columns:180px 1fr; }
+  #view-pro.on .container{ grid-template-columns:var(--railw,180px) 10px 1fr; }
+  #view-fresher.on .fr-grid{ grid-template-columns:var(--railw,180px) 10px 1fr; }
   /* no room to split on narrow screens */
   .pv-split{ display:none; }
   #view-pro.on .pv-live, #view-fresher.on .pv-live{ display:none; }
@@ -1486,14 +1486,14 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 .fmt-add button:hover{border-color:var(--main);color:#0B8A55;background:#F0FDF9}
 
 /* ---------- Resizable preview splitter ---------- */
-.pv-split{width:10px;flex-shrink:0;cursor:col-resize;position:relative;display:flex;align-items:center;
+.pv-split,.rail-split{width:10px;flex-shrink:0;cursor:col-resize;position:relative;display:flex;align-items:center;
   justify-content:center;background:transparent;touch-action:none;z-index:20}
-.pv-split::before{content:'';width:3px;height:100%;background:rgba(11,74,49,.16);border-radius:2px;transition:background .15s}
-.pv-split:hover::before,.pv-split.drag::before{background:var(--main,#0FA968)}
-.pv-split .pv-grip{position:absolute;width:18px;height:44px;border-radius:5px;background:#fff;border:1px solid #C9D6CE;
+.pv-split::before,.rail-split::before{content:'';width:3px;height:100%;background:rgba(11,74,49,.16);border-radius:2px;transition:background .15s}
+.pv-split:hover::before,.pv-split.drag::before,.rail-split:hover::before,.rail-split.drag::before{background:var(--main,#0FA968)}
+.pv-split .pv-grip,.rail-split .pv-grip{position:absolute;width:18px;height:44px;border-radius:5px;background:#fff;border:1px solid #C9D6CE;
   box-shadow:0 1px 4px rgba(0,0,0,.12);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
-.pv-split .pv-grip i{width:2px;height:2px;border-radius:50%;background:#8FA398;display:block}
-.pv-split:hover .pv-grip{border-color:var(--main,#0FA968)}
+.pv-split .pv-grip i,.rail-split .pv-grip i{width:2px;height:2px;border-radius:50%;background:#8FA398;display:block}
+.pv-split:hover .pv-grip,.rail-split:hover .pv-grip{border-color:var(--main,#0FA968)}
 .pv-widthtag{font-size:8.5px;font-weight:800;color:var(--ink-soft,#4A5B76);background:#fff;border:1px solid #D6DED8;
   border-radius:5px;padding:2px 7px}
 .pv-panebtn{background:#fff;border:1px solid #D6DED8;border-radius:5px;width:22px;height:22px;font-family:inherit;
@@ -1879,6 +1879,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <button class="rail-folder js-tplopen" type="button">Templates</button>
         <button class="rail-folder js-savedopen" type="button">Saved Resumes</button>
       </nav>
+      <div class="rail-split" title="Drag to resize · double-click to reset"><span class="pv-grip"><i></i><i></i><i></i></span></div>
       <main>
         <!-- Import progress -->
         <div class="progress-wrap" id="progressWrap">
@@ -1944,6 +1945,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
       <button class="rail-folder js-tplopen" type="button">Templates</button>
       <button class="rail-folder js-savedopen" type="button">Saved Resumes</button>
     </nav>
+    <div class="rail-split" title="Drag to resize · double-click to reset"><span class="pv-grip"><i></i><i></i><i></i></span></div>
     <main>
     <div id="fresherStart">
       <div class="card" id="frWizard" style="max-width:640px;margin:0 auto">
