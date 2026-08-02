@@ -2160,7 +2160,7 @@ function templateCSS(t){
     ? `.gcv-head{display:block}
        .gcv-contact{text-align:left;margin-top:8px}`
     : `.gcv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap}
-       .gcv-contact{text-align:right;min-width:220px}`;
+       .gcv-contact{text-align:left;min-width:220px}`;
 
   let layoutCSS = '';
   if(layout === 'banner') layoutCSS = `
