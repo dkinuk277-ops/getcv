@@ -2750,6 +2750,7 @@ function showView(id){
     requestAnimationFrame(function(){
       decoratePreviewHeader();
       initPreviewSplitter();
+      initRailSplitter();
     });
   }
   // Builder views: the footer rides at the END of the centre scroll column so
@@ -4967,6 +4968,10 @@ var PV_MAX_ZOOM   = 1.35;  // zoom at the widest the splitter can reach \u2014
                             // more easily, not just to stop at "actual size"
 var _pvLast = PV_DEFAULT;
 
+var RAIL_MIN     = 140;
+var RAIL_MAX     = 320;
+var RAIL_DEFAULT = 180;
+
 function pvGrid(){
   var pro = document.getElementById('view-pro');
   if(pro && pro.classList.contains('on')) return pro.querySelector('.container');
@@ -4977,7 +4982,9 @@ function pvGrid(){
 
 function pvMaxWidth(grid){
   var w = grid.clientWidth;
-  return Math.max(0, w - 180 - 10 - 28 - PV_MIN_CENTRE);
+  var railw = parseInt(getComputedStyle(grid).getPropertyValue('--railw'), 10);
+  if(isNaN(railw)) railw = RAIL_DEFAULT;
+  return Math.max(0, w - railw - 10 - 10 - 28 - PV_MIN_CENTRE);
 }
 
 function setPreviewWidth(px, persist){
@@ -5018,6 +5025,81 @@ function setPreviewWidth(px, persist){
 
   if(persist){ try{ localStorage.setItem('reeve_pvw', String(px)); }catch(e){} }
   if(typeof _askBtn !== 'undefined' && _askBtn) positionAskPop(_askBtn);   // popover follows the reflow
+}
+
+// ============================================================
+// RESIZABLE RAIL SPLITTER
+// Same drag mechanics as the preview splitter, applied to the sections
+// rail on the left instead of the live-preview pane on the right. No zoom
+// mapping needed here — just a plain column-width clamp.
+// ============================================================
+function setRailWidth(px, persist){
+  var grid = pvGrid(); if(!grid) return;
+  px = Math.max(RAIL_MIN, Math.min(px, RAIL_MAX));
+  grid.style.setProperty('--railw', px+'px');
+  // The rail width feeds into the preview's own max-width clamp, so re-run
+  // it now rather than leaving the preview pane sized for the old rail width.
+  var cur = parseInt(getComputedStyle(grid).getPropertyValue('--pvw'), 10) || 0;
+  if(cur > 0) setPreviewWidth(cur, false);
+  if(persist){ try{ localStorage.setItem('reeve_railw', String(px)); }catch(e){} }
+}
+
+function initRailSplitter(){
+  var grid = pvGrid(); if(!grid) return;
+
+  var saved = null;
+  try{ saved = parseInt(localStorage.getItem('reeve_railw'), 10); }catch(e){}
+  setRailWidth((!isNaN(saved) && saved !== null) ? saved : RAIL_DEFAULT, false);
+
+  document.querySelectorAll('.rail-split').forEach(function(sp){
+    if(sp._wired) return;
+    sp._wired = true;
+    var dragging = false;
+
+    sp.addEventListener('pointerdown', function(e){
+      dragging = true; sp.classList.add('drag');
+      sp.setPointerCapture(e.pointerId);
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+    });
+    sp.addEventListener('pointermove', function(e){
+      if(!dragging) return;
+      var g = pvGrid(); if(!g) return;
+      var left = g.getBoundingClientRect().left;
+      setRailWidth(e.clientX - left - 5, false);
+    });
+    function stopDrag(e){
+      if(!dragging) return;
+      dragging = false; sp.classList.remove('drag');
+      try{ sp.releasePointerCapture(e.pointerId); }catch(err){}
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      var g = pvGrid();
+      if(g) setRailWidth(parseInt(getComputedStyle(g).getPropertyValue('--railw'), 10) || RAIL_DEFAULT, true);
+    }
+    sp.addEventListener('pointerup', stopDrag);
+    sp.addEventListener('pointercancel', stopDrag);
+    sp.addEventListener('dblclick', function(){ setRailWidth(RAIL_DEFAULT, true); });
+
+    sp.setAttribute('tabindex','0');
+    sp.setAttribute('role','separator');
+    sp.setAttribute('aria-label','Resize sections panel');
+    sp.addEventListener('keydown', function(e){
+      var g = pvGrid(); if(!g) return;
+      var cur = parseInt(getComputedStyle(g).getPropertyValue('--railw'), 10) || RAIL_DEFAULT;
+      if(e.key === 'ArrowLeft'){ e.preventDefault(); setRailWidth(cur-24, true); }
+      if(e.key === 'ArrowRight'){ e.preventDefault(); setRailWidth(cur+24, true); }
+      if(e.key === 'Home'){ e.preventDefault(); setRailWidth(RAIL_DEFAULT, true); }
+    });
+  });
+
+  if(!initRailSplitter._resizeHooked){
+    initRailSplitter._resizeHooked = true;
+    window.addEventListener('resize', function(){
+      var g = pvGrid(); if(!g) return;
+      setRailWidth(parseInt(getComputedStyle(g).getPropertyValue('--railw'), 10) || RAIL_DEFAULT, false);
+    });
+  }
 }
 
 function togglePreviewPane(){
