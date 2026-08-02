@@ -28,6 +28,11 @@ const TEMPLATES = [
   {id:'royal-purple',name:'Royal Purple',        main:'#7C3AED', soft:'#F3E8FF', dark:'#5B21B6', border:'double',   header:'left',   serif:true },
   {id:'steel-corp',  name:'Steel Corporate',     main:'#475569', soft:'#E2E8F0', dark:'#334155', border:'solid',    header:'split',  serif:false},
   {id:'crimson',     name:'Crimson Impact',      main:'#B91C1C', soft:'#FEE2E2', dark:'#7F1D1D', border:'sideband', header:'left',   serif:false},
+  {id:'copper-terracotta', name:'Copper Terracotta', main:'#C2410C', soft:'#FFF1E8', dark:'#7C2D12', border:'solid',    header:'left',   serif:false},
+  {id:'cobalt-blue', name:'Cobalt Blue',         main:'#1D4ED8', soft:'#EAF0FE', dark:'#1E3A8A', border:'topband',  header:'split',  serif:false},
+  {id:'sage-minimal',name:'Sage Minimal',        main:'#5B6B4F', soft:'#EEF1E9', dark:'#3A4432', border:'hairline', header:'left',   serif:true },
+  {id:'charcoal-ivory',name:'Charcoal Ivory',    main:'#44403C', soft:'#F5F1EA', dark:'#292524', border:'hairline', header:'left',   serif:true },
+  {id:'golden-mustard',name:'Golden Mustard',    main:'#A16207', soft:'#FEF6E0', dark:'#713F12', border:'solid',    header:'split',  serif:false},
   // 5 structural templates — different layouts, not just colours
   {id:'banner-sky',   name:'Banner Sky',          main:'#0284C7', soft:'#E0F2FE', dark:'#075985', border:'none',     header:'split',  serif:false, layout:'banner'},
   {id:'sidebar-slate',name:'Sidebar Slate',       main:'#334155', soft:'#E2E8F0', dark:'#1E293B', border:'hairline', header:'left',   serif:false, layout:'sidebar'},
