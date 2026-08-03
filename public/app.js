@@ -28,11 +28,11 @@ const TEMPLATES = [
   {id:'royal-purple',name:'Royal Purple',        main:'#7C3AED', soft:'#F3E8FF', dark:'#5B21B6', border:'double',   header:'left',   serif:true },
   {id:'steel-corp',  name:'Steel Corporate',     main:'#475569', soft:'#E2E8F0', dark:'#334155', border:'solid',    header:'split',  serif:false},
   {id:'crimson',     name:'Crimson Impact',      main:'#B91C1C', soft:'#FEE2E2', dark:'#7F1D1D', border:'sideband', header:'left',   serif:false},
-  {id:'sidebar-plum', name:'Sidebar Plum',        main:'#831843', soft:'#FCE7F3', dark:'#500724', border:'hairline', header:'left',   serif:false, layout:'sidebar'},
-  {id:'timeline-teal',name:'Timeline Executive',  main:'#0F766E', soft:'#E6F2F0', dark:'#134E4A', border:'hairline', header:'left',   serif:false, layout:'timeline'},
-  {id:'twocol-indigo',name:'Two-Column Indigo',   main:'#4338CA', soft:'#EAE8FB', dark:'#312E81', border:'topband',  header:'split',  serif:false, layout:'twocol'},
+  {id:'sidebar-plum', name:'Sidebar Plum',        main:'#831843', soft:'#FCE7F3', dark:'#500724', border:'hairline', header:'left',   serif:false, layout:'sidebar',  photo:true},
+  {id:'timeline-teal',name:'Timeline Executive',  main:'#0F766E', soft:'#E6F2F0', dark:'#134E4A', border:'hairline', header:'left',   serif:false, layout:'timeline', photo:true},
+  {id:'twocol-indigo',name:'Two-Column Indigo',   main:'#4338CA', soft:'#EAE8FB', dark:'#312E81', border:'topband',  header:'split',  serif:false, layout:'twocol',   photo:true},
   {id:'ats-plain',    name:'ATS Plain',           main:'#374151', soft:'#F3F4F6', dark:'#111827', border:'none',     header:'left',   serif:false, layout:'plain'},
-  {id:'banner-bold',  name:'Banner Bold',         main:'#C2410C', soft:'#FFF1E8', dark:'#7C2D12', border:'none',     header:'left',   serif:false, layout:'banner'},
+  {id:'banner-bold',  name:'Banner Bold',         main:'#C2410C', soft:'#FFF1E8', dark:'#7C2D12', border:'none',     header:'left',   serif:false, layout:'banner',   photo:true},
   // 5 structural templates — different layouts, not just colours
   {id:'banner-sky',   name:'Banner Sky',          main:'#0284C7', soft:'#E0F2FE', dark:'#075985', border:'none',     header:'split',  serif:false, layout:'banner'},
   {id:'sidebar-slate',name:'Sidebar Slate',       main:'#334155', soft:'#E2E8F0', dark:'#1E293B', border:'hairline', header:'left',   serif:false, layout:'sidebar'},
@@ -1859,40 +1859,45 @@ function personalCard(){
   const h2 = el('h2',{}, 'Personal details');
   c.appendChild(h2);
 
-  // ---- Photo upload ----
-  const photoRow = el('div',{class:'photo-row'});
-  const preview = el('div',{class:'photo-preview'});
-  function renderPreview(){
-    preview.innerHTML = R.personal.photo
-      ? `<img src="${R.personal.photo}" alt="">`
-      : `<span class="photo-ph">${esc((R.personal.name||'?').trim().charAt(0).toUpperCase())}</span>`;
-  }
-  renderPreview();
-  const fileInp = el('input',{type:'file',accept:'image/*',style:'display:none'});
-  const upBtn = el('button',{class:'btn btn-dline',type:'button'}, R.personal.photo ? 'Change photo' : '+ Add photo');
-  const rmBtn = el('button',{class:'btn btn-dline',type:'button',style:R.personal.photo?'':'display:none'}, 'Remove');
-  upBtn.addEventListener('click', ()=> fileInp.click());
-  fileInp.addEventListener('change', ()=>{
-    processPersonalPhotoFile(fileInp.files[0], ()=>{
-      renderPreview();
-      upBtn.textContent = 'Change photo';
-      rmBtn.style.display = '';
-    });
-    fileInp.value = '';
-  });
-  rmBtn.addEventListener('click', ()=>{
-    R.personal.photo = '';
+  // ---- Photo upload (only for templates built with a photo slot) ----
+  if(getTemplate().photo){
+    const photoRow = el('div',{class:'photo-row'});
+    const preview = el('div',{class:'photo-preview'});
+    function renderPreview(){
+      preview.innerHTML = R.personal.photo
+        ? `<img src="${R.personal.photo}" alt="">`
+        : `<span class="photo-ph">${esc((R.personal.name||'?').trim().charAt(0).toUpperCase())}</span>`;
+    }
     renderPreview();
-    upBtn.textContent = '+ Add photo';
-    rmBtn.style.display = 'none';
-    schedulePreview();
-    toast('Photo removed');
-  });
-  const photoBtns = el('div',{class:'photo-btns'});
-  photoBtns.appendChild(upBtn); photoBtns.appendChild(rmBtn); photoBtns.appendChild(fileInp);
-  photoRow.appendChild(preview);
-  photoRow.appendChild(photoBtns);
-  c.appendChild(photoRow);
+    const fileInp = el('input',{type:'file',accept:'image/*',style:'display:none'});
+    const upBtn = el('button',{class:'btn btn-dline',type:'button'}, R.personal.photo ? 'Change photo' : '+ Add photo');
+    const rmBtn = el('button',{class:'btn btn-dline',type:'button',style:R.personal.photo?'':'display:none'}, 'Remove');
+    upBtn.addEventListener('click', ()=> fileInp.click());
+    fileInp.addEventListener('change', ()=>{
+      processPersonalPhotoFile(fileInp.files[0], ()=>{
+        renderPreview();
+        upBtn.textContent = 'Change photo';
+        rmBtn.style.display = '';
+      });
+      fileInp.value = '';
+    });
+    rmBtn.addEventListener('click', ()=>{
+      R.personal.photo = '';
+      renderPreview();
+      upBtn.textContent = '+ Add photo';
+      rmBtn.style.display = 'none';
+      schedulePreview();
+      toast('Photo removed');
+    });
+    const photoBtns = el('div',{class:'photo-btns'});
+    photoBtns.appendChild(upBtn); photoBtns.appendChild(rmBtn); photoBtns.appendChild(fileInp);
+    photoRow.appendChild(preview);
+    photoRow.appendChild(photoBtns);
+    c.appendChild(photoRow);
+  } else {
+    c.appendChild(el('div',{class:'photo-unsupported'},
+      'This template doesn\u2019t include a photo. Switch to Sidebar Plum, Timeline Executive, Two-Column Indigo or Banner Bold to add one.'));
+  }
 
   const grid = el('div',{class:'grid2'});
   FIELDS.forEach(([f,lab,ai])=>{
@@ -2504,10 +2509,10 @@ function resumeHTML(forExport=false){
   // ---- identity (name / current title / industry line) + optional photo
   // In preview/review (not export) show a clickable "+" placeholder when no
   // photo is set yet, so the feature is visible in the resume itself.
-  // ATS Plain stays photo-free by design regardless of any photo on file.
-  const photoPlaceholder = (!forExport && !p.photo && layout !== 'plain')
+  // Only templates explicitly built with a photo slot (t.photo) show one.
+  const photoPlaceholder = (!forExport && !p.photo && t.photo)
     ? `<div class="gcv-photo gcv-photo-add" onclick="triggerPhotoFromPreview()" title="Click to add a photo">+</div>` : '';
-  const photoImg = (p.photo && layout !== 'plain') ? `<img class="gcv-photo" src="${esc(p.photo)}" alt="">` : photoPlaceholder;
+  const photoImg = (p.photo && t.photo) ? `<img class="gcv-photo" src="${esc(p.photo)}" alt="">` : photoPlaceholder;
   const identityText = `<h1 class="gcv-name">${esc(p.name)||'Your Name'}</h1>
     ${currentTitle?`<div class="gcv-title">${esc(currentTitle)}</div>`:''}
     ${p.headline?`<div class="gcv-headline">${esc(p.headline)}</div>`:''}`;
