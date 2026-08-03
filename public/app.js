@@ -1552,11 +1552,10 @@ function buildEditor(){
   // Career insights (only if we have experience)
   if(R.experience.length) ed.appendChild(insightsCard());
 
-  // Always show every section — grouped: personal (pinned) → header credentials → resume body
+  // Always show every section — grouped: header credentials (personal + certs/education) → resume body
   if(!Array.isArray(R.section_order) || !R.section_order.length) R.section_order = DEFAULT_SECTION_ORDER.slice();
   const pCard = personalCard();
   pCard.setAttribute('data-seckey', 'personal');
-  ed.appendChild(pCard);
 
   const makeCard = (key) => {
     let card;
@@ -1571,6 +1570,7 @@ function buildEditor(){
   const credKeys = R.section_order.filter(k => CRED_KEYS.includes(k));
   const bodyKeys = R.section_order.filter(k => !CRED_KEYS.includes(k));
   ed.appendChild(el('div',{class:'sec-grpcap'},'Header credentials <span class="gtag">print under your name</span>'));
+  ed.appendChild(pCard);
   credKeys.forEach(k => ed.appendChild(makeCard(k)));
   ed.appendChild(el('div',{class:'sec-grpcap'},'Resume body <span class="gtag">drag to arrange print order</span>'));
   bodyKeys.forEach(k => ed.appendChild(makeCard(k)));
