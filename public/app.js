@@ -1803,6 +1803,48 @@ document.addEventListener('click', e=>{
 });
 
 // ---------- Cards ----------
+// Shared by the Personal-details upload button AND the click-to-add placeholder
+// that renders directly in the resume preview when no photo is set yet.
+function processPersonalPhotoFile(file, onDone){
+  if(!file) return;
+  if(!file.type.startsWith('image/')) return toast('Please choose an image file');
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const SIZE = 320;
+      const canvas = document.createElement('canvas');
+      canvas.width = SIZE; canvas.height = SIZE;
+      const ctx = canvas.getContext('2d');
+      const scale = Math.max(SIZE/img.width, SIZE/img.height);
+      const w = img.width*scale, h = img.height*scale;
+      ctx.drawImage(img, (SIZE-w)/2, (SIZE-h)/2, w, h);
+      R.personal.photo = canvas.toDataURL('image/jpeg', 0.85);
+      schedulePreview();
+      toast('Photo added');
+      if(onDone) onDone();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Click-to-add placeholder rendered inside the resume preview itself (see
+// resumeHTML) — makes the photo feature visible right where people expect it,
+// not just buried in the Personal details form.
+function triggerPhotoFromPreview(){
+  const fi = document.createElement('input');
+  fi.type = 'file'; fi.accept = 'image/*';
+  fi.addEventListener('change', ()=>{
+    processPersonalPhotoFile(fi.files[0], ()=>{
+      if(document.getElementById('sec-personal')) buildEditor();
+      const pv = document.getElementById('previewBody');
+      if(pv) injectResumeInto([pv]);
+    });
+  });
+  fi.click();
+}
+
 function personalCard(){
   const FIELDS = [
     ['name','Name',false],
@@ -1831,30 +1873,11 @@ function personalCard(){
   const rmBtn = el('button',{class:'btn btn-dline',type:'button',style:R.personal.photo?'':'display:none'}, 'Remove');
   upBtn.addEventListener('click', ()=> fileInp.click());
   fileInp.addEventListener('change', ()=>{
-    const file = fileInp.files[0];
-    if(!file) return;
-    if(!file.type.startsWith('image/')) return toast('Please choose an image file');
-    const reader = new FileReader();
-    reader.onload = ()=>{
-      const img = new Image();
-      img.onload = ()=>{
-        const SIZE = 320;
-        const canvas = document.createElement('canvas');
-        canvas.width = SIZE; canvas.height = SIZE;
-        const ctx = canvas.getContext('2d');
-        const scale = Math.max(SIZE/img.width, SIZE/img.height);
-        const w = img.width*scale, h = img.height*scale;
-        ctx.drawImage(img, (SIZE-w)/2, (SIZE-h)/2, w, h);
-        R.personal.photo = canvas.toDataURL('image/jpeg', 0.85);
-        renderPreview();
-        upBtn.textContent = 'Change photo';
-        rmBtn.style.display = '';
-        schedulePreview();
-        toast('Photo added');
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
+    processPersonalPhotoFile(fileInp.files[0], ()=>{
+      renderPreview();
+      upBtn.textContent = 'Change photo';
+      rmBtn.style.display = '';
+    });
     fileInp.value = '';
   });
   rmBtn.addEventListener('click', ()=>{
@@ -2288,6 +2311,9 @@ function templateCSS(t){
 .gcv-page, .gcv-page *{overflow-wrap:break-word;word-break:break-word}
 .gcv-identity{display:flex;align-items:center;gap:14px}
 .gcv-photo{width:72px;height:72px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid ${t.soft}}
+.gcv-photo-add{display:flex;align-items:center;justify-content:center;border:2px dashed ${t.main};
+  background:${t.soft};color:${t.main};font-size:28px;font-weight:300;cursor:pointer;transition:background .15s}
+.gcv-photo-add:hover{background:${t.main};color:#fff}
 .gcv-side-photo{display:flex;justify-content:center}
 .gcv-side-photo .gcv-photo{width:84px;height:84px}
 .gcv-head{border-bottom:3px solid ${t.main};padding-bottom:12px;margin-bottom:12px}
@@ -2476,7 +2502,12 @@ function resumeHTML(forExport=false){
   const on = k => sp[k] !== false;
 
   // ---- identity (name / current title / industry line) + optional photo
-  const photoImg = p.photo ? `<img class="gcv-photo" src="${esc(p.photo)}" alt="">` : '';
+  // In preview/review (not export) show a clickable "+" placeholder when no
+  // photo is set yet, so the feature is visible in the resume itself.
+  // ATS Plain stays photo-free by design regardless of any photo on file.
+  const photoPlaceholder = (!forExport && !p.photo && layout !== 'plain')
+    ? `<div class="gcv-photo gcv-photo-add" onclick="triggerPhotoFromPreview()" title="Click to add a photo">+</div>` : '';
+  const photoImg = (p.photo && layout !== 'plain') ? `<img class="gcv-photo" src="${esc(p.photo)}" alt="">` : photoPlaceholder;
   const identityText = `<h1 class="gcv-name">${esc(p.name)||'Your Name'}</h1>
     ${currentTitle?`<div class="gcv-title">${esc(currentTitle)}</div>`:''}
     ${p.headline?`<div class="gcv-headline">${esc(p.headline)}</div>`:''}`;
