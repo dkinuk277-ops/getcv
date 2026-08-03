@@ -1580,11 +1580,16 @@ function buildEditor(){
   ed.querySelectorAll('.card').forEach((c,i)=>
     c.style.setProperty('--sec', SEC_COLOURS[i % SEC_COLOURS.length]));
 
-  // start collapsed per persisted state (default: collapsed for a calm workspace)
+  // start collapsed per persisted state (default: collapsed for a calm workspace,
+  // except Personal details — always expanded, it holds the photo control + core fields)
   if(!R.section_collapsed || typeof R.section_collapsed !== 'object') R.section_collapsed = {};
+  if(!window._personalExpandFixed){
+    R.section_collapsed.personal = false;
+    window._personalExpandFixed = true;
+  }
   ed.querySelectorAll('.card[data-seckey]').forEach(c=>{
     const k = c.dataset.seckey;
-    if(!(k in R.section_collapsed)) R.section_collapsed[k] = true; // default collapsed
+    if(!(k in R.section_collapsed)) R.section_collapsed[k] = (k !== 'personal');
     if(R.section_collapsed[k]) c.classList.add('collapsed');
   });
 
