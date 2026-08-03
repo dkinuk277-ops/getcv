@@ -2650,13 +2650,16 @@ function templateMini(t){
     : t.border==='sideband' ? `border:1px solid #E2E5EA;border-left:5px solid ${t.main};`
     : t.border==='none' ? `border:1px solid #E5E7EB;`
     : `border:1px solid #D8DCE2;border-top:2.5px solid ${t.main};`;
-  const wrapOpen = `<div style="${borderStyle}border-radius:5px;background:#fff;height:84px;overflow:hidden">`;
+  const wrapOpen = `<div style="${borderStyle}border-radius:5px;background:#fff;height:84px;overflow:hidden;position:relative">
+    ${t.photo ? `<div style="position:absolute;top:4px;right:4px;width:14px;height:14px;border-radius:50%;background:${t.main};border:1.5px solid #fff;box-shadow:0 0 0 1px ${t.main};z-index:2" title="Photo supported"></div>` : ''}`;
   const wrapClose = `</div>`;
 
   if(t.layout === 'sidebar'){
     return `${wrapOpen}<div style="display:flex;height:100%">
       <div style="width:32%;background:${t.dark};padding:6px 4px">
-        <div style="width:14px;height:14px;border-radius:50%;background:${t.soft};margin:0 auto 5px"></div>
+        ${t.photo
+          ? `<div style="width:14px;height:14px;border-radius:50%;background:${t.soft};margin:0 auto 5px"></div>`
+          : `<div style="height:3px;width:55%;margin:0 auto 5px;background:rgba(255,255,255,.6);border-radius:1px"></div>`}
         <div style="height:3px;width:80%;margin:0 auto 3px;background:rgba(255,255,255,.8);border-radius:1px"></div>
         <div style="height:2px;width:60%;margin:0 auto 6px;background:rgba(255,255,255,.55);border-radius:1px"></div>
         ${[70,55,65].map(w=>`<div style="height:2px;width:${w}%;margin:0 auto 3px;background:rgba(255,255,255,.7);border-radius:1px"></div>`).join('')}
@@ -2748,6 +2751,10 @@ function renderTemplateGrid(){
         renderLivePreview();
         if($('#previewModal').classList.contains('open'))
           injectResumeInto([$('#previewBody')]);
+        // Personal details' photo row depends on which template is selected —
+        // rebuild the editor so it doesn't show stale photo support from the
+        // previously selected template.
+        if(document.getElementById('sec-personal')) buildEditor();
       });
       grid.appendChild(b);
     });
