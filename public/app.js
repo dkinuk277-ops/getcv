@@ -3680,25 +3680,12 @@ renderRail();
 // ====== AI BUILDER FUNCTIONS ======
 // Show the AI builder bar when editor is active
 function showAIBuilder(){
-  // The bar is re-parented under the quality dashboard by buildEditor();
-  // this only fills the suggestion chips.
-  populateAIChips();
+  // Chips row was removed to save vertical space — nothing to populate here now.
 }
 
 function hideAIBuilder(){
   var bar = document.getElementById('aiBuilderBar');
   if(bar) bar.classList.add('hidden');
-}
-
-function populateAIChips(){
-  var chips = document.getElementById('aiBuilderChips');
-  if(!chips) return;
-  chips.innerHTML = [
-    {text:'🔧 Fix all issues', cmd:'Fix all quality issues'},
-    {text:'+ Add skill', cmd:'Add Python and Docker to my skills'},
-    {text:'− Delete job', cmd:'Delete my last work experience'},
-    {text:'+ Add certification', cmd:'Add AWS certification from AWS, June 2024'}
-  ].map(c => '<span class="ai-chip" style="background:rgba(255,255,255,.8);border:1px solid rgba(11,74,49,.2);border-radius:20px;padding:5px 12px;font-size:10px;font-weight:600;color:#0B4A31;cursor:pointer;transition:all .15s" onclick="setAICommand(\''+c.cmd.replace(/'/g,"\\'")+'\')" onmouseover="this.style.background=\'#fff\';this.style.borderColor=\'#0FA968\';this.style.transform=\'translateY(-1px)\';" onmouseout="this.style.background=\'rgba(255,255,255,.8)\';this.style.borderColor=\'rgba(11,74,49,.2)\';this.style.transform=\'translateY(0)\'">'+c.text+'</span>').join('');
 }
 
 function setAICommand(cmd){
