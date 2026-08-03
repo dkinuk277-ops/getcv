@@ -1492,6 +1492,7 @@ function getFieldErrors(secKey){
 
 
 function buildEditor(){
+  builtForModule = currentModule;
   $('#startArea').classList.add('hidden');
   $('#fresherStart').classList.add('hidden');
   $('#editorWrap').classList.remove('hidden');
@@ -2988,8 +2989,16 @@ function enterModule(module){
   if(!currentUser){ showView('login'); return; }
   currentModule = module;
   showView(module);
-  // if a resume is already built, bring the editor along
-  if(!$('#editor').classList.contains('hidden')) moveEditorTo(module);
+  const editorBuilt = !$('#editor').classList.contains('hidden');
+  if(editorBuilt && builtForModule === module){
+    // this module's own resume is already in progress — bring the editor back
+    moveEditorTo(module);
+  } else if(module === 'fresher'){
+    // a different module's resume is in progress (or none yet) — fresh start here
+    if($('#fresherStart')) $('#fresherStart').classList.remove('hidden');
+  } else {
+    if($('#startArea')) $('#startArea').classList.remove('hidden');
+  }
   loadSavedList();
 }
 
@@ -3061,6 +3070,7 @@ document.querySelectorAll('.js-switch').forEach(b =>
 // ============================================================
 let currentResumeId = null;
 let currentModule = 'pro';
+let builtForModule = null;
 
 function resumeIsEmpty(){
   return !R.personal.name && !R.experience.length && !R.skills.length && !R.summary;
@@ -3149,6 +3159,7 @@ document.querySelectorAll('.js-upload').forEach(b => b.addEventListener('click',
 function clearBuilder(){
   R = emptyResume();
   currentResumeId = null; currentResumeName = '';
+  builtForModule = null;
   $('#editorWrap').classList.add('hidden');
   hideAIBuilder();
   $('#editor').classList.add('hidden');
