@@ -617,12 +617,13 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
   margin-top:14px;padding-top:12px;border-top:1px solid var(--line);font-size:13px}
 /* Templates picker: rectangular panel docked LEFT so the live preview stays visible */
 .modal.tpl-dock{background:transparent;pointer-events:none;justify-content:flex-start;align-items:stretch;padding:0}
-.modal.tpl-dock .modal-box{pointer-events:auto;width:350px;max-width:88vw;height:100vh;max-height:100vh;
+.modal.tpl-dock .modal-box{pointer-events:auto;width:640px;max-width:92vw;height:100vh;max-height:100vh;
   border-radius:0 14px 14px 0;display:flex;flex-direction:column;padding:18px 16px;
   box-shadow:6px 0 30px rgba(0,0,0,.35);border-right:1.5px solid var(--accent)}
-.modal.tpl-dock .tpl-grid{grid-template-columns:1fr 1fr;overflow-y:auto;flex:1;max-height:none;
+.modal.tpl-dock .tpl-grid{grid-template-columns:repeat(3,1fr);overflow-y:auto;flex:1;max-height:none;
   align-content:start;padding-right:4px}
 .modal.tpl-dock .tplm-foot{margin-top:10px}
+@media(max-width:700px){.modal.tpl-dock .modal-box{width:100vw}.modal.tpl-dock .tpl-grid{grid-template-columns:1fr 1fr}}
 
 /* ---------- Resume preview: styles generated per-theme in app.js ---------- */
 
