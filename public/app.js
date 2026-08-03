@@ -28,11 +28,11 @@ const TEMPLATES = [
   {id:'royal-purple',name:'Royal Purple',        main:'#7C3AED', soft:'#F3E8FF', dark:'#5B21B6', border:'double',   header:'left',   serif:true },
   {id:'steel-corp',  name:'Steel Corporate',     main:'#475569', soft:'#E2E8F0', dark:'#334155', border:'solid',    header:'split',  serif:false},
   {id:'crimson',     name:'Crimson Impact',      main:'#B91C1C', soft:'#FEE2E2', dark:'#7F1D1D', border:'sideband', header:'left',   serif:false},
-  {id:'copper-terracotta', name:'Copper Terracotta', main:'#C2410C', soft:'#FFF1E8', dark:'#7C2D12', border:'solid',    header:'left',   serif:false},
-  {id:'cobalt-blue', name:'Cobalt Blue',         main:'#1D4ED8', soft:'#EAF0FE', dark:'#1E3A8A', border:'topband',  header:'split',  serif:false},
-  {id:'sage-minimal',name:'Sage Minimal',        main:'#5B6B4F', soft:'#EEF1E9', dark:'#3A4432', border:'hairline', header:'left',   serif:true },
-  {id:'charcoal-ivory',name:'Charcoal Ivory',    main:'#44403C', soft:'#F5F1EA', dark:'#292524', border:'hairline', header:'left',   serif:true },
-  {id:'golden-mustard',name:'Golden Mustard',    main:'#A16207', soft:'#FEF6E0', dark:'#713F12', border:'solid',    header:'split',  serif:false},
+  {id:'sidebar-plum', name:'Sidebar Plum',        main:'#831843', soft:'#FCE7F3', dark:'#500724', border:'hairline', header:'left',   serif:false, layout:'sidebar'},
+  {id:'timeline-teal',name:'Timeline Executive',  main:'#0F766E', soft:'#E6F2F0', dark:'#134E4A', border:'hairline', header:'left',   serif:false, layout:'timeline'},
+  {id:'twocol-indigo',name:'Two-Column Indigo',   main:'#4338CA', soft:'#EAE8FB', dark:'#312E81', border:'topband',  header:'split',  serif:false, layout:'twocol'},
+  {id:'ats-plain',    name:'ATS Plain',           main:'#374151', soft:'#F3F4F6', dark:'#111827', border:'none',     header:'left',   serif:false, layout:'plain'},
+  {id:'banner-bold',  name:'Banner Bold',         main:'#C2410C', soft:'#FFF1E8', dark:'#7C2D12', border:'none',     header:'left',   serif:false, layout:'banner'},
   // 5 structural templates — different layouts, not just colours
   {id:'banner-sky',   name:'Banner Sky',          main:'#0284C7', soft:'#E0F2FE', dark:'#075985', border:'none',     header:'split',  serif:false, layout:'banner'},
   {id:'sidebar-slate',name:'Sidebar Slate',       main:'#334155', soft:'#E2E8F0', dark:'#1E293B', border:'hairline', header:'left',   serif:false, layout:'sidebar'},
@@ -45,7 +45,7 @@ const getTemplate = () => TEMPLATES.find(t => t.id === selectedTemplate) || TEMP
 
 function emptyResume(){
   return {
-    personal:{name:'',email:'',phone:'',location:'',linkedin:'',website:'',headline:''},
+    personal:{name:'',email:'',phone:'',location:'',linkedin:'',website:'',headline:'',photo:''},
     section_order: DEFAULT_SECTION_ORDER.slice(),
     section_collapsed: {},
     summary:'',
@@ -1811,12 +1811,67 @@ function personalCard(){
   const c = el('div',{class:'card',id:'sec-personal'});
   const h2 = el('h2',{}, 'Personal details');
   c.appendChild(h2);
+
+  // ---- Photo upload ----
+  const photoRow = el('div',{class:'photo-row'});
+  const preview = el('div',{class:'photo-preview'});
+  function renderPreview(){
+    preview.innerHTML = R.personal.photo
+      ? `<img src="${R.personal.photo}" alt="">`
+      : `<span class="photo-ph">${esc((R.personal.name||'?').trim().charAt(0).toUpperCase())}</span>`;
+  }
+  renderPreview();
+  const fileInp = el('input',{type:'file',accept:'image/*',style:'display:none'});
+  const upBtn = el('button',{class:'btn btn-dline',type:'button'}, R.personal.photo ? 'Change photo' : '+ Add photo');
+  const rmBtn = el('button',{class:'btn btn-dline',type:'button',style:R.personal.photo?'':'display:none'}, 'Remove');
+  upBtn.addEventListener('click', ()=> fileInp.click());
+  fileInp.addEventListener('change', ()=>{
+    const file = fileInp.files[0];
+    if(!file) return;
+    if(!file.type.startsWith('image/')) return toast('Please choose an image file');
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const SIZE = 320;
+        const canvas = document.createElement('canvas');
+        canvas.width = SIZE; canvas.height = SIZE;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(SIZE/img.width, SIZE/img.height);
+        const w = img.width*scale, h = img.height*scale;
+        ctx.drawImage(img, (SIZE-w)/2, (SIZE-h)/2, w, h);
+        R.personal.photo = canvas.toDataURL('image/jpeg', 0.85);
+        renderPreview();
+        upBtn.textContent = 'Change photo';
+        rmBtn.style.display = '';
+        schedulePreview();
+        toast('Photo added');
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+    fileInp.value = '';
+  });
+  rmBtn.addEventListener('click', ()=>{
+    R.personal.photo = '';
+    renderPreview();
+    upBtn.textContent = '+ Add photo';
+    rmBtn.style.display = 'none';
+    schedulePreview();
+    toast('Photo removed');
+  });
+  const photoBtns = el('div',{class:'photo-btns'});
+  photoBtns.appendChild(upBtn); photoBtns.appendChild(rmBtn); photoBtns.appendChild(fileInp);
+  photoRow.appendChild(preview);
+  photoRow.appendChild(photoBtns);
+  c.appendChild(photoRow);
+
   const grid = el('div',{class:'grid2'});
   FIELDS.forEach(([f,lab,ai])=>{
     const wrap = el('div',{class:'field'});
     wrap.appendChild(fieldHead(lab, null));
     const inp = el('input',{'data-p':f,value:R.personal[f]||''});
-    inp.addEventListener('input',()=> R.personal[f]=inp.value);
+    inp.addEventListener('input',()=> { R.personal[f]=inp.value; if(f==='name') renderPreview(); });
     wrap.appendChild(inp);
     grid.appendChild(wrap);
   });
@@ -2197,18 +2252,39 @@ function templateCSS(t){
   if(layout === 'sidebar') layoutCSS = `
 .gcv-body{display:grid;grid-template-columns:195px 1fr;gap:18px}
 @media(max-width:640px){.gcv-body{grid-template-columns:1fr}}
-.gcv-side{border-right:2px solid ${t.soft};padding-right:14px}
+.gcv-side{border-right:2px solid ${t.soft};padding-right:14px;text-align:center}
 @media(max-width:640px){.gcv-side{border-right:none;padding-right:0}}
-.gcv-side .gcv-contact{text-align:left;min-width:0;margin-top:0}
-.gcv-side h2{font-size:11.5px}
-.gcv-side .gcv-chips{gap:4px}
-.gcv-main h2:first-child{margin-top:0}
-.gcv-head{display:block;border-bottom:3px solid ${t.main};padding-bottom:10px;margin-bottom:12px}`;
+.gcv-side .gcv-name{font-size:18px;margin-top:8px}
+.gcv-side .gcv-title{font-size:11.5px}
+.gcv-side .gcv-headline{font-size:9.5px}
+.gcv-side .gcv-contact{text-align:left;min-width:0;margin-top:14px}
+.gcv-side .gcv-credline{text-align:left}
+.gcv-side h2{font-size:11.5px;text-align:left}
+.gcv-side .gcv-chips{gap:4px;justify-content:flex-start}
+.gcv-main h2:first-child{margin-top:0}`;
+  if(layout === 'timeline') layoutCSS = `
+.gcv-timeline{position:relative;padding-left:16px;border-left:2px solid ${t.soft};margin-top:4px}
+.gcv-tl-item{position:relative;margin-bottom:14px}
+.gcv-tl-dot{position:absolute;left:-21px;top:4px;width:9px;height:9px;border-radius:50%;background:${t.main};
+  box-shadow:0 0 0 2px #fff}`;
+  if(layout === 'plain') layoutCSS = `
+.gcv-page{font-family:'Arial',Helvetica,sans-serif}
+.gcv-name{color:#111827}
+.gcv-title{color:#374151}
+.gcv-page h2{color:#111827;border-bottom:1px solid #9CA3AF;text-transform:uppercase;letter-spacing:.04em}
+.gcv-contact .cl,.gcv-credline .cl{color:#374151}
+.gcv-chip{background:none;border:none;color:#111827;padding:0;margin-right:10px;font-size:11px}
+.gcv-chip::after{content:',';color:#6B7280}
+.gcv-chip:last-child::after{content:''}`;
 
   return `
 .gcv-page{font-family:Inter,'Segoe UI',Arial,sans-serif;color:#26292e;background:#fff;
   ${borderCSS}padding:32px 36px;max-width:820px;margin:0 auto;line-height:1.5;box-sizing:border-box}
 .gcv-page, .gcv-page *{overflow-wrap:break-word;word-break:break-word}
+.gcv-identity{display:flex;align-items:center;gap:14px}
+.gcv-photo{width:72px;height:72px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid ${t.soft}}
+.gcv-side-photo{display:flex;justify-content:center}
+.gcv-side-photo .gcv-photo{width:84px;height:84px}
 .gcv-head{border-bottom:3px solid ${t.main};padding-bottom:12px;margin-bottom:12px}
 ${headCSS}
 .gcv-name{font-size:27px;font-weight:800;color:${t.dark};letter-spacing:.01em;margin:0;font-family:${nameFont}}
@@ -2394,10 +2470,12 @@ function resumeHTML(forExport=false){
   const sp = R.section_prefs || {};
   const on = k => sp[k] !== false;
 
-  // ---- identity (name / current title / industry line)
-  const identity = `<h1 class="gcv-name">${esc(p.name)||'Your Name'}</h1>
+  // ---- identity (name / current title / industry line) + optional photo
+  const photoImg = p.photo ? `<img class="gcv-photo" src="${esc(p.photo)}" alt="">` : '';
+  const identityText = `<h1 class="gcv-name">${esc(p.name)||'Your Name'}</h1>
     ${currentTitle?`<div class="gcv-title">${esc(currentTitle)}</div>`:''}
     ${p.headline?`<div class="gcv-headline">${esc(p.headline)}</div>`:''}`;
+  const identity = photoImg ? `<div class="gcv-identity">${photoImg}<div>${identityText}</div></div>` : identityText;
 
   // ---- contact block: only fields available from the resume, always grouped
   const contactLines = [];
@@ -2456,13 +2534,26 @@ function resumeHTML(forExport=false){
       ${renderDescFmt(j.desc, getFmt(j,'desc'))}
     </div>`).join('') : '';
 
+  const expBlockTimeline = (on('experience') && R.experience.length) ? `<h2>Work Experience / History</h2>
+    <div class="gcv-timeline">` +
+    R.experience.map((j,i)=>`
+    <div class="gcv-tl-item">
+      <div class="gcv-tl-dot"></div>
+      <div class="gcv-job-head">
+        <strong>${esc(j.company)}</strong>
+        <span class="gcv-dates">${fmtDates(j, i===0)}</span>
+      </div>
+      <div class="gcv-job-title">${esc(j.title)}${j.location?' · '+esc(j.location):''}</div>
+      ${renderDescFmt(j.desc, getFmt(j,'desc'))}
+    </div>`).join('') + `</div>` : '';
+
   const extrasBlock = R.extra_sections.map(s=>`<h2>${esc(s.heading)}</h2><ul>${(s.items||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`).join('');
 
   const foot = `<div class="gcv-foot">Built with Reeve · <a href="https://www.decompliance.uk">www.decompliance.uk</a> · AI GRC Intelligence by DeCompliance</div>`;
 
   // ---- LAYOUT COMPOSER: user-arranged section order feeds every layout
   const blockMap = {summary:aopBlock, skills:skillsBlock, accomplishments:accomplishmentsBlock,
-    courses:coursesBlock, projects:projectsBlock, experience:expBlock};
+    courses:coursesBlock, projects:projectsBlock, experience: layout==='timeline' ? expBlockTimeline : expBlock};
   const orderKeys = (Array.isArray(R.section_order) && R.section_order.length ? R.section_order : DEFAULT_SECTION_ORDER)
     .filter(k => blockMap[k] !== undefined);
   const orderedAll = orderKeys.map(k=>blockMap[k]).join('');
@@ -2471,12 +2562,16 @@ function resumeHTML(forExport=false){
   const classicFlow = orderKeys[0]==='skills'
     ? skillsBlock + trendsBlock + orderKeys.slice(1).map(k=>blockMap[k]).join('')
     : trendsBlock + orderedAll;
+  const expForCols = layout==='timeline' ? expBlockTimeline : expBlock;
   let body;
   if(layout === 'sidebar'){
-    body = `<div class="gcv-page">
-      <div class="gcv-head">${identity}</div>
+    body = `<div class="gcv-page gcv-layout-sidebar">
       <div class="gcv-body">
         <div class="gcv-side">
+          ${photoImg?`<div class="gcv-side-photo">${photoImg}</div>`:''}
+          <div class="gcv-name">${esc(p.name)||'Your Name'}</div>
+          ${currentTitle?`<div class="gcv-title">${esc(currentTitle)}</div>`:''}
+          ${p.headline?`<div class="gcv-headline">${esc(p.headline)}</div>`:''}
           ${contactBlock}
           ${credLine}
           ${skillsBlock}
@@ -2486,14 +2581,14 @@ function resumeHTML(forExport=false){
         </div>
       </div>${foot}</div>`;
   } else if(layout === 'twocol'){
-    body = `<div class="gcv-page">
+    body = `<div class="gcv-page gcv-layout-twocol">
       <div class="gcv-head"><div>${identity}${credLine}</div>${contactBlock}</div>
       ${skillsBlock}${trendsBlock}
       <div class="gcv-cols">${orderedCols}</div>
-      ${expBlock}${extrasBlock}${foot}</div>`;
+      ${expForCols}${extrasBlock}${foot}</div>`;
   } else {
-    // classic / banner / compact / mono share the classic structure (CSS restyles them)
-    body = `<div class="gcv-page">
+    // classic / banner / plain share the classic structure (CSS restyles them per gcv-layout-X)
+    body = `<div class="gcv-page gcv-layout-${layout}">
       <div class="gcv-head"><div>${identity}${credLine}</div>${contactBlock}</div>
       ${classicFlow}${extrasBlock}${foot}</div>`;
   }
@@ -2508,7 +2603,77 @@ function resumeHTML(forExport=false){
 // then locked and identical in preview and every download.
 // ============================================================
 function templateMini(t){
-  // Tiny schematic preview of the template
+  const borderStyle = t.border==='double' ? `border:2px double ${t.main};`
+    : t.border==='solid' ? `border:1.5px solid ${t.main};`
+    : t.border==='topband' ? `border:1px solid #E2E5EA;border-top:5px solid ${t.main};`
+    : t.border==='sideband' ? `border:1px solid #E2E5EA;border-left:5px solid ${t.main};`
+    : t.border==='none' ? `border:1px solid #E5E7EB;`
+    : `border:1px solid #D8DCE2;border-top:2.5px solid ${t.main};`;
+  const wrapOpen = `<div style="${borderStyle}border-radius:5px;background:#fff;height:84px;overflow:hidden">`;
+  const wrapClose = `</div>`;
+
+  if(t.layout === 'sidebar'){
+    return `${wrapOpen}<div style="display:flex;height:100%">
+      <div style="width:32%;background:${t.dark};padding:6px 4px">
+        <div style="width:14px;height:14px;border-radius:50%;background:${t.soft};margin:0 auto 5px"></div>
+        <div style="height:3px;width:80%;margin:0 auto 3px;background:rgba(255,255,255,.8);border-radius:1px"></div>
+        <div style="height:2px;width:60%;margin:0 auto 6px;background:rgba(255,255,255,.55);border-radius:1px"></div>
+        ${[70,55,65].map(w=>`<div style="height:2px;width:${w}%;margin:0 auto 3px;background:rgba(255,255,255,.7);border-radius:1px"></div>`).join('')}
+      </div>
+      <div style="flex:1;padding:6px 5px">
+        <div style="height:4px;width:70%;background:${t.main};border-radius:1px;margin-bottom:6px"></div>
+        ${[90,82,88,70].map(w=>`<div style="height:2px;width:${w}%;background:#E5E7EB;border-radius:1px;margin-bottom:3px"></div>`).join('')}
+      </div>
+    </div>${wrapClose}`;
+  }
+  if(t.layout === 'twocol'){
+    return `${wrapOpen}
+      <div style="padding:6px 6px;border-bottom:2px solid ${t.soft}">
+        <div style="height:5px;width:55%;background:${t.dark};border-radius:1px;margin-bottom:3px"></div>
+        <div style="height:3px;width:35%;background:${t.main};border-radius:1px"></div>
+      </div>
+      <div style="display:flex;gap:5px;padding:6px 6px">
+        <div style="flex:1">
+          ${[90,75,85].map(w=>`<div style="height:2px;width:${w}%;background:#E5E7EB;border-radius:1px;margin-bottom:3px"></div>`).join('')}
+        </div>
+        <div style="flex:1">
+          ${[85,80,70].map(w=>`<div style="height:2px;width:${w}%;background:#E5E7EB;border-radius:1px;margin-bottom:3px"></div>`).join('')}
+        </div>
+      </div>${wrapClose}`;
+  }
+  if(t.layout === 'timeline'){
+    return `${wrapOpen}<div style="padding:6px 6px">
+      <div style="height:5px;width:55%;background:${t.dark};border-radius:1px;margin-bottom:8px"></div>
+      <div style="position:relative;padding-left:9px;border-left:2px solid ${t.soft}">
+        <div style="width:5px;height:5px;border-radius:50%;background:${t.main};position:absolute;left:-3.5px;top:1px"></div>
+        <div style="height:2px;width:60%;background:#374151;border-radius:1px;margin-bottom:2px"></div>
+        <div style="height:2px;width:40%;background:#E5E7EB;border-radius:1px;margin-bottom:10px"></div>
+        <div style="width:5px;height:5px;border-radius:50%;background:${t.main};position:absolute;left:-3.5px;top:31px"></div>
+        <div style="height:2px;width:55%;background:#374151;border-radius:1px;margin-bottom:2px"></div>
+        <div style="height:2px;width:35%;background:#E5E7EB;border-radius:1px"></div>
+      </div>
+    </div>${wrapClose}`;
+  }
+  if(t.layout === 'banner'){
+    return `${wrapOpen}
+      <div style="background:${t.main};padding:8px 8px">
+        <div style="height:6px;width:55%;background:#fff;border-radius:1px;margin-bottom:3px"></div>
+        <div style="height:3px;width:38%;background:${t.soft};border-radius:1px"></div>
+      </div>
+      <div style="padding:6px 6px">
+        ${[85,90,75].map(w=>`<div style="height:2px;width:${w}%;background:#E5E7EB;border-radius:1px;margin-bottom:3px"></div>`).join('')}
+      </div>${wrapClose}`;
+  }
+  if(t.layout === 'plain'){
+    return `${wrapOpen}<div style="padding:7px 7px">
+      <div style="height:6px;width:50%;background:#111827;border-radius:0;margin-bottom:2px"></div>
+      <div style="height:2px;width:35%;background:#6B7280;border-radius:0;margin-bottom:8px"></div>
+      <div style="height:2px;width:25%;background:#111827;border-bottom:1px solid #9CA3AF;margin-bottom:4px"></div>
+      ${[88,80].map(w=>`<div style="height:2px;width:${w}%;background:#D1D5DB;border-radius:0;margin-bottom:3px"></div>`).join('')}
+    </div>${wrapClose}`;
+  }
+
+  // Tiny schematic preview for the shared classic structure
   const headerRow = t.header==='center'
     ? `<div style="height:7px;width:55%;margin:4px auto 2px;background:${t.dark};border-radius:2px"></div>
        <div style="height:4px;width:70%;margin:0 auto;background:${t.main};border-radius:2px"></div>`
@@ -2518,19 +2683,14 @@ function templateMini(t){
     : `<div style="display:flex;justify-content:space-between;padding:4px 6px 2px">
          <div style="height:7px;width:45%;background:${t.dark};border-radius:2px"></div>
          <div style="height:7px;width:25%;background:${t.soft};border:1px solid ${t.main};border-radius:2px"></div></div>`;
-  const borderStyle = t.border==='double' ? `border:2px double ${t.main};`
-    : t.border==='solid' ? `border:1.5px solid ${t.main};`
-    : t.border==='topband' ? `border:1px solid #E2E5EA;border-top:5px solid ${t.main};`
-    : t.border==='sideband' ? `border:1px solid #E2E5EA;border-left:5px solid ${t.main};`
-    : `border:1px solid #D8DCE2;border-top:2.5px solid ${t.main};`;
-  return `<div style="${borderStyle}border-radius:5px;background:#fff;height:84px;overflow:hidden">
+  return `${wrapOpen}
     ${headerRow}
     <div style="display:flex;gap:2px;padding:3px 6px">
       ${[28,34,22,30].map(w=>`<div style="height:5px;width:${w}px;background:${t.soft};border:1px solid ${t.main};border-radius:99px"></div>`).join('')}
     </div>
     <div style="height:4px;width:40%;margin:2px 6px;background:${t.main};opacity:.85;border-radius:2px"></div>
     ${[85,78,88].map(w=>`<div style="height:3px;width:${w}%;margin:2.5px 6px;background:#E5E7EB;border-radius:2px"></div>`).join('')}
-  </div>`;
+  ${wrapClose}`;
 }
 
 function renderTemplateGrid(){
