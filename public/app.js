@@ -3636,16 +3636,19 @@ function initLanding(){
     }, 34);
   });
 
-  // Rolling template formats (duplicated for a seamless loop)
+  // Rolling template formats (duplicated for a seamless loop) — mirrors the
+  // real template lineup so this stays accurate as templates are added.
   const FORMATS = [
-    {f:'classic', n:'Classic', c:'#1E3A8A'},
-    {f:'banner',  n:'Banner',  c:'#0FA968'},
-    {f:'sidebar', n:'Sidebar', c:'#6D3A6E'},
-    {f:'duo',     n:'Duo Column', c:'#0284C7'},
-    {f:'exec',    n:'Executive Serif', c:'#8E1F38'},
-    {f:'mono',    n:'Monoline', c:'#3A4756'},
-    {f:'banner',  n:'Banner Slate', c:'#334155'},
-    {f:'sidebar', n:'Sidebar Forest', c:'#2F6B4F'}
+    {f:'classic',  n:'Classic',            c:'#1E3A8A'},
+    {f:'banner',   n:'Banner Bold',        c:'#C2410C', photo:true},
+    {f:'sidebar',  n:'Sidebar Plum',       c:'#831843', photo:true},
+    {f:'timeline', n:'Timeline Executive', c:'#0F766E', photo:true},
+    {f:'duo',      n:'Two-Column Indigo',  c:'#4338CA', photo:true},
+    {f:'plain',    n:'ATS Plain',          c:'#374151'},
+    {f:'exec',     n:'Executive',          c:'#8E1F38'},
+    {f:'mono',     n:'Monoline',           c:'#3A4756'},
+    {f:'sidebar',  n:'Sidebar Slate',      c:'#334155'},
+    {f:'duo',      n:'Duo Column',         c:'#0284C7'}
   ];
   const rollEl = document.getElementById('ldtRoll');
   if(rollEl){
@@ -3674,11 +3677,21 @@ function initLanding(){
       } else if(t.f === 'mono'){
         inner = `<div class="toprule"></div><div class="body"><div class="ldt-nm" style="background:#1A2434"></div>${L('44%')}
           ${H(t.c,'34%')}${L()}${L('82%')}${H(t.c,'28%')}${L('88%')}${L('72%')}${L('58%')}</div>`;
+      } else if(t.f === 'timeline'){
+        inner = `<div class="body"><div class="ldt-nm" style="background:${t.c}"></div>${L('44%')}
+          <div class="tl">
+            <div class="tl-item"><span class="tl-dot"></span>${L('68%')}${L('44%')}</div>
+            <div class="tl-item"><span class="tl-dot"></span>${L('60%')}${L('40%')}</div>
+          </div></div>`;
+      } else if(t.f === 'plain'){
+        inner = `<div class="body"><div class="ldt-nm"></div>${L('30%')}
+          <div class="prule"></div>${L('88%')}${L('72%')}
+          <div class="prule"></div>${L('80%')}${L('64%')}</div>`;
       } else {
         inner = `<div class="body"><div class="ldt-nm" style="background:${t.c}"></div>${L('46%')}
           ${H(t.c,'40%')}${L()}${L('86%')}${L('70%')}${H(t.c,'34%')}${L('90%')}${L('76%')}${L('62%')}</div>`;
       }
-      d.innerHTML = inner + `<div class="ldt-lbl">${t.n}</div>`;
+      d.innerHTML = inner + `<div class="ldt-lbl">${t.n}${t.photo?'<span class="ldt-photo" title="Photo supported"></span>':''}</div>`;
       return d;
     };
     [...FORMATS, ...FORMATS].forEach(t => rollEl.appendChild(card(t)));
