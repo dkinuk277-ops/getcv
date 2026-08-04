@@ -3873,7 +3873,7 @@ function initLanding(){
       entries.forEach(e=>{
         if(!e.isIntersecting) return;
         const el = e.target;
-        if(el.id === 'ldTimeline'){
+        if(el.classList.contains('ld-timeline')){
           el.classList.add('play');
           [...el.querySelectorAll('.ld-tstep')].forEach((k,i)=>
             setTimeout(()=> k.classList.add('reveal'), i*160));
@@ -3886,14 +3886,13 @@ function initLanding(){
         io.unobserve(el);
       });
     }, {threshold:.2});
-    ['ldTimeline','ldTdemo'].forEach(id=>{
-      const el = document.getElementById(id); if(el) io.observe(el);
-    });
+    document.querySelectorAll('.ld-timeline').forEach(el => io.observe(el));
+    const td = document.getElementById('ldTdemo'); if(td) io.observe(td);
     const fg = document.querySelector('.ld-fgrid'); if(fg) io.observe(fg);
   } else {
     // very old browsers: just show everything
     document.querySelectorAll('.ld-tstep,.ld-fcard').forEach(el=>el.classList.add('reveal'));
-    const tl = document.getElementById('ldTimeline'); if(tl) tl.classList.add('play');
+    document.querySelectorAll('.ld-timeline').forEach(el=>el.classList.add('play'));
     const td = document.getElementById('ldTdemo'); if(td) td.classList.add('play');
   }
 }
