@@ -930,6 +930,17 @@ body:has(#view-landing.on) .app-footer{ display:none; }
 .ld-build .job li{font-size:9px;color:#3C4A61;margin-left:12px;margin-top:3px}
 .ld-samplebadge{position:absolute;bottom:-11px;left:50%;transform:translateX(-50%);background:#12233F;color:#9FEFCB;font-size:8.5px;
 font-weight:900;letter-spacing:.08em;border-radius:99px;padding:4px 12px;text-transform:uppercase;white-space:nowrap}
+.ld-spark{color:var(--rv-main);font-size:9px}
+.ld-chip.suggest{background:#fff;color:#92400E;border:1px dashed #F0B94A}
+.ld-build .job li.old{color:#B91C1C;text-decoration:line-through;list-style:none;margin-left:0}
+.ld-build .job li.new{color:#14532D;background:#EAF9F1;border-radius:4px;padding:2px 6px;list-style:none;margin-left:0;margin-top:3px;display:inline-block}
+.ld-build .matchrow{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:8px;
+  border-top:1.5px solid var(--rv-tint);animation-delay:3.8s}
+.ld-build .matchrow span{font-size:8.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--rv-ink-soft)}
+.ld-build .matchrow b{font-size:14px;font-weight:900;color:var(--rv-main)}
+.ld-build .done2{position:absolute;top:-13px;left:-13px;background:#12233F;color:#7CF0BE;
+  font-size:11px;font-weight:900;border-radius:99px;padding:7px 13px;box-shadow:0 6px 16px rgba(6,35,25,.4);
+  opacity:0;transform:scale(.6);animation:ldPop .45s cubic-bezier(.6,1.6,.5,1) forwards 3.6s}
 /* -- 2. rolling templates -- */
 .ldt-sec{background:linear-gradient(180deg,var(--rv-ws-top),var(--rv-ws-bot));padding:56px 0;overflow:hidden}
 .ldt-sec h2{font-size:30px;font-weight:900;text-align:center;letter-spacing:-.015em}
@@ -944,6 +955,7 @@ overflow:hidden;position:relative;transition:transform .25s;display:flex;flex-di
 .ldt-h{height:5.5px;border-radius:2px;margin:8px 0 5px}
 .ldt-nm{height:11px;border-radius:3px;width:62%;margin-bottom:4px}
 .ldt-lbl{position:absolute;bottom:0;left:0;right:0;background:rgba(18,35,63,.85);color:#fff;font-size:10px;font-weight:800;text-align:center;padding:6px}
+.ldt-photo{display:inline-block;width:7px;height:7px;border-radius:50%;background:#7CF0BE;margin-left:5px;vertical-align:middle}
 .ldt-tpl.banner .bhead{background:var(--tc);padding:12px}
 .ldt-tpl.banner .bhead .ldt-nm{background:rgba(255,255,255,.92)}
 .ldt-tpl.banner .bhead .ldt-l{background:rgba(255,255,255,.5);width:46%}
@@ -958,6 +970,14 @@ overflow:hidden;position:relative;transition:transform .25s;display:flex;flex-di
 .ldt-tpl.exec .rule{height:2px;background:var(--tc);width:44%;margin:6px auto}
 .ldt-tpl.exec .ldt-l{margin-left:auto;margin-right:auto}
 .ldt-tpl.mono .toprule{height:6px;background:var(--tc)}
+.ldt-tpl.timeline .tl{position:relative;padding-left:11px;border-left:2px solid #E4E9F0;margin-top:8px}
+.ldt-tpl.timeline .tl-item{position:relative;margin-bottom:12px}
+.ldt-tpl.timeline .tl-dot{position:absolute;left:-16px;top:2px;width:7px;height:7px;border-radius:50%;background:var(--tc)}
+.ldt-tpl.plain .ldt-nm{background:#1F2937;width:56%}
+.ldt-tpl.plain .ldt-l{background:#D1D5DB}
+.ldt-tpl.plain .prule{height:1px;background:#9CA3AF;margin:8px 0 5px;width:34%}
+.ldt-photo{position:absolute;top:8px;right:8px;width:16px;height:16px;border-radius:50%;
+  background:var(--tc);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.25);z-index:2}
 /* -- 3. builder peek demo -- */
 .ldp-sec{background:linear-gradient(165deg,#0B4A31,#067A4B);color:#fff;padding:60px 26px}
 .ldp-sec h2{font-size:30px;font-weight:900;text-align:center;letter-spacing:-.015em;color:#fff}
@@ -1555,7 +1575,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
     <button class="btn-dline" id="btnLogout" type="button">Log out</button>
   </div>
 </header>
-<div class="ticker"><span><b>◆</b> Build your CV in 15 minutes &nbsp;<b>◆</b> 20 professional templates &nbsp;<b>◆</b> Career timeline &amp; tenure ranking &nbsp;<b>◆</b> AI-enhanced summaries &nbsp;<b>◆</b> 🎯 Tailor for any job with AI &nbsp;<b>◆</b> Export to PDF &amp; Word &nbsp;<b>◆</b> Build your CV in 15 minutes &nbsp;<b>◆</b> 20 professional templates &nbsp;<b>◆</b> Career timeline &amp; tenure ranking</span></div>
+<div class="ticker"><span><b>◆</b> Talk to your resume with AI &nbsp;<b>◆</b> 25 professional templates &nbsp;<b>◆</b> Career timeline &amp; tenure ranking &nbsp;<b>◆</b> Photo-ready templates &nbsp;<b>◆</b> 🎯 Tailor for any job with AI &nbsp;<b>◆</b> Export to PDF &amp; Word &nbsp;<b>◆</b> Talk to your resume with AI &nbsp;<b>◆</b> 25 professional templates &nbsp;<b>◆</b> Career timeline &amp; tenure ranking</span></div>
 
 
 <!-- ============ LOGIN ============ -->
@@ -1571,9 +1591,9 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
     <div class="ld-hwrap">
       <div>
         <div class="ld-kick">&#9670; Reeve &middot; AI Resume Builder &middot; by DeCompliance</div>
-        <h1>Your custom resume,<br>ready in <span class="ld-shiny">15 minutes</span></h1>
+        <h1>Tell it what to change.<br>Watch your resume <span class="ld-shiny">rewrite itself</span>.</h1>
         <div class="ld-type"><span id="ldTyper"></span><span class="ld-cursor"></span></div>
-        <p class="ld-sub">Upload your old CV or start from scratch. Reeve's AI rewrites, structures and tailors your resume to the exact job you're chasing &mdash; then hands you a recruiter-ready PDF.</p>
+        <p class="ld-sub">Type "add my AWS certification" or "fix the grammar in my summary" &mdash; Reeve's AI Builder does it live, right in front of you. No forms, no menus, just say what you need.</p>
         <div class="ld-ctarow">
           <button class="ld-cta" data-ldgo="signup" type="button">Start building free &rarr;</button>
           <button class="ld-cta2" id="ldHowBtn" type="button">See how it works</button>
@@ -1583,18 +1603,20 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <div class="ld-build">
           <div class="ld-bd nm">First Name Last Name</div>
           <div class="ld-bd role">YOUR PROFESSIONAL TITLE &middot; YOUR INDUSTRY</div>
-          <h6 class="ld-bd h1x">Professional Summary</h6>
+          <h6 class="ld-bd h1x">Professional Summary <span class="ld-spark">&#10022;</span></h6>
           <p class="ld-bd ld-blur">Accomplished professional with 10+ years leading complex programmes, known for calm stakeholder management and reliable delivery&hellip;</p>
           <h6 class="ld-bd h2x">Key Skills</h6>
           <div class="ld-chips">
-            <span class="ld-chip">Leadership</span><span class="ld-chip">Delivery</span><span class="ld-chip">Stakeholders</span><span class="ld-chip">Strategy</span><span class="ld-chip">Risk</span>
+            <span class="ld-chip">Leadership</span><span class="ld-chip">Delivery</span><span class="ld-chip">Stakeholders</span><span class="ld-chip suggest">+ Strategy</span>
           </div>
           <h6 class="ld-bd h3x">Experience</h6>
           <div class="ld-bd job"><b>Job Title &mdash; Company Name Ltd</b><span>2021 &ndash; Present</span>
-            <li class="ld-blur">Delivered a major platform migration two weeks early</li>
-            <li class="ld-blur">Managed a cross-functional team across three sites</li>
+            <li class="old">Responsible for team tasks</li>
+            <li class="new">Led a 14-person team, delivering 2 weeks early</li>
           </div>
-          <div class="done">&#10003; Ready in 15:00</div>
+          <div class="ld-bd matchrow"><span>Match score</span><b>92%</b></div>
+          <div class="done">&#10024; AI-enhanced</div>
+          <div class="done2">&#10022; Live editing</div>
           <div class="ld-samplebadge">Sample resume &middot; illustrative</div>
         </div>
       </div>
@@ -1602,13 +1624,13 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   </section>
   <section class="ld-stats">
     <div class="row">
-      <div class="ld-stat"><b data-ldcount="15" data-ldsuffix=" min">0</b><span>Average build time</span></div>
-      <div class="ld-stat"><b data-ldcount="20" data-ldsuffix="">0</b><span>Professional templates</span></div>
-      <div class="ld-stat"><b data-ldcount="6" data-ldsuffix="">0</b><span>AI-enhanced sections</span></div>
+      <div class="ld-stat"><b data-ldcount="25" data-ldsuffix="">0</b><span>Professional templates</span></div>
+      <div class="ld-stat"><b data-ldcount="5" data-ldsuffix="">0</b><span>Real layout structures</span></div>
+      <div class="ld-stat"><b data-ldcount="4" data-ldsuffix="">0</b><span>Photo-ready templates</span></div>
       <div class="ld-stat"><b data-ldcount="100" data-ldsuffix="%">0</b><span>Truth-first tailoring</span></div>
     </div>
   </section>
-  <div class="ld-marq"><span><b>&#9670;</b> Build your CV in minutes &nbsp;<b>&#9670;</b> AI never invents experience &mdash; truth-first tailoring &nbsp;<b>&#9670;</b> 20 professional templates &nbsp;<b>&#9670;</b> Live split-screen preview &nbsp;<b>&#9670;</b> Export to PDF &amp; Word &nbsp;<b>&#9670;</b> Free while in beta &nbsp;<b>&#9670;</b> Built by DeCompliance &middot; decompliance.uk &nbsp;<b>&#9670;</b> Build your CV in minutes &nbsp;<b>&#9670;</b> AI never invents experience &nbsp;<b>&#9670;</b> 20 professional templates</span></div>
+  <div class="ld-marq"><span><b>&#9670;</b> Build your CV in minutes &nbsp;<b>&#9670;</b> AI never invents experience &mdash; truth-first tailoring &nbsp;<b>&#9670;</b> 25 professional templates &nbsp;<b>&#9670;</b> Live split-screen preview &nbsp;<b>&#9670;</b> Export to PDF &amp; Word &nbsp;<b>&#9670;</b> Free while in beta &nbsp;<b>&#9670;</b> Built by DeCompliance &middot; decompliance.uk &nbsp;<b>&#9670;</b> Build your CV in minutes &nbsp;<b>&#9670;</b> AI never invents experience &nbsp;<b>&#9670;</b> 25 professional templates</span></div>
   <section class="ld-how" id="ld-how">
     <h2>From blank page to <span style="color:var(--rv-main)">hired-ready</span> in four steps</h2>
     <p class="ld-lead">No design skills, no formatting fights. You bring the experience &mdash; Reeve does everything else.</p>
@@ -1621,9 +1643,10 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   </section>
 
   <section class="ldt-sec" id="ld-templates">
-    <h2>20 professional templates</h2>
-    <p class="ld-lead" style="margin-bottom:0">Classic &middot; Banner &middot; Sidebar &middot; Duo-column &middot; Executive &middot; Monoline &mdash; hover to pause &amp; inspect. One click restyles your whole resume.</p>
+    <h2>25 professional templates</h2>
+    <p class="ld-lead" style="margin-bottom:0">Classic &middot; Banner &middot; Sidebar &middot; Timeline &middot; Two-column &middot; ATS-plain &middot; Executive &middot; Monoline &mdash; hover to pause &amp; inspect. One click restyles your whole resume.</p>
     <div class="ldt-roll" id="ldtRoll"></div>
+    <p style="font-size:11px;color:var(--rv-ink-soft,#6b8f7a);text-align:center;margin-top:10px"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#0FA968;vertical-align:middle;margin-right:5px"></span>Photo support on select templates</p>
   </section>
   <section class="ld-feat" id="ld-features">
     <h2>Everything a serious application needs</h2>
@@ -1632,8 +1655,11 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
       <div class="ld-fcard"><div class="ic">&#11014;</div><h4>Smart CV upload</h4><p>PDF or Word in &mdash; structured, editable resume out. AI parses every section in seconds.</p></div>
       <div class="ld-fcard"><div class="ic">&#10024;</div><h4>AI enhancement</h4><p>Every summary, bullet and skill sharpened by AI trained to write like a senior recruiter.</p></div>
       <div class="ld-fcard gold"><div class="ic">&#127919;</div><h4>Tailor for Job<span class="pro">&#9733; PRO</span></h4><p>Paste any job description. Reeve scores your match, reorders skills, rewrites bullets &mdash; and never invents experience you don't have.</p></div>
+      <div class="ld-fcard"><div class="ic">&#128172;</div><h4>Talk to your resume</h4><p>Add a skill, delete a job, fix the grammar &mdash; just type it in plain English and watch it happen live.</p></div>
+      <div class="ld-fcard"><div class="ic">&#127912;</div><h4>25 professional templates</h4><p>Sidebar, timeline, two-column, banner, ATS-plain &mdash; genuinely different structures, not just recolors.</p></div>
+      <div class="ld-fcard"><div class="ic">&#128247;</div><h4>Add your photo</h4><p>Professional headshot support on select templates, live in the preview as you upload.</p></div>
       <div class="ld-fcard"><div class="ic">&#128065;</div><h4>Live split-screen preview</h4><p>Watch your resume take shape as you type. What you see is exactly what downloads.</p></div>
-      <div class="ld-fcard"><div class="ic">&#127912;</div><h4>20 professional templates</h4><p>Executive, modern, compact &mdash; one click restyles the whole document instantly.</p></div>
+      <div class="ld-fcard"><div class="ic">&#8596;</div><h4>Workspace, your way</h4><p>Drag to resize every panel &mdash; sections, editor, live preview &mdash; to fit how you work.</p></div>
       <div class="ld-fcard"><div class="ic">&#128196;</div><h4>Clean PDF &amp; Word export</h4><p>Per-page borders, no orphaned headings, recruiter-ready pagination. Files that look hand-finished.</p></div>
     </div>
   </section>
@@ -1744,7 +1770,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
     </div>
   </section>
   <section class="ld-ctaband">
-    <h2>Your next role is <span class="ld-shiny">15 minutes</span> away</h2>
+    <h2>Your resume, <span class="ld-shiny">one message away</span></h2>
     <p>Free while in beta &middot; No credit card &middot; Your data stays yours (GDPR-first, built by a compliance professional)</p>
     <button class="ld-cta" data-ldgo="signup" type="button">Create your free account &rarr;</button>
   </section>
