@@ -175,7 +175,7 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .sk.partial::before{content:"≈ "}
 .tl-caveat{font-size:11px;color:var(--ink-soft);font-style:italic;margin-top:4px;line-height:1.4}
 .tl-explainer{background:#EEF4FF;border:1px solid #C7D9F5;border-radius:10px;padding:14px 16px;margin-bottom:16px}
-.tl-explainer b{display:block;font-size:13.5px;margin-bottom:6px}
+.tl-explainer-title{display:block;font-size:13.5px;margin-bottom:6px}
 .tl-explainer-list{margin:8px 0 0;padding-left:19px}
 .tl-explainer-list li{font-size:12.5px;color:var(--ink-soft);line-height:1.55;margin-bottom:7px}
 .tl-explainer-list li:last-child{margin-bottom:0}
@@ -2155,7 +2155,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         📄 Welcome back — we restored your last pasted job and results.
       </div>
       <div class="tl-explainer">
-        <b>🔍 What is ATS matching, and why does this matter?</b>
+        <b class="tl-explainer-title">🔍 What is ATS matching, and why does this matter?</b>
         <ul class="tl-explainer-list">
           <li>Most large employers run every application through software called an <b>ATS (Applicant Tracking System)</b> before a recruiter ever opens it.</li>
           <li>It scans your resume for the specific skills, tools and keywords the job posting asks for, then ranks or filters candidates based on how well those match.</li>
@@ -2184,7 +2184,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
       </div>
       <div id="tlResults" class="hidden">
         <div class="tl-disclaimer-top">
-          <b>⚠ How to read this score</b>
+          <b class="tl-explainer-title" style="color:#9A3412">⚠ How to read this score</b>
           <ul class="tl-disclaimer-list">
             <li>Based only on matching skills named in the job description against skills already evidenced in your resume — nothing invented or newly added.</li>
             <li>It's an indication of your screening chances with the ATS software recruiters use — not a guarantee of getting an interview. That decision always stays with the recruiter.</li>
