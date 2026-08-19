@@ -3306,6 +3306,50 @@ $('#btnConfirmDelete').addEventListener('click', async ()=>{
 // Paste a JD → AI analysis → accept/reject changes → save as new resume
 // ============================================================
 let tailorResult = null;
+const TL_SESSION_KEY = 'reeve_tailor_session';
+
+function tlSaveSession(extra){
+  try{
+    const data = {
+      jobTitle: $('#tlTitle').value.trim(),
+      company: $('#tlCompany').value.trim(),
+      jobDescription: $('#tlJD').value,
+      result: tailorResult,
+      ts: Date.now()
+    };
+    Object.assign(data, extra || {});
+    localStorage.setItem(TL_SESSION_KEY, JSON.stringify(data));
+  }catch(e){ /* storage unavailable — fail silently, not critical */ }
+}
+
+function tlLoadSession(){
+  try{
+    const raw = localStorage.getItem(TL_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+// Debounced draft save — keeps whatever the user has typed even if they
+// switch tabs/apps and come back before ever clicking Analyse. If the JD
+// text changes after a result was cached, the stale result is dropped so
+// we never show results that don't match the pasted text.
+let tlDraftTimer = null;
+function tlScheduleDraftSave(){
+  clearTimeout(tlDraftTimer);
+  const note = $('#tlSaveNote');
+  tlDraftTimer = setTimeout(()=>{
+    const prev = tlLoadSession();
+    const jdNow = $('#tlJD').value;
+    const keepResult = prev && prev.jobDescription === jdNow ? prev.result : null;
+    if(!tailorResult) tailorResult = keepResult; // don't clobber a live result in memory
+    tlSaveSession({ result: tailorResult || keepResult });
+    if(note){ note.textContent = 'Saved — safe to switch tabs and come back.'; setTimeout(()=> note.textContent='', 2500); }
+  }, 600);
+}
+['#tlTitle','#tlCompany','#tlJD'].forEach(sel=>{
+  const node = $(sel);
+  if(node) node.addEventListener('input', tlScheduleDraftSave);
+});
 
 function tlStep(n){
   for(let i=1;i<=4;i++){
@@ -3324,13 +3368,34 @@ function tlError(paneId, msg){
 
 document.querySelectorAll('.js-tailor').forEach(b => b.addEventListener('click', ()=>{
   if(resumeIsEmpty()) return toast('Import or open a resume first — then tailor it for a job.', 5000);
-  tailorResult = null;
   $('#tlErr').classList.remove('on');
   $('#tlErr2').classList.remove('on');
+  $('#tailorModal').classList.add('open');
+
+  const saved = tlLoadSession();
+  const banner = $('#tlRestoreBanner');
+  if(saved && (saved.jobDescription || saved.jobTitle)){
+    $('#tlTitle').value = saved.jobTitle || '';
+    $('#tlCompany').value = saved.company || '';
+    $('#tlJD').value = saved.jobDescription || '';
+    if(banner) banner.classList.remove('hidden');
+    if(saved.result){
+      // Full parsed results already exist for this exact pasted JD — show
+      // them straight away instead of making the user re-run the analysis.
+      tailorResult = saved.result;
+      $('#tlLoading').style.display = 'none';
+      $('#tlResults').classList.remove('hidden');
+      tlStep(2);
+      renderTailorResults();
+      return;
+    }
+  } else {
+    if(banner) banner.classList.add('hidden');
+    tailorResult = null;
+  }
   $('#tlResults').classList.add('hidden');
   $('#tlLoading').style.display = 'block';
   tlStep(1);
-  $('#tailorModal').classList.add('open');
   setTimeout(()=> $('#tlJD').focus(), 40);
 }));
 
@@ -3352,6 +3417,7 @@ $('#tlAnalyse').addEventListener('click', async ()=>{
       })
     });
     tailorResult = out.result;
+    tlSaveSession({});
     renderTailorResults();
   }catch(err){
     tlStep(1);
@@ -3364,21 +3430,26 @@ function renderTailorResults(){
   $('#tlLoading').style.display = 'none';
   $('#tlResults').classList.remove('hidden');
 
-  // Match ring
+  // Match ring — animates 0 → score so it reads as "being calculated"
   const pct = r.match_score || 0;
-  $('#tlScore').textContent = pct + '%';
-  $('#tlRing').style.background = `conic-gradient(var(--accent) 0 ${pct}%, #E5E7EB ${pct}% 100%)`;
+  animateTlScore(pct);
   const jt = $('#tlTitle').value.trim(), co = $('#tlCompany').value.trim();
   $('#tlMatchTitle').textContent = 'Your resume vs. ' + (jt || 'this job') + (co ? ' @ ' + co : '');
   $('#tlMatchSummary').textContent = r.match_summary || '';
 
-  // Coverage chips
+  // Coverage chips + tile counts
   const cov = $('#tlCoverage'); cov.innerHTML = '';
+  let nFound=0, nPartial=0, nMissing=0;
   (r.skills_coverage || []).forEach(s=>{
-    const chip = el('span', {class:'sk ' + (s.status || 'partial')});
+    const status = s.status || 'partial';
+    if(status==='have') nFound++; else if(status==='missing') nMissing++; else nPartial++;
+    const chip = el('span', {class:'sk ' + status});
     chip.textContent = s.skill + (s.note ? ' — ' + s.note : '');
     cov.appendChild(chip);
   });
+  $('#tlFoundNum').textContent = nFound;
+  $('#tlPartialNum').textContent = nPartial;
+  $('#tlMissingNum').textContent = nMissing;
 
   renderAtsParseability();
 
@@ -3445,6 +3516,24 @@ function renderTailorResults(){
 }
 
 // ============================================================
+// SCORE ANIMATION — counts up 0 → score on render so it reads as
+// "being calculated" rather than an instant static number.
+// ============================================================
+function animateTlScore(pct){
+  const ring = $('#tlRing'), label = $('#tlScore');
+  if(!ring || !label) return;
+  const dur = 900, start = performance.now();
+  function step(now){
+    const t = Math.min(1, (now-start)/dur);
+    const cur = Math.round(t*pct);
+    label.textContent = cur + '%';
+    ring.style.background = `conic-gradient(var(--accent) 0 ${cur}%, #E5E7EB ${cur}% 100%)`;
+    if(t<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ============================================================
 // ATS PARSEABILITY CHECK — deterministic, no AI call.
 // Flags whether the currently selected template's layout is
 // likely to be misread by real ATS parsing software (multi-column,
@@ -3462,11 +3551,15 @@ const ATS_RISKY_LAYOUTS = {
 
 function renderAtsParseability(){
   const box = $('#tlParse');
+  const tile = $('#tlFormatTile');
+  const tileIcon = $('#tlFormatIcon');
   if(!box) return;
   const t = getTemplate();
   const risk = t.layout && ATS_RISKY_LAYOUTS[t.layout];
   box.innerHTML = '';
   box.classList.remove('ok','risk');
+  if(tile){ tile.classList.remove('ok','risk'); tile.classList.add(risk ? 'risk' : 'ok'); }
+  if(tileIcon) tileIcon.textContent = risk ? '⚠' : '✓';
   if(risk){
     box.classList.add('risk');
     box.innerHTML = `⚠ <span><b>${esc(t.name)}</b> uses a ${esc(risk)}. Consider <a class="tl-switch-ats" id="tlSwitchAts">switching to ATS Plain</a> for this application.</span>`;
