@@ -29,7 +29,16 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // ---- Middleware
 app.use(cors()); // same-origin in production; open for local dev
 app.use(express.json({ limit: '2mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+// Static files: force revalidation on every request for HTML/JS instead of
+// letting browsers cache them freely. Without this, a browser can keep
+// serving an old cached app.js after a deploy — the page loads, but
+// event handlers from the stale script don't match the current markup,
+// which shows up as "the first click does nothing, a reload fixes it."
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (/\.(html|js)$/i.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
+  }
+}));
 
 // File upload: keep in memory (no disk writes), 10 MB cap
 const upload = multer({
