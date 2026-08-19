@@ -3591,7 +3591,7 @@ function renderAtsParseability(){
   if(tileIcon) tileIcon.textContent = risk ? '⚠' : '✓';
   if(risk){
     box.classList.add('risk');
-    box.innerHTML = `⚠ <span><b>${esc(t.name)}</b> uses a ${esc(risk)}. Consider <a class="tl-switch-ats" id="tlSwitchAts">switching to ATS Plain</a> for this application.</span>`;
+    box.innerHTML = `⚠ <span>You've selected the <b>${esc(t.name)}</b> template for this resume, which uses a ${esc(risk)}. ATS software may misread or skip this content when it scans your file — meaning a recruiter might never see it, regardless of how strong the wording is. <a class="tl-switch-ats" id="tlSwitchAts">Switch to ATS Plain</a> to remove this risk for this application.</span>`;
     const link = box.querySelector('#tlSwitchAts');
     if(link) link.addEventListener('click', ()=>{
       selectedTemplate = 'ats-plain';
@@ -3605,9 +3605,9 @@ function renderAtsParseability(){
     });
   } else {
     box.classList.add('ok');
-    box.innerHTML = `✓ <span><b>${esc(t.name)}</b> uses a single-column layout that parses cleanly in most ATS software.</span>`;
+    box.innerHTML = `✓ <span>You've selected the <b>${esc(t.name)}</b> template for this resume. It uses a single, top-to-bottom column — the layout ATS software reads most reliably, so nothing in it risks being skipped or read out of order during automated screening.</span>`;
     if(t.photo){
-      box.innerHTML += ` <span style="font-weight:600">Note: this template includes a photo — a small number of ATS setups strip photos on import.</span>`;
+      box.innerHTML += ` <span style="font-weight:600">Note: this template includes a photo — a small number of ATS setups strip photos on import, so the photo itself (not your text) may not carry through.</span>`;
     }
   }
 }
