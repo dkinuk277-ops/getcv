@@ -135,6 +135,10 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
   margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line)}
 .tl-head h2{font-size:19px}
+.tl-clear-btn{position:absolute;top:9px;right:48px;font-size:11px;font-weight:700;color:var(--ink-soft);
+  background:#F3F4F6;border:1px solid var(--line);border-radius:99px;padding:5px 12px;cursor:pointer;z-index:10;white-space:nowrap}
+.tl-clear-btn:hover{background:#E5E7EB;color:var(--ink)}
+@media(max-width:640px){.tl-clear-btn{position:static;display:inline-block;margin-bottom:8px}}
 .tl-steps{display:flex;gap:6px}
 .tl-stp{font-size:10.5px;font-weight:700;padding:4px 11px;border-radius:99px;background:#EEF1F4;color:var(--ink-soft)}
 .tl-stp.on{background:var(--accent);color:#fff}
@@ -172,13 +176,17 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-caveat{font-size:11px;color:var(--ink-soft);font-style:italic;margin-top:4px;line-height:1.4}
 .tl-explainer{background:#EEF4FF;border:1px solid #C7D9F5;border-radius:10px;padding:14px 16px;margin-bottom:16px}
 .tl-explainer b{display:block;font-size:13.5px;margin-bottom:6px}
-.tl-explainer p{font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin:5px 0 0}
+.tl-explainer-list{margin:8px 0 0;padding-left:19px}
+.tl-explainer-list li{font-size:12.5px;color:var(--ink-soft);line-height:1.55;margin-bottom:7px}
+.tl-explainer-list li:last-child{margin-bottom:0}
 .tl-cov-label{font-size:12px;font-weight:600;color:var(--ink);margin-top:12px;margin-bottom:2px}
 .tl-savenote{font-size:11px;color:var(--ink-soft);margin-top:4px;min-height:14px}
 .tl-restore-banner{background:#EEF4FF;border:1px solid #C7D9F5;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;font-weight:600;color:#1E3A8A}
 .tl-disclaimer-top{background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:12px 16px;margin-bottom:14px}
 .tl-disclaimer-top b{display:block;font-size:12.5px;color:#9A3412;margin-bottom:4px}
-.tl-disclaimer-top p{font-size:12px;color:#7C2D12;line-height:1.5;margin:0}
+.tl-disclaimer-list{margin:0;padding-left:18px}
+.tl-disclaimer-list li{font-size:12px;color:#7C2D12;line-height:1.55;margin-bottom:5px}
+.tl-disclaimer-list li:last-child{margin-bottom:0}
 .ats-tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:14px}
 @media(max-width:640px){.ats-tiles{grid-template-columns:repeat(3,1fr)}}
 .ats-tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 6px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;min-height:96px}
@@ -197,6 +205,8 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-parse.ok{background:#DCFCE7;color:#15803D}
 .tl-parse.risk{background:#FEF3C7;color:#B45309}
 .tl-parse a.tl-switch-ats{color:inherit;text-decoration:underline;cursor:pointer;font-weight:800;white-space:nowrap}
+.tl-boost-tip{margin-top:10px;padding:9px 12px;border-radius:8px;background:#F0FDF4;border:1px solid #BBF7D0;font-size:12px;color:#166534;line-height:1.5}
+.tl-boost-tip b{font-weight:800}
 .tl-changebar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:11px;font-size:13px;color:var(--ink)}
 .diff-card{background:#fff;border:1.5px solid var(--line);border-radius:12px;margin-bottom:11px;overflow:hidden;transition:opacity .2s}
 .diff-card.rejected{opacity:.45}
@@ -2128,6 +2138,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 <div class="modal" id="tailorModal" role="dialog" aria-modal="true">
   <div class="modal-box" style="max-width:860px">
     <button class="modal-close" data-close type="button">&times;</button>
+    <button class="tl-clear-btn" id="tlClearBtn" type="button" title="Clear this job and start with a new one">🗑 Clear &amp; New JD</button>
     <div class="tl-head">
       <h2>🎯 Tailor your CV to Job Description <span class="pro-chip">★ PRO</span></h2>
       <span class="tl-steps">
@@ -2145,8 +2156,11 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
       </div>
       <div class="tl-explainer">
         <b>🔍 What is ATS matching, and why does this matter?</b>
-        <p>Most employers — over 9 in 10 large companies — run every application through software called an <b>ATS (Applicant Tracking System)</b> before a recruiter ever opens it. It scans your resume for the specific skills, tools and keywords the job posting asks for, and ranks or filters candidates based on how well those match.</p>
-        <p>Paste a job description below and Reeve will show you a <b>match score</b>, exactly which requirements your resume already covers, and which ones are missing or weakly worded — so you can fix the gaps before you apply, not after you get silently rejected.</p>
+        <ul class="tl-explainer-list">
+          <li>Most large employers run every application through software called an <b>ATS (Applicant Tracking System)</b> before a recruiter ever opens it.</li>
+          <li>It scans your resume for the specific skills, tools and keywords the job posting asks for, then ranks or filters candidates based on how well those match.</li>
+          <li>Paste the job description below and Reeve will show you a <b>match score</b>, exactly what your resume already covers, and what's missing — so you can fix the gaps before you apply.</li>
+        </ul>
       </div>
       <div class="tl-grid">
         <div class="tl-f"><label for="tlTitle">Job title</label><input id="tlTitle" placeholder="e.g. Senior GRC Manager"></div>
@@ -2171,7 +2185,10 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
       <div id="tlResults" class="hidden">
         <div class="tl-disclaimer-top">
           <b>⚠ How to read this score</b>
-          <p>This score is based only on matching the skills named in the job description against the skills already evidenced in your resume — nothing is invented or newly added. It's an indication of your screening chances with the ATS software recruiters use, not a guarantee of getting an interview — that decision always stays at the recruiter's discretion.</p>
+          <ul class="tl-disclaimer-list">
+            <li>Based only on matching skills named in the job description against skills already evidenced in your resume — nothing invented or newly added.</li>
+            <li>It's an indication of your screening chances with the ATS software recruiters use — not a guarantee of getting an interview. That decision always stays with the recruiter.</li>
+          </ul>
         </div>
         <div class="ats-tiles">
           <div class="ats-tile main">
@@ -2205,6 +2222,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
             </div>
             <div class="skill-cover" id="tlCoverage"></div>
             <div class="tl-parse" id="tlParse"></div>
+            <div class="tl-boost-tip" id="tlBoostTip"></div>
           </div>
         </div>
         <div class="tl-changebar">
