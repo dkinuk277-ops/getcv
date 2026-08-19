@@ -3381,52 +3381,6 @@ function renderTailorResults(){
   });
 
   renderAtsParseability();
-}
-
-// ============================================================
-// ATS PARSEABILITY CHECK — deterministic, no AI call.
-// Flags whether the currently selected template's layout is
-// likely to be misread by real ATS parsing software (multi-column,
-// sidebar, timeline graphics, banner headers) and offers a one-click
-// switch to the ATS-safe plain template. This is separate from the
-// content match score above: this checks the *container*, that
-// checks the *content*.
-// ============================================================
-const ATS_RISKY_LAYOUTS = {
-  sidebar:  'multi-column layout — some ATS parsers read columns left-to-right across the page and scramble section order',
-  twocol:   'two-column layout — content can be read out of order by some ATS parsers',
-  timeline: 'graphical timeline elements — decorative graphics can be skipped or misread',
-  banner:   'header content sits inside a styled banner — some parsers miss text placed in graphic bands'
-};
-
-function renderAtsParseability(){
-  const box = $('#tlParse');
-  if(!box) return;
-  const t = getTemplate();
-  const risk = t.layout && ATS_RISKY_LAYOUTS[t.layout];
-  box.innerHTML = '';
-  box.classList.remove('ok','risk');
-  if(risk){
-    box.classList.add('risk');
-    box.innerHTML = `⚠ <span><b>${esc(t.name)}</b> uses a ${esc(risk)}. Consider <a class="tl-switch-ats" id="tlSwitchAts">switching to ATS Plain</a> for this application.</span>`;
-    const link = box.querySelector('#tlSwitchAts');
-    if(link) link.addEventListener('click', ()=>{
-      selectedTemplate = 'ats-plain';
-      renderTemplateGrid();
-      const sel = $('#tplSelName'); if(sel) sel.textContent = getTemplate().name;
-      renderLivePreview();
-      if($('#previewModal').classList.contains('open')) injectResumeInto([$('#previewBody')]);
-      if(document.getElementById('sec-personal')) buildEditor();
-      renderAtsParseability();
-      toast('Switched to ATS Plain for this resume.', 3500);
-    });
-  } else {
-    box.classList.add('ok');
-    box.innerHTML = `✓ <span><b>${esc(t.name)}</b> uses a single-column layout that parses cleanly in most ATS software.</span>`;
-    if(t.photo){
-      box.innerHTML += ` <span style="font-weight:600">Note: this template includes a photo — a small number of ATS setups strip photos on import.</span>`;
-    }
-  }
 
   // Change cards
   const list = $('#tlChanges'); list.innerHTML = '';
@@ -3488,6 +3442,52 @@ function renderAtsParseability(){
 
   $('#tlChangeCount').textContent = (r.changes || []).length + ' proposed change' + ((r.changes||[]).length===1?'':'s');
   updateTailorCount();
+}
+
+// ============================================================
+// ATS PARSEABILITY CHECK — deterministic, no AI call.
+// Flags whether the currently selected template's layout is
+// likely to be misread by real ATS parsing software (multi-column,
+// sidebar, timeline graphics, banner headers) and offers a one-click
+// switch to the ATS-safe plain template. This is separate from the
+// content match score above: this checks the *container*, that
+// checks the *content*.
+// ============================================================
+const ATS_RISKY_LAYOUTS = {
+  sidebar:  'multi-column layout — some ATS parsers read columns left-to-right across the page and scramble section order',
+  twocol:   'two-column layout — content can be read out of order by some ATS parsers',
+  timeline: 'graphical timeline elements — decorative graphics can be skipped or misread',
+  banner:   'header content sits inside a styled banner — some parsers miss text placed in graphic bands'
+};
+
+function renderAtsParseability(){
+  const box = $('#tlParse');
+  if(!box) return;
+  const t = getTemplate();
+  const risk = t.layout && ATS_RISKY_LAYOUTS[t.layout];
+  box.innerHTML = '';
+  box.classList.remove('ok','risk');
+  if(risk){
+    box.classList.add('risk');
+    box.innerHTML = `⚠ <span><b>${esc(t.name)}</b> uses a ${esc(risk)}. Consider <a class="tl-switch-ats" id="tlSwitchAts">switching to ATS Plain</a> for this application.</span>`;
+    const link = box.querySelector('#tlSwitchAts');
+    if(link) link.addEventListener('click', ()=>{
+      selectedTemplate = 'ats-plain';
+      renderTemplateGrid();
+      const sel = $('#tplSelName'); if(sel) sel.textContent = getTemplate().name;
+      renderLivePreview();
+      if($('#previewModal').classList.contains('open')) injectResumeInto([$('#previewBody')]);
+      if(document.getElementById('sec-personal')) buildEditor();
+      renderAtsParseability();
+      toast('Switched to ATS Plain for this resume.', 3500);
+    });
+  } else {
+    box.classList.add('ok');
+    box.innerHTML = `✓ <span><b>${esc(t.name)}</b> uses a single-column layout that parses cleanly in most ATS software.</span>`;
+    if(t.photo){
+      box.innerHTML += ` <span style="font-weight:600">Note: this template includes a photo — a small number of ATS setups strip photos on import.</span>`;
+    }
+  }
 }
 
 function updateTailorCount(){
