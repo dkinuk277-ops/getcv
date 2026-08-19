@@ -3619,9 +3619,17 @@ function updateTailorCount(){
 }
 
 $('#tlAcceptAll').addEventListener('click', ()=>{
-  document.querySelectorAll('#tlChanges .diff-card').forEach((card, i)=>{
-    const c = tailorResult.changes[i];
+  if(!tailorResult || !Array.isArray(tailorResult.changes)) return;
+  document.querySelectorAll('#tlChanges .diff-card').forEach((card)=>{
+    // Look up by the card's own data-ci index rather than trusting forEach's
+    // iteration order to line up with tailorResult.changes — if a card ever
+    // fails to match (e.g. a restored session from before a data-shape
+    // change), skip it instead of throwing and silently aborting the whole
+    // loop, which previously made this button appear to do nothing.
+    const idx = Number(card.dataset.ci);
+    const c = tailorResult.changes[idx];
     const cb = card.querySelector('input');
+    if(!c || !cb) return;
     cb.checked = !!c.verified;            // accept-all only turns on VERIFIED ones
     card.classList.toggle('rejected', !cb.checked);
   });
