@@ -170,6 +170,10 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .sk.partial{background:#FEF3C7;color:#B45309;border:1px solid #FCD34D}
 .sk.partial::before{content:"≈ "}
 .tl-caveat{font-size:11px;color:var(--ink-soft);font-style:italic;margin-top:4px;line-height:1.4}
+.tl-explainer{background:#EEF4FF;border:1px solid #C7D9F5;border-radius:10px;padding:14px 16px;margin-bottom:16px}
+.tl-explainer b{display:block;font-size:13.5px;margin-bottom:6px}
+.tl-explainer p{font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin:5px 0 0}
+.tl-cov-label{font-size:12px;font-weight:600;color:var(--ink);margin-top:12px;margin-bottom:2px}
 .tl-cov-legend{display:flex;gap:5px;margin-top:10px}
 .tl-cov-legend .sk{pointer-events:none;opacity:.85}
 .tl-parse{margin-top:10px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;line-height:1.4}
@@ -2119,6 +2123,11 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
     <!-- STEP 1: paste -->
     <div class="tl-pane on" id="tlPane1">
+      <div class="tl-explainer">
+        <b>🔍 What is ATS matching, and why does this matter?</b>
+        <p>Most employers — over 9 in 10 large companies — run every application through software called an <b>ATS (Applicant Tracking System)</b> before a recruiter ever opens it. It scans your resume for the specific skills, tools and keywords the job posting asks for, and ranks or filters candidates based on how well those match.</p>
+        <p>Paste a job description below and Reeve will show you a <b>match score</b>, exactly which requirements your resume already covers, and which ones are missing or weakly worded — so you can fix the gaps before you apply, not after you get silently rejected.</p>
+      </div>
       <div class="tl-grid">
         <div class="tl-f"><label for="tlTitle">Job title</label><input id="tlTitle" placeholder="e.g. Senior GRC Manager"></div>
         <div class="tl-f"><label for="tlCompany">Company (optional)</label><input id="tlCompany" placeholder="e.g. Barclays"></div>
@@ -2145,6 +2154,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
             <h4 id="tlMatchTitle">Your resume vs. this job</h4>
             <p id="tlMatchSummary"></p>
             <p class="tl-caveat">This score reflects keyword &amp; format alignment for this job — not your likelihood of getting an interview.</p>
+            <p class="tl-cov-label">Keyword &amp; skill coverage — what the ATS software this job likely uses would look for:</p>
             <div class="tl-cov-legend">
               <span class="sk have">Found</span><span class="sk partial">Partial</span><span class="sk missing">Missing</span>
             </div>
