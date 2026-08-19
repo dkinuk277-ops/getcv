@@ -169,6 +169,13 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .sk.missing::before{content:"✗ "}
 .sk.partial{background:#FEF3C7;color:#B45309;border:1px solid #FCD34D}
 .sk.partial::before{content:"≈ "}
+.tl-caveat{font-size:11px;color:var(--ink-soft);font-style:italic;margin-top:4px;line-height:1.4}
+.tl-cov-legend{display:flex;gap:5px;margin-top:10px}
+.tl-cov-legend .sk{pointer-events:none;opacity:.85}
+.tl-parse{margin-top:10px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;line-height:1.4}
+.tl-parse.ok{background:#DCFCE7;color:#15803D}
+.tl-parse.risk{background:#FEF3C7;color:#B45309}
+.tl-parse a.tl-switch-ats{color:inherit;text-decoration:underline;cursor:pointer;font-weight:800;white-space:nowrap}
 .tl-changebar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:11px;font-size:13px;color:var(--ink)}
 .diff-card{background:#fff;border:1.5px solid var(--line);border-radius:12px;margin-bottom:11px;overflow:hidden;transition:opacity .2s}
 .diff-card.rejected{opacity:.45}
@@ -2137,7 +2144,12 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
           <div class="match-info">
             <h4 id="tlMatchTitle">Your resume vs. this job</h4>
             <p id="tlMatchSummary"></p>
+            <p class="tl-caveat">This score reflects keyword &amp; format alignment for this job — not your likelihood of getting an interview.</p>
+            <div class="tl-cov-legend">
+              <span class="sk have">Found</span><span class="sk partial">Partial</span><span class="sk missing">Missing</span>
+            </div>
             <div class="skill-cover" id="tlCoverage"></div>
+            <div class="tl-parse" id="tlParse"></div>
           </div>
         </div>
         <div class="tl-changebar">
