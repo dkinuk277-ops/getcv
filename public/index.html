@@ -174,6 +174,23 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-explainer b{display:block;font-size:13.5px;margin-bottom:6px}
 .tl-explainer p{font-size:12.5px;color:var(--ink-soft);line-height:1.5;margin:5px 0 0}
 .tl-cov-label{font-size:12px;font-weight:600;color:var(--ink);margin-top:12px;margin-bottom:2px}
+.tl-savenote{font-size:11px;color:var(--ink-soft);margin-top:4px;min-height:14px}
+.tl-restore-banner{background:#EEF4FF;border:1px solid #C7D9F5;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;font-weight:600;color:#1E3A8A}
+.tl-disclaimer-top{background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:12px 16px;margin-bottom:14px}
+.tl-disclaimer-top b{display:block;font-size:12.5px;color:#9A3412;margin-bottom:4px}
+.tl-disclaimer-top p{font-size:12px;color:#7C2D12;line-height:1.5;margin:0}
+.ats-tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:14px}
+@media(max-width:640px){.ats-tiles{grid-template-columns:repeat(3,1fr)}}
+.ats-tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 6px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;min-height:96px}
+.ats-tile-num{font-size:24px;font-weight:800;color:var(--ink)}
+.ats-tile-label{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft)}
+.ats-tile-icon{font-size:22px;line-height:1}
+.ats-tile.risk .ats-tile-icon{color:#B45309}
+.ats-tile.ok .ats-tile-icon{color:#15803D}
+.ats-tile .score-ring{width:66px;height:66px}
+.ats-tile .score-ring>div{width:48px;height:48px}
+.ats-tile .score-ring b{font-size:14px}
+.ats-tile .score-ring span{font-size:7px}
 .tl-cov-legend{display:flex;gap:5px;margin-top:10px}
 .tl-cov-legend .sk{pointer-events:none;opacity:.85}
 .tl-parse{margin-top:10px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;line-height:1.4}
@@ -2123,6 +2140,9 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
     <!-- STEP 1: paste -->
     <div class="tl-pane on" id="tlPane1">
+      <div class="tl-restore-banner hidden" id="tlRestoreBanner">
+        📄 Welcome back — we restored your last pasted job and results.
+      </div>
       <div class="tl-explainer">
         <b>🔍 What is ATS matching, and why does this matter?</b>
         <p>Most employers — over 9 in 10 large companies — run every application through software called an <b>ATS (Applicant Tracking System)</b> before a recruiter ever opens it. It scans your resume for the specific skills, tools and keywords the job posting asks for, and ranks or filters candidates based on how well those match.</p>
@@ -2133,7 +2153,8 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <div class="tl-f"><label for="tlCompany">Company (optional)</label><input id="tlCompany" placeholder="e.g. Barclays"></div>
       </div>
       <div class="tl-f"><label for="tlJD">Paste the job description</label>
-        <textarea id="tlJD" rows="9" placeholder="Paste the whole listing — requirements, responsibilities, everything. More text = better tailoring."></textarea></div>
+        <textarea id="tlJD" rows="16" placeholder="Paste the whole listing — requirements, responsibilities, everything. More text = better tailoring."></textarea>
+        <p class="tl-savenote" id="tlSaveNote"></p></div>
       <div class="tl-tip">💡 Reeve never invents experience you don't have — it re-frames and reorders what's already true. Anything it can't verify from your resume is flagged and left for you to decide.</div>
       <div class="tl-err" id="tlErr"></div>
       <div class="tl-actions">
@@ -2148,12 +2169,36 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <span class="spin"></span> Analysing your match against this job — takes 15–30 seconds…
       </div>
       <div id="tlResults" class="hidden">
+        <div class="tl-disclaimer-top">
+          <b>⚠ How to read this score</b>
+          <p>This score is based only on matching the skills named in the job description against the skills already evidenced in your resume — nothing is invented or newly added. It's an indication of your screening chances with the ATS software recruiters use, not a guarantee of getting an interview — that decision always stays at the recruiter's discretion.</p>
+        </div>
+        <div class="ats-tiles">
+          <div class="ats-tile main">
+            <div class="score-ring" id="tlRing"><div><b id="tlScore">0%</b><span>match</span></div></div>
+            <div class="ats-tile-label">Match Score</div>
+          </div>
+          <div class="ats-tile">
+            <div class="ats-tile-num" id="tlFoundNum">0</div>
+            <div class="ats-tile-label">✓ Found</div>
+          </div>
+          <div class="ats-tile">
+            <div class="ats-tile-num" id="tlPartialNum">0</div>
+            <div class="ats-tile-label">≈ Partial</div>
+          </div>
+          <div class="ats-tile">
+            <div class="ats-tile-num" id="tlMissingNum">0</div>
+            <div class="ats-tile-label">✗ Missing</div>
+          </div>
+          <div class="ats-tile" id="tlFormatTile">
+            <div class="ats-tile-icon" id="tlFormatIcon">—</div>
+            <div class="ats-tile-label">Format Risk</div>
+          </div>
+        </div>
         <div class="match-band">
-          <div class="score-ring" id="tlRing"><div><b id="tlScore">0%</b><span>match</span></div></div>
           <div class="match-info">
             <h4 id="tlMatchTitle">Your resume vs. this job</h4>
             <p id="tlMatchSummary"></p>
-            <p class="tl-caveat">This score reflects keyword &amp; format alignment for this job — not your likelihood of getting an interview.</p>
             <p class="tl-cov-label">Keyword &amp; skill coverage — what the ATS software this job likely uses would look for:</p>
             <div class="tl-cov-legend">
               <span class="sk have">Found</span><span class="sk partial">Partial</span><span class="sk missing">Missing</span>
