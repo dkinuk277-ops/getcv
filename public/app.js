@@ -3399,6 +3399,20 @@ document.querySelectorAll('.js-tailor').forEach(b => b.addEventListener('click',
   setTimeout(()=> $('#tlJD').focus(), 40);
 }));
 
+$('#tlClearBtn').addEventListener('click', ()=>{
+  try{ localStorage.removeItem(TL_SESSION_KEY); }catch(e){}
+  tailorResult = null;
+  $('#tlTitle').value = '';
+  $('#tlCompany').value = '';
+  $('#tlJD').value = '';
+  const banner = $('#tlRestoreBanner'); if(banner) banner.classList.add('hidden');
+  $('#tlErr').classList.remove('on');
+  $('#tlResults').classList.add('hidden');
+  tlStep(1);
+  setTimeout(()=> $('#tlJD').focus(), 40);
+  toast('Cleared — paste a new job description.', 3000);
+});
+
 $('#tlAnalyse').addEventListener('click', async ()=>{
   const jd = $('#tlJD').value.trim();
   if(jd.length < 80) return tlError('#tlErr', 'Please paste the full job description — at least a few sentences.');
@@ -3450,6 +3464,21 @@ function renderTailorResults(){
   $('#tlFoundNum').textContent = nFound;
   $('#tlPartialNum').textContent = nPartial;
   $('#tlMissingNum').textContent = nMissing;
+
+  // Guidance: connect the gap counts to the actual suggested changes below,
+  // so "how do I improve this score" has a concrete, clickable answer.
+  const boost = $('#tlBoostTip');
+  if(boost){
+    const gaps = nMissing + nPartial;
+    const nChanges = (r.changes || []).length;
+    if(gaps === 0){
+      boost.innerHTML = `✓ Your resume already covers everything this job description asks for — no gaps to close.`;
+    } else if(nChanges > 0){
+      boost.innerHTML = `💡 <b>To raise this score:</b> review the ${nChanges} suggested change${nChanges===1?'':'s'} below — each is built directly from a gap above. Accept the verified ones, save your resume, then paste this job again to see your updated score.`;
+    } else {
+      boost.innerHTML = `💡 <b>To raise this score:</b> for each "Missing" or "Partial" skill above, add it to your resume where it's genuinely true — under Skills or as a bullet in the relevant role — then re-run this check.`;
+    }
+  }
 
   renderAtsParseability();
 
