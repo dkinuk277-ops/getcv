@@ -195,6 +195,7 @@ async function handleFile(file){
 
     setProgress(3, 96, 'Building your editable form…');
     R = normalize(out.data);
+    tlClearSessionSilently(); // fresh resume — don't carry over a previous JD/tailor session
     moveEditorTo('pro');
     buildEditor();
     const msg = `Done — imported ${R.experience.length} role${R.experience.length===1?'':'s'} and ${countSections()} sections ✓`;
@@ -481,6 +482,7 @@ $('#btnFresher').addEventListener('click', async ()=>{
       })
     });
     R = normalize(out.data);
+    tlClearSessionSilently(); // fresh resume — don't carry over a previous JD/tailor session
     if(frAns.name) R.personal.name = frAns.name;
 
     // The graduate's own education details take priority over anything the AI guessed
@@ -3035,6 +3037,7 @@ async function doSignup(){
 async function doLogout(){
   try{ await api('/api/auth/logout', {method:'POST'}); }catch{}
   currentUser = null;
+  tlClearSessionSilently(); // log out = fresh start, no carried-over JD/tailor session
   $('#hdrRight').style.display = 'none';
   showView('landing');
   initLanding();
@@ -3327,6 +3330,14 @@ function tlLoadSession(){
     const raw = localStorage.getItem(TL_SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
   }catch(e){ return null; }
+}
+
+// Wipes any saved tailor session (fields + result) without touching the UI —
+// used when the user's underlying resume changes (new upload, fresher build)
+// or they log out, so a new resume/session never inherits a previous JD.
+function tlClearSessionSilently(){
+  try{ localStorage.removeItem(TL_SESSION_KEY); }catch(e){}
+  tailorResult = null;
 }
 
 // Debounced draft save — keeps whatever the user has typed even if they
