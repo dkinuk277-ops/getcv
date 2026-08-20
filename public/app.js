@@ -3499,132 +3499,22 @@ function renderTailorResults(){
   $('#tlLoading').style.display = 'none';
   $('#tlResults').classList.remove('hidden');
 
-  // Match ring — deterministic score from the coverage rows so it can move
-  // as the user selects changes. Falls back to the model's holistic figure
-  // only when there's no requirement breakdown to compute from.
   const jt = $('#tlTitle').value.trim(), co = $('#tlCompany').value.trim();
   $('#tlMatchTitle').textContent = 'Your resume vs. ' + (jt || 'this job') + (co ? ' @ ' + co : '');
   $('#tlMatchSummary').textContent = r.match_summary || '';
 
-  // Comparison table + tile counts
-  const counts = renderCompareTable(r.skills_coverage || []);
-  const nFound = counts.have, nPartial = counts.partial, nMissing = counts.missing + counts.absent;
-  $('#tlFoundNum').textContent = nFound;
-  $('#tlPartialNum').textContent = nPartial;
-  $('#tlMissingNum').textContent = nMissing;
-
-  // Guidance: connect the gap counts to the actual suggested changes below,
-  // so "how do I improve this score" has a concrete, clickable answer.
-  const boost = $('#tlBoostTip');
-  if(boost){
-    const gaps = nMissing + nPartial;
-    const nChanges = (r.changes || []).length;
-    if(gaps === 0){
-      boost.innerHTML = `✓ Your resume already covers everything this job description asks for — no gaps to close.`;
-    } else if(nChanges > 0){
-      boost.innerHTML = `💡 <b>To raise this score:</b> review the ${nChanges} suggested change${nChanges===1?'':'s'} below — each is built directly from a gap above. Accept the verified ones, save your resume, then paste this job again to see your updated score.`;
-    } else {
-      boost.innerHTML = `💡 <b>To raise this score:</b> for each "Missing" or "Partial" skill above, add it to your resume where it's genuinely true — under Skills or as a bullet in the relevant role — then re-run this check.`;
-    }
-  }
+  // One table renders every requirement row AND its linked fix/edit/apply
+  // controls in a single pass — no separate change-card list. Any proposed
+  // change not tied to a specific requirement (e.g. a broad summary rewrite)
+  // renders as its own trailing row so nothing the AI proposed is hidden.
+  const counts = renderCompareTable(r.skills_coverage || [], r.changes || []);
+  $('#tlFoundNum').textContent = counts.have;
+  $('#tlPartialNum').textContent = counts.partial;
+  $('#tlMissingNum').textContent = counts.missing + counts.absent;
 
   renderAtsParseability();
-
-  // Change cards
-  const list = $('#tlChanges'); list.innerHTML = '';
-  (r.changes || []).forEach((c, i)=>{
-    const card = el('div', {class:'diff-card' + (c.verified ? '' : ' rejected'), 'data-ci': String(i)});
-    const whyClass = c.verified ? 'why' : 'why warn';
-    const whyText = c.verified ? esc(c.reason || '') : '⚠ Only if truthful — you decide';
-    card.innerHTML = `<div class="diff-head">
-        <span class="where">${esc(c.where_label || 'Change')}</span>
-        <span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <span class="${whyClass}">${whyText}</span>
-          <button class="tl-edit-btn" type="button">✎ Edit</button>
-          <label class="switch"><input type="checkbox" ${c.verified ? 'checked' : ''}><span class="slider"></span><span class="sw-lbl">Apply</span></label>
-        </span>
-      </div>
-      <div class="diff-body">
-        ${c.old_text ? `<div class="d-old d-old-strike">${esc(c.old_text)}</div>` : ''}
-        <div class="d-new">${esc(c.new_text)}</div>
-        ${!c.verified ? `<div class="d-warn">⚠ Reeve can't verify this from your resume — it defaults to OFF. Only enable it if it's true.</div>` : ''}
-      </div>`;
-    // Remember the AI's original wording so "Reset to suggestion" can restore
-    // it after the user edits — editing shouldn't be a one-way door.
-    const original = { new_text: c.new_text, new_value: Array.isArray(c.apply.new_value) ? c.apply.new_value.slice() : c.apply.new_value };
-
-    function markEdited(){
-      if(card.querySelector('.tl-editedtag')) return;
-      const tag = el('div', {class:'tl-editedtag'});
-      tag.textContent = '✎ Edited by you';
-      card.querySelector('.diff-body').appendChild(tag);
-    }
-    function clearEdited(){
-      const tag = card.querySelector('.tl-editedtag');
-      if(tag) tag.remove();
-    }
-
-    card.querySelector('input').addEventListener('change', e=>{
-      card.classList.toggle('rejected', !e.target.checked);
-      updateTailorCount();
-    });
-    // ✎ Edit: swap the proposed text for a textarea; save writes back into the
-    // change so the user's wording is what gets applied and previewed.
-    // Array fields (skills, additions) edit as one item per line.
-    card.querySelector('.tl-edit-btn').addEventListener('click', (e)=>{
-      const btn = e.target;
-      const body = card.querySelector('.diff-body');
-      const dnew = body.querySelector('.d-new');
-      const isArray = Array.isArray(c.apply.new_value);
-      if(btn.textContent.includes('Edit')){
-        const ta = el('textarea', {class:'tl-edit-ta'});
-        ta.value = isArray ? c.apply.new_value.join('\n') : String(c.apply.new_value);
-        dnew.style.display = 'none';
-        dnew.after(ta);
-        ta.focus();
-        btn.textContent = '💾 Save edit';
-        // Offer a way back to the AI's wording while editing.
-        if(!card.querySelector('.tl-resetsug')){
-          const reset = el('span', {class:'tl-resetsug'});
-          reset.textContent = '↺ Reset to suggestion';
-          reset.addEventListener('click', ()=>{
-            const box = card.querySelector('.tl-edit-ta');
-            if(box) box.value = Array.isArray(original.new_value) ? original.new_value.join('\n') : String(original.new_value);
-          });
-          card.querySelector('.diff-head').lastElementChild.appendChild(reset);
-        }
-      } else {
-        const ta = body.querySelector('.tl-edit-ta');
-        if(ta){
-          if(isArray){
-            const items = ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
-            if(items.length){ c.apply.new_value = items; c.new_text = items.join(' · '); }
-          } else {
-            const v = ta.value.trim();
-            if(v){ c.apply.new_value = v; c.new_text = v; }
-          }
-          ta.remove();
-        }
-        dnew.textContent = c.new_text;
-        dnew.style.display = '';
-        btn.textContent = '✎ Edit';
-        const rs = card.querySelector('.tl-resetsug'); if(rs) rs.remove();
-        // Flag it only if the wording actually differs from the suggestion.
-        if(c.new_text !== original.new_text) markEdited(); else clearEdited();
-      }
-    });
-    list.appendChild(card);
-  });
-
-  const nChanges = (r.changes || []).length;
-  $('#tlChangeCount').textContent = nChanges === 0
-    ? '✓ No suggested changes — your resume already covers this job well'
-    : nChanges + ' proposed change' + (nChanges===1?'':'s');
-  $('#tlAcceptAll').disabled = nChanges === 0;
-  $('#tlRejectAll').disabled = nChanges === 0;
   updateTailorCount();
 
-  // Cards exist now, so the projection can read their checkboxes.
   if((r.skills_coverage || []).length){
     tlRefreshScore(true);
   } else {
@@ -3680,14 +3570,16 @@ function tlScore(coverage, selectedIds){
   return { now: pct(earnedNow), projected: pct(earnedProj), ceiling: pct(earnedMax), closable, blocked };
 }
 
-// The ids of changes currently ticked in the apply bar.
+// The ids of changes currently ticked in the table's Apply column.
+// A checkbox's data-ci can list several change indices (a row needing more
+// than one edit to fully resolve), so every index it covers counts.
 function tlSelectedChangeIds(){
   const ids = new Set();
-  document.querySelectorAll('#tlChanges .diff-card').forEach(card => {
-    const cb = card.querySelector('input');
-    const idx = Number(card.dataset.ci);
-    const c = tailorResult && tailorResult.changes ? tailorResult.changes[idx] : null;
-    if(cb && cb.checked && c && c.id) ids.add(c.id);
+  document.querySelectorAll('#tlCompareTable input.tl-row-apply:checked').forEach(cb => {
+    (cb.dataset.ci || '').split(',').filter(Boolean).forEach(idxStr => {
+      const c = tailorResult && tailorResult.changes ? tailorResult.changes[Number(idxStr)] : null;
+      if(c && c.id) ids.add(c.id);
+    });
   });
   return ids;
 }
@@ -3765,59 +3657,206 @@ function tlEmployerCell(employer){
   return esc(e);
 }
 
-function renderCompareTable(coverage){
+// Renders the "Suggested fix" + "Apply" cells for a set of linked change
+// indices. Returns {fixHtml, applyHtml} — kept together because the Apply
+// checkbox's default state depends on the same changes the fix cell shows.
+function tlFixCell(idxList, changes, rowKey){
+  if(!idxList.length){
+    return { fixHtml: '', applyHtml: '' };
+  }
+  const items = idxList.map(i => changes[i]).filter(Boolean);
+  if(!items.length) return { fixHtml: '', applyHtml: '' };
+
+  const allVerified = items.every(c => c.verified);
+  const oldTexts = items.map(c => c.old_text).filter(Boolean).join(' / ');
+  const newTexts = items.map(c => c.new_text).join(' / ');
+  const warn = !allVerified
+    ? `<span class="tl-fix-warn">⚠ Reeve can't verify this from your CV — only apply if it's true.</span>` : '';
+  const canEdit = idxList.length === 1;
+
+  const fixHtml = `<div class="tl-fixwrap" data-ci="${idxList.join(',')}" data-rowkey="${rowKey}">
+      <div class="tl-fixview">
+        ${oldTexts ? `<div class="tl-fix-current">${esc(oldTexts)}</div>` : ''}
+        <div><span class="tl-fix-arrow">→</span> <span class="tl-fix-new">${esc(newTexts)}</span></div>
+        ${warn}
+        ${canEdit ? `<span class="tl-fix-edit">✎ Edit</span>` : ''}
+      </div>
+    </div>`;
+
+  const applyHtml = `<input type="checkbox" class="tl-row-apply" data-ci="${idxList.join(',')}"
+      data-default="${allVerified ? '1' : '0'}" ${allVerified ? 'checked' : ''}>`;
+
+  return { fixHtml, applyHtml };
+}
+
+function renderCompareTable(coverage, changes){
   const counts = { have:0, partial:0, missing:0, absent:0 };
-  // Look the table itself up — this function rewrites the table's entire
-  // innerHTML (thead + tbody), so caching a tbody reference here would go
-  // stale the moment we render once.
   const table = $('#tlCompareTable');
   if(!table) return counts;
 
   const rows = (coverage || []).filter(s => s && s.skill);
+  const allChanges = changes || [];
   rows.forEach(s => { const st = s.status || 'partial'; if(counts[st] !== undefined) counts[st]++; });
 
-  if(!rows.length){
-    table.innerHTML = '<tbody><tr><td colspan="5" class="tl-table-empty">No requirement breakdown available for this job.</td></tr></tbody>';
+  if(!rows.length && !allChanges.length){
+    table.innerHTML = '<tbody><tr><td colspan="6" class="tl-table-empty">No requirement breakdown available for this job.</td></tr></tbody>';
     return counts;
   }
 
-  const header = `<tr>
-      <th style="width:13%">Employer</th>
-      <th style="width:20%">What the job asks for</th>
-      <th style="width:26%">What your CV shows</th>
-      <th style="width:12%">Matching status</th>
-      <th style="width:29%">Your action</th>
-    </tr>`;
+  const header = `<thead><tr>
+      <th style="width:12%">Employer</th>
+      <th style="width:17%">What the job asks for</th>
+      <th style="width:20%">What your CV shows</th>
+      <th style="width:11%">Matching status</th>
+      <th style="width:28%">Suggested fix</th>
+      <th style="width:6%">Apply</th>
+    </tr></thead>`;
 
-  const present = rows.filter(s => (s.status || 'partial') !== 'absent');
-  const absent  = rows.filter(s => (s.status || 'partial') === 'absent');
-  let html = '<thead>' + header + '</thead>';
+  // Track which change indices got claimed by a requirement row, so nothing
+  // the AI proposed silently disappears if it isn't tied to a specific gap.
+  const usedIdx = new Set();
+  const idxByChangeId = new Map();
+  allChanges.forEach((c, i) => { if(c.id) idxByChangeId.set(c.id, i); });
 
+  let rowKey = 0;
   const rowHtml = (s)=>{
     const st = s.status || 'partial';
     const cv = st === 'absent'
       ? '<span style="color:var(--ink-soft)">Not mentioned anywhere</span>'
       : (s.cv_text ? tlHighlight(s.cv_text, s.cv_highlight) : '<span style="color:var(--ink-soft)">—</span>');
-    const action = s.action || (st === 'have' ? 'No action needed' : (s.note || '—'));
+
+    const linkedIdx = (Array.isArray(s.resolved_by) ? s.resolved_by : [])
+      .map(id => idxByChangeId.get(id))
+      .filter(i => i !== undefined);
+    linkedIdx.forEach(i => usedIdx.add(i));
+
+    let fixHtml, applyHtml;
+    if(linkedIdx.length){
+      const cell = tlFixCell(linkedIdx, allChanges, 'r' + (rowKey++));
+      fixHtml = cell.fixHtml;
+      applyHtml = cell.applyHtml;
+    } else if(st === 'have'){
+      fixHtml = '<span style="color:var(--ink-soft)">No action needed</span>';
+      applyHtml = '<input type="checkbox" checked disabled title="Already matched">';
+    } else {
+      // A genuine gap with no proposed fix — informational only, nothing to apply.
+      fixHtml = esc(s.action || s.note || 'No suggested fix available.');
+      applyHtml = '<span style="color:var(--ink-soft)">—</span>';
+    }
+
     return `<tr>
       <td class="c-emp">${tlEmployerCell(s.employer)}</td>
       <td class="c-req">${esc(s.skill)}</td>
       <td>${cv}</td>
       <td><span class="sk ${st}">${TL_STATUS_LABEL[st] || st}</span></td>
-      <td class="c-act">${esc(action)}</td>
+      <td class="c-fix">${fixHtml}</td>
+      <td class="c-apply">${applyHtml}</td>
     </tr>`;
   };
 
-  html += '<tbody>' + present.map(rowHtml).join('');
+  const present = rows.filter(s => (s.status || 'partial') !== 'absent');
+  const absent  = rows.filter(s => (s.status || 'partial') === 'absent');
+  let html = header + '<tbody>' + present.map(rowHtml).join('');
   if(absent.length){
-    html += `<tr class="tl-grouphead"><td colspan="5">
+    html += `<tr class="tl-grouphead"><td colspan="6">
         <b>Asked for in the job, but nowhere in your CV</b>
         <span>No related experience found under any employer — these are genuine gaps, not wording problems. Only add what's actually true for you.</span>
       </td></tr>` + absent.map(rowHtml).join('');
   }
+
+  // Any proposed change not claimed by a requirement row (e.g. a broad
+  // summary rewrite) still gets a row, so it's applicable and never hidden.
+  const extra = allChanges.map((c, i) => ({c, i})).filter(x => !usedIdx.has(x.i));
+  if(extra.length){
+    html += `<tr class="tl-grouphead"><td colspan="6">
+        <b>Other suggested improvements</b>
+        <span>Not tied to a single requirement above, but still worth reviewing.</span>
+      </td></tr>`;
+    html += extra.map(({c, i})=>{
+      const cell = tlFixCell([i], allChanges, 'x' + i);
+      const pillClass = c.verified ? 'have' : 'missing';
+      const pillLabel = c.verified ? 'Improvement' : 'Needs confirmation';
+      return `<tr>
+        <td class="c-emp">—</td>
+        <td class="c-req">${esc(c.where_label || 'General change')}</td>
+        <td><span style="color:var(--ink-soft)">—</span></td>
+        <td><span class="sk ${pillClass}">${pillLabel}</span></td>
+        <td class="c-fix">${cell.fixHtml}</td>
+        <td class="c-apply">${cell.applyHtml}</td>
+      </tr>`;
+    }).join('');
+  }
+
   html += '</tbody>';
   table.innerHTML = html;
+  tlWireTableRows(allChanges);
   return counts;
+}
+
+// Attaches behaviour to whatever renderCompareTable just painted: toggling
+// the score/count on every checkbox change, and turning "✎ Edit" into an
+// inline textarea that writes straight back into the tailorResult.changes
+// entry so apply/preview use the user's own wording, not just the AI's.
+function tlWireTableRows(allChanges){
+  document.querySelectorAll('#tlCompareTable input.tl-row-apply').forEach(cb=>{
+    cb.addEventListener('change', updateTailorCount);
+  });
+
+  document.querySelectorAll('#tlCompareTable .tl-fixwrap').forEach(wrap=>{
+    const idx = Number(wrap.dataset.ci); // only single-change wraps render an Edit link
+    const c = allChanges[idx];
+    if(!c) return;
+    const editLink = wrap.querySelector('.tl-fix-edit');
+    if(!editLink) return;
+
+    const original = { new_text: c.new_text, new_value: Array.isArray(c.apply.new_value) ? c.apply.new_value.slice() : c.apply.new_value };
+
+    editLink.addEventListener('click', ()=>{
+      const view = wrap.querySelector('.tl-fixview');
+      const isArray = Array.isArray(c.apply.new_value);
+      const ta = el('textarea', {class:'tl-edit-ta-row'});
+      ta.value = isArray ? c.apply.new_value.join('\n') : String(c.apply.new_value);
+
+      const actions = el('div', {class:'tl-editrow-actions'});
+      const saveBtn = el('button', {class:'btn btn-ghost', type:'button'}); saveBtn.textContent = '💾 Save';
+      const cancelBtn = el('span', {class:'tl-resetsug'}); cancelBtn.textContent = 'Cancel';
+      const resetBtn = el('span', {class:'tl-resetsug'}); resetBtn.textContent = '↺ Reset to suggestion';
+      actions.append(saveBtn, cancelBtn, resetBtn);
+
+      wrap.classList.add('tl-row-editing');
+      view.style.display = 'none';
+      wrap.append(ta, actions);
+      ta.focus();
+
+      resetBtn.addEventListener('click', ()=>{
+        ta.value = Array.isArray(original.new_value) ? original.new_value.join('\n') : String(original.new_value);
+      });
+      cancelBtn.addEventListener('click', ()=>{
+        ta.remove(); actions.remove();
+        wrap.classList.remove('tl-row-editing');
+        view.style.display = '';
+      });
+      saveBtn.addEventListener('click', ()=>{
+        if(isArray){
+          const items = ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+          if(items.length){ c.apply.new_value = items; c.new_text = items.join(' · '); }
+        } else {
+          const v = ta.value.trim();
+          if(v){ c.apply.new_value = v; c.new_text = v; }
+        }
+        const newSpan = view.querySelector('.tl-fix-new');
+        if(newSpan) newSpan.textContent = c.new_text;
+        let tag = view.querySelector('.tl-editedtag-sm');
+        if(c.new_text !== original.new_text){
+          if(!tag){ tag = el('span', {class:'tl-editedtag-sm'}); tag.textContent = '✎ Edited by you'; view.appendChild(tag); }
+        } else if(tag){ tag.remove(); }
+        ta.remove(); actions.remove();
+        wrap.classList.remove('tl-row-editing');
+        view.style.display = '';
+        updateTailorCount();
+      });
+    });
+  });
 }
 
 // ============================================================
@@ -3889,42 +3928,37 @@ function renderAtsParseability(){
 }
 
 function updateTailorCount(){
-  const n = document.querySelectorAll('#tlChanges .diff-card input:checked').length;
+  const n = tlAcceptedIdx().length;
   $('#tlApply').textContent = n === 0 ? 'Select changes to preview' : `Apply ${n} change${n===1?'':'s'} and preview →`;
   $('#tlApply').disabled = n === 0;
-  // Every toggle path (single card, Select all, Clear all) lands here, so
-  // this is the one place the projected score needs recomputing.
+  const totalActionable = document.querySelectorAll('#tlCompareTable input.tl-row-apply').length;
+  $('#tlChangeCount').textContent = totalActionable === 0
+    ? '✓ No suggested changes — your resume already covers this job well'
+    : n + ' of ' + totalActionable + ' suggested change' + (totalActionable===1?'':'s') + ' selected';
+  $('#tlAcceptAll').disabled = totalActionable === 0;
+  $('#tlRejectAll').disabled = totalActionable === 0;
+  // Every toggle path (single row, Apply all, Clear all, an edit) lands
+  // here, so this is the one place the projected score needs recomputing.
   tlRefreshScore(false);
 }
 
 $('#tlAcceptAll').addEventListener('click', ()=>{
-  if(!tailorResult || !Array.isArray(tailorResult.changes) || !tailorResult.changes.length) return;
+  const boxes = document.querySelectorAll('#tlCompareTable input.tl-row-apply');
+  if(!boxes.length) return;
   let accepted = 0;
-  document.querySelectorAll('#tlChanges .diff-card').forEach((card)=>{
-    // Look up by the card's own data-ci index rather than trusting forEach's
-    // iteration order to line up with tailorResult.changes — if a card ever
-    // fails to match (e.g. a restored session from before a data-shape
-    // change), skip it instead of throwing and silently aborting the whole
-    // loop, which previously made this button appear to do nothing.
-    const idx = Number(card.dataset.ci);
-    const c = tailorResult.changes[idx];
-    const cb = card.querySelector('input');
-    if(!c || !cb) return;
-    cb.checked = !!c.verified;            // accept-all only turns on VERIFIED ones
+  boxes.forEach(cb=>{
+    cb.checked = cb.dataset.default === '1';   // reset to each row's verified-default state
     if(cb.checked) accepted++;
-    card.classList.toggle('rejected', !cb.checked);
   });
   updateTailorCount();
-  toast(accepted ? `Accepted ${accepted} verified change${accepted===1?'':'s'}.` : 'None of the suggested changes were verified — nothing to accept.', 3000);
+  toast(accepted ? `Applied ${accepted} verified change${accepted===1?'':'s'}.` : 'None of the suggested changes were verified — nothing to apply.', 3000);
 });
 $('#tlRejectAll').addEventListener('click', ()=>{
-  if(!document.querySelectorAll('#tlChanges .diff-card').length) return;
-  document.querySelectorAll('#tlChanges .diff-card input').forEach(cb=>{
-    cb.checked = false;
-    cb.closest('.diff-card').classList.add('rejected');
-  });
+  const boxes = document.querySelectorAll('#tlCompareTable input.tl-row-apply');
+  if(!boxes.length) return;
+  boxes.forEach(cb=>{ cb.checked = false; });
   updateTailorCount();
-  toast('Rejected all suggested changes.', 3000);
+  toast('Cleared all selections.', 3000);
 });
 $('#tlBack').addEventListener('click', ()=> tlStep(1));
 
@@ -3953,13 +3987,15 @@ function applyTailorChanges(base, changes, acceptedIdx){
   return r;
 }
 
-// Collect indexes of currently accepted change cards
+// Flattened, deduped list of change indices currently ticked in the table.
+// A row's checkbox can carry more than one index (a gap needing two edits
+// to fully resolve), so this is not simply "one index per checked box".
 function tlAcceptedIdx(){
-  const accepted = [];
-  document.querySelectorAll('#tlChanges .diff-card').forEach((card, i)=>{
-    if(card.querySelector('input').checked) accepted.push(i);
+  const seen = new Set();
+  document.querySelectorAll('#tlCompareTable input.tl-row-apply:checked').forEach(cb=>{
+    (cb.dataset.ci || '').split(',').filter(Boolean).forEach(s => seen.add(Number(s)));
   });
-  return accepted;
+  return Array.from(seen).filter(i => Number.isInteger(i));
 }
 
 // HL tokens survive esc() untouched (unicode, not HTML) and are swapped for
