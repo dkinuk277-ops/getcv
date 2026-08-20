@@ -3519,8 +3519,6 @@ function renderTailorResults(){
     tlRefreshScore(true);
   } else {
     animateTlScore(r.match_score || 0);
-    const proj = $('#tlProjected'); if(proj) proj.classList.add('hidden');
-    const cap = $('#tlCeiling'); if(cap) cap.classList.add('hidden');
   }
 }
 
@@ -3584,43 +3582,38 @@ function tlSelectedChangeIds(){
   return ids;
 }
 
-// Paints the ring without animating (used for live updates on toggle).
-function setTlRing(pct){
+// Animates the ring between two REAL values — used for live toggle updates,
+// where the score is already showing something and needs to move to a new
+// true figure, not restart a 0→X reveal every time a checkbox is clicked.
+function animateTlScoreBetween(fromPct, toPct){
   const ring = $('#tlRing'), label = $('#tlScore');
   if(!ring || !label) return;
-  label.textContent = pct + '%';
-  ring.style.background = `conic-gradient(var(--accent) 0 ${pct}%, #E5E7EB ${pct}% 100%)`;
+  const dur = 500, start = performance.now();
+  function step(now){
+    const t = Math.min(1, (now-start)/dur);
+    const cur = Math.round(fromPct + (toPct-fromPct)*t);
+    label.textContent = cur + '%';
+    ring.style.background = `conic-gradient(var(--accent) 0 ${cur}%, #E5E7EB ${cur}% 100%)`;
+    if(t<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
 }
 
-// Repaints the score ring, the projection line and the ceiling note.
+// Repaints the score ring with the TRUE score for whatever is currently
+// ticked — no forecast, no "up to X%" ceiling. The number on screen is
+// always the real weighted result of the selections as they stand right
+// now; it moves because the underlying maths changed, not because of a
+// promise made in advance.
 function tlRefreshScore(animate){
   if(!tailorResult) return;
   const s = tlScore(tailorResult.skills_coverage, tlSelectedChangeIds());
+  const prevProjected = tlLastScore ? tlLastScore.projected : null;
   tlLastScore = s;
 
-  if(animate) animateTlScore(s.now); else setTlRing(s.now);
-
-  const proj = $('#tlProjected');
-  if(proj){
-    if(s.projected > s.now){
-      proj.classList.remove('hidden');
-      proj.innerHTML = `<b>${s.now}%</b> now &nbsp;→&nbsp; <b class="up">${s.projected}%</b> once you apply the changes you've selected`;
-    } else if(s.ceiling > s.now){
-      proj.classList.remove('hidden');
-      proj.innerHTML = `Select the suggested changes below to raise this score — up to <b class="up">${s.ceiling}%</b>`;
-    } else {
-      proj.classList.add('hidden');
-    }
-  }
-
-  const cap = $('#tlCeiling');
-  if(cap){
-    if(s.blocked > 0 && s.ceiling < 95){
-      cap.classList.remove('hidden');
-      cap.innerHTML = `Applying every suggestion takes this CV to <b>${s.ceiling}%</b>. The remainder rests on ${s.blocked} requirement${s.blocked===1?'':'s'} your CV doesn't currently evidence — rewording can't close ${s.blocked===1?'it':'those'}, and Reeve won't invent experience to inflate the number.`;
-    } else {
-      cap.classList.add('hidden');
-    }
+  if(animate || prevProjected === null){
+    animateTlScore(s.projected);          // first reveal: 0 → true score for the default selection
+  } else if(prevProjected !== s.projected){
+    animateTlScoreBetween(prevProjected, s.projected); // live toggle: real value → real value
   }
 }
 
