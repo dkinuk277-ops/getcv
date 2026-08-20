@@ -3354,6 +3354,8 @@ function tlLoadSession(){
 function tlClearSessionSilently(){
   try{ localStorage.removeItem(TL_SESSION_KEY); }catch(e){}
   tailorResult = null;
+  tlLastScore = null;
+  tlDisplayedScore = null;
 }
 
 // Debounced draft save — keeps whatever the user has typed even if they
@@ -3379,7 +3381,7 @@ function tlScheduleDraftSave(){
 });
 
 function tlStep(n){
-  for(let i=1;i<=4;i++){
+  for(let i=1;i<=3;i++){
     $('#tlPane'+i).classList.toggle('on', i===n);
     const s = document.querySelector('[data-tstep="'+i+'"]');
     s.classList.toggle('on', i===n);
@@ -3415,6 +3417,9 @@ document.querySelectorAll('.js-tailor').forEach(b => b.addEventListener('click',
       // Full parsed results already exist for this exact pasted JD — show
       // them straight away instead of making the user re-run the analysis.
       tailorResult = saved.result;
+      tlLastScore = null; tlDisplayedScore = null; // fresh render context — recompute baseline cleanly
+      $('#tlTableMode').classList.remove('hidden');
+      $('#tlReviewMode').classList.add('hidden');
       $('#tlLoading').style.display = 'none';
       $('#tlResults').classList.remove('hidden');
       tlStep(2);
@@ -3424,6 +3429,7 @@ document.querySelectorAll('.js-tailor').forEach(b => b.addEventListener('click',
   } else {
     if(banner) banner.classList.add('hidden');
     tailorResult = null;
+    tlLastScore = null; tlDisplayedScore = null;
   }
   $('#tlResults').classList.add('hidden');
   $('#tlLoading').style.display = 'block';
@@ -3434,6 +3440,7 @@ document.querySelectorAll('.js-tailor').forEach(b => b.addEventListener('click',
 $('#tlClearBtn').addEventListener('click', ()=>{
   try{ localStorage.removeItem(TL_SESSION_KEY); }catch(e){}
   tailorResult = null;
+  tlLastScore = null; tlDisplayedScore = null;
   $('#tlTitle').value = '';
   $('#tlCompany').value = '';
   $('#tlJD').value = '';
@@ -3485,6 +3492,8 @@ $('#tlAnalyse').addEventListener('click', async ()=>{
     });
     tailorResult = out.result;
     tlSaveSession({});
+    $('#tlTableMode').classList.remove('hidden');
+    $('#tlReviewMode').classList.add('hidden');
     renderTailorResults();
   }catch(err){
     tlStep(1);
@@ -3535,6 +3544,11 @@ function renderTailorResults(){
 const TL_WEIGHT = { critical: 3, important: 2, nice_to_have: 1 };
 const TL_CREDIT = { have: 1, partial: 0.5, missing: 0.25, absent: 0 };
 var tlLastScore = null;
+// Whatever number is literally painted on the ring right now — separate
+// from tlLastScore's now/projected pair, so every animation always starts
+// from what the user actually sees, never from an internal figure they
+// haven't been shown yet.
+var tlDisplayedScore = null;
 
 // Returns { now, projected, ceiling, closable, blocked }
 //  now       — score as the CV stands today
@@ -3607,13 +3621,19 @@ function animateTlScoreBetween(fromPct, toPct){
 function tlRefreshScore(animate){
   if(!tailorResult) return;
   const s = tlScore(tailorResult.skills_coverage, tlSelectedChangeIds());
-  const prevProjected = tlLastScore ? tlLastScore.projected : null;
   tlLastScore = s;
 
-  if(animate || prevProjected === null){
-    animateTlScore(s.projected);          // first reveal: 0 → true score for the default selection
-  } else if(prevProjected !== s.projected){
-    animateTlScoreBetween(prevProjected, s.projected); // live toggle: real value → real value
+  if(animate || tlDisplayedScore === null){
+    // First reveal: show the TRUE baseline — what the resume matches
+    // today, ignoring every suggestion, whether pre-checked by default
+    // or not. Painting the default-selected score here instead would
+    // mean the "before" number never actually appears on screen, only
+    // showing up later as an unexplained figure in a before/after line.
+    animateTlScore(s.now);
+    tlDisplayedScore = s.now;
+  } else if(tlDisplayedScore !== s.projected){
+    animateTlScoreBetween(tlDisplayedScore, s.projected); // real value → real value
+    tlDisplayedScore = s.projected;
   }
 }
 
@@ -4160,41 +4180,42 @@ function tlBuildReviewSections(accepted){
 // REAL values — the baseline before any of this was applied, and the
 // true score for exactly what got accepted. Not a forecast: both numbers
 // are facts about a specific, already-decided selection.
-function tlAnimateRise(fromPct, toPct){
-  const wrap = document.querySelector('.tl-scorerise-ring');
-  const label = $('#tlRiseScore');
-  if(!wrap || !label) return;
-  const dur = 1100, start = performance.now();
-  function step(now){
-    const t = Math.min(1, (now-start)/dur);
-    const cur = Math.round(fromPct + (toPct-fromPct)*t);
-    label.textContent = cur + '%';
-    wrap.style.background = `conic-gradient(#10B981 0 ${cur}%, #D1FAE5 ${cur}% 100%)`;
-    if(t<1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
-// STEP 2 → STEP 3: build the section-by-section review in place and show
-// the real score rising from baseline to what was actually selected.
+// Apply: build the section-by-section review, switch the pane's content
+// from table-mode to review-mode, and animate the SAME ring the user has
+// been watching the whole time from its current true value up to the
+// true score for exactly what's being applied. No navigation to a
+// different pane, no separate ring — this is the one score, moving for
+// real, in the same window.
 $('#tlApply').addEventListener('click', ()=>{
   const accepted = tlAcceptedIdx();
   if(!accepted.length) return;
 
   $('#tlReviewSections').innerHTML = tlBuildReviewSections(accepted);
+  const nChanges = accepted.length;
+  $('#tlReviewLabel').textContent = nChanges + ' change' + (nChanges===1?'':'s') + ' applied — here\'s exactly where they landed:';
 
-  const before = tlLastScore ? tlLastScore.now : 0;
-  const after  = tlLastScore ? tlLastScore.projected : before;
-  $('#tlRiseTitle').textContent = accepted.length + ' change' + (accepted.length===1?'':'s') + ' applied';
-  $('#tlRiseSub').textContent = before + '% → ' + after + '%';
-  tlAnimateRise(before, after);
+  $('#tlTableMode').classList.add('hidden');
+  $('#tlReviewMode').classList.remove('hidden');
 
-  tlStep(3);
+  // tlLastScore.projected is the true score for exactly this selection —
+  // animate the main ring from wherever it's currently sitting up to it.
+  if(tlLastScore && tlDisplayedScore !== tlLastScore.projected){
+    animateTlScoreBetween(tlDisplayedScore, tlLastScore.projected);
+    tlDisplayedScore = tlLastScore.projected;
+  }
 });
 
-$('#tlPrevBack').addEventListener('click', ()=> tlStep(2));
+// Back: return to the table without losing any selections, and without
+// leaving the pane — the table's checkboxes were never touched, so
+// nothing needs re-rendering.
+$('#tlPrevBack').addEventListener('click', ()=>{
+  $('#tlReviewMode').classList.add('hidden');
+  $('#tlTableMode').classList.remove('hidden');
+});
 
-// STEP 3 → STEP 4: save the CLEAN tailored resume (no tokens, no marks)
+// Save the CLEAN tailored resume (no tokens, no marks) and move to the
+// Saved pane (now step 3, since the old separate Preview step no longer
+// exists as its own pane).
 $('#tlPrevSave').addEventListener('click', async ()=>{
   const accepted = tlAcceptedIdx();
   if(!accepted.length) return;
@@ -4218,7 +4239,7 @@ $('#tlPrevSave').addEventListener('click', async ()=>{
     loadSavedList();
     $('#tlSavedTitle').textContent = accepted.length + ' change' + (accepted.length===1?'':'s') + ' applied';
     $('#tlSavedName').textContent = '📄 ' + name;
-    tlStep(4);
+    tlStep(3);
     toast('Tailored resume saved and loaded — ready to download');
   }catch(err){
     tlError('#tlErr3', 'Could not save: ' + (err.message || 'unknown error'));
