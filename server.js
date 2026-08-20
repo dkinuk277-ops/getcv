@@ -491,7 +491,15 @@ Return JSON with EXACTLY this shape:
   "match_score": <integer 0-100, honest assessment of current resume vs this JD>,
   "match_summary": "<2-3 sentences: where the resume is strong for this job, and what tailoring will fix>",
   "skills_coverage": [
-    { "skill": "<requirement from the JD>", "status": "have" | "partial" | "missing", "note": "<short note, e.g. 'present but buried in older role'>" }
+    {
+      "skill": "<the requirement, as the JD expresses it>",
+      "status": "have" | "partial" | "missing" | "absent",
+      "note": "<short note, e.g. 'present but buried in older role'>",
+      "employer": "<where this maps to in the resume: an employer name with dates e.g. 'Kaseya (2021-2024)', or 'Skills section', or 'Across roles', or 'Not in your CV' when status is absent>",
+      "cv_text": "<the candidate's OWN wording from their resume that relates to this requirement, quoted as close to verbatim as possible. Empty string when status is absent.>",
+      "cv_highlight": "<the EXACT substring of cv_text that does not line up with the JD's language, so it can be highlighted. Must appear verbatim inside cv_text. Empty string if status is have or absent.>",
+      "action": "<specific instruction. For partial: name the exact change, e.g. 'Change \\"managed the compliance programme\\" to \\"designed and owned the enterprise GRC strategy\\"'. For missing/absent: say what to add and where, and be explicit that they should only add it if genuinely true. For have: 'No action needed'.>"
+    }
   ],
   "changes": [
     {
@@ -518,7 +526,15 @@ Field semantics:
 - "accomplishments_add": APPENDS accomplishment lines. verified:false unless directly evidenced. new_value = array of lines.
 - "summary_append": APPENDS a sentence to the summary. Use for unverified positioning claims. ALWAYS verified:false.
 
-skills_coverage: max 8 entries, focused on the JD's most important requirements.`;
+skills_coverage: max 10 entries, focused on the JD's most important requirements.
+
+skills_coverage status semantics — these drive a side-by-side comparison table, so be precise:
+- "have": the resume clearly evidences this requirement in language an ATS would match. cv_highlight must be empty.
+- "partial": the candidate HAS done this, but describes it in different words than the JD uses (e.g. resume says "reporting metrics", JD asks for "KRIs"). cv_text = their current wording; cv_highlight = the specific phrase that needs rewording. This is the most useful category — look hard for these.
+- "missing": related or adjacent experience exists somewhere, but this specific requirement is not stated. cv_text = the closest related thing they DO have.
+- "absent": nothing anywhere in the resume relates to this at all — a genuinely new domain, tool or credential for this candidate. cv_text and cv_highlight must both be empty strings. Order these LAST in the array.
+
+Be honest about "absent" — do not stretch to find a connection that isn't there. A candidate is better served by knowing a real gap exists than by a false reassurance. Never suggest they claim something untrue; for absent items the action should be conditional ("if you have done X, add it under...") or should acknowledge the gap plainly.`;
 
     let out;
     try {
@@ -538,6 +554,33 @@ skills_coverage: max 8 entries, focused on the JD's most important requirements.
     if (typeof out.match_score !== 'number') out.match_score = 0;
     out.match_score = Math.max(0, Math.min(100, Math.round(out.match_score)));
     if (!Array.isArray(out.skills_coverage)) out.skills_coverage = [];
+    // Normalize coverage rows: the comparison table reads these fields directly,
+    // so guarantee every one is a string and the status is one we recognise.
+    const VALID_STATUS = ['have','partial','missing','absent'];
+    out.skills_coverage = out.skills_coverage
+      .filter(s => s && typeof s === 'object' && s.skill)
+      .map(s => {
+        const status = VALID_STATUS.includes(s.status) ? s.status : 'partial';
+        const cv_text = typeof s.cv_text === 'string' ? s.cv_text : '';
+        let cv_highlight = typeof s.cv_highlight === 'string' ? s.cv_highlight : '';
+        // Only keep a highlight that genuinely occurs in the quoted text —
+        // otherwise the client can't mark it and would render stray markup.
+        if (cv_highlight && !cv_text.includes(cv_highlight)) cv_highlight = '';
+        if (status === 'have' || status === 'absent') cv_highlight = '';
+        return {
+          skill: String(s.skill),
+          status,
+          note: typeof s.note === 'string' ? s.note : '',
+          employer: typeof s.employer === 'string' && s.employer ? s.employer
+                    : (status === 'absent' ? 'Not in your CV' : ''),
+          cv_text: status === 'absent' ? '' : cv_text,
+          cv_highlight,
+          action: typeof s.action === 'string' ? s.action : ''
+        };
+      })
+      .slice(0, 12);
+    // Absent rows always sort last — they're genuine gaps, not wording fixes.
+    out.skills_coverage.sort((a, b) => (a.status === 'absent' ? 1 : 0) - (b.status === 'absent' ? 1 : 0));
     if (!Array.isArray(out.changes)) out.changes = [];
     const VALID_FIELDS = ['summary','skills','experience_desc','skills_add','accomplishments_add','summary_append'];
     out.changes = out.changes.filter(c =>
