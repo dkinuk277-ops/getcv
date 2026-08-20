@@ -498,7 +498,9 @@ Return JSON with EXACTLY this shape:
       "employer": "<where this maps to in the resume: an employer name with dates e.g. 'Kaseya (2021-2024)', or 'Skills section', or 'Across roles', or 'Not in your CV' when status is absent>",
       "cv_text": "<the candidate's OWN wording from their resume that relates to this requirement, quoted as close to verbatim as possible. Empty string when status is absent.>",
       "cv_highlight": "<the EXACT substring of cv_text that does not line up with the JD's language, so it can be highlighted. Must appear verbatim inside cv_text. Empty string if status is have or absent.>",
-      "action": "<specific instruction. For partial: name the exact change, e.g. 'Change \\"managed the compliance programme\\" to \\"designed and owned the enterprise GRC strategy\\"'. For missing/absent: say what to add and where, and be explicit that they should only add it if genuinely true. For have: 'No action needed'.>"
+      "action": "<specific instruction. For partial: name the exact change, e.g. 'Change \\"managed the compliance programme\\" to \\"designed and owned the enterprise GRC strategy\\"'. For missing/absent: say what to add and where, and be explicit that they should only add it if genuinely true. For have: 'No action needed'.>",
+      "importance": "critical" | "important" | "nice_to_have",
+      "resolved_by": [<array of change ids from the "changes" array below that, if applied, would make this requirement fully evidenced. Empty array if no proposed change fixes it.>]
     }
   ],
   "changes": [
@@ -534,7 +536,14 @@ skills_coverage status semantics — these drive a side-by-side comparison table
 - "missing": related or adjacent experience exists somewhere, but this specific requirement is not stated. cv_text = the closest related thing they DO have.
 - "absent": nothing anywhere in the resume relates to this at all — a genuinely new domain, tool or credential for this candidate. cv_text and cv_highlight must both be empty strings. Order these LAST in the array.
 
-Be honest about "absent" — do not stretch to find a connection that isn't there. A candidate is better served by knowing a real gap exists than by a false reassurance. Never suggest they claim something untrue; for absent items the action should be conditional ("if you have done X, add it under...") or should acknowledge the gap plainly.`;
+Be honest about "absent" — do not stretch to find a connection that isn't there. A candidate is better served by knowing a real gap exists than by a false reassurance. Never suggest they claim something untrue; for absent items the action should be conditional ("if you have done X, add it under...") or should acknowledge the gap plainly.
+
+SCORING LINKAGE — this drives a live "projected score" as the candidate selects changes, so accuracy matters:
+- "importance": how much this requirement matters to THIS job. "critical" = named as a must-have or central to the role; "important" = clearly expected; "nice_to_have" = desirable/preferred.
+- "resolved_by": list the id(s) from your "changes" array that would genuinely close this gap if applied. A rewording change that puts the JD's language into the resume DOES resolve a "partial" row. Only list a change if applying it truly makes the requirement evidenced.
+- For "have" rows, resolved_by must be [].
+- For "absent" rows, only list a change if that change is an unverified addition (verified:false) that would add this requirement — the candidate has to confirm it is true, so it is their call whether it counts.
+- Every id you list must exist in your "changes" array. Do not invent ids.`;
 
     let out;
     try {
@@ -557,6 +566,7 @@ Be honest about "absent" — do not stretch to find a connection that isn't ther
     // Normalize coverage rows: the comparison table reads these fields directly,
     // so guarantee every one is a string and the status is one we recognise.
     const VALID_STATUS = ['have','partial','missing','absent'];
+    const VALID_IMPORTANCE = ['critical','important','nice_to_have'];
     out.skills_coverage = out.skills_coverage
       .filter(s => s && typeof s === 'object' && s.skill)
       .map(s => {
@@ -575,7 +585,9 @@ Be honest about "absent" — do not stretch to find a connection that isn't ther
                     : (status === 'absent' ? 'Not in your CV' : ''),
           cv_text: status === 'absent' ? '' : cv_text,
           cv_highlight,
-          action: typeof s.action === 'string' ? s.action : ''
+          action: typeof s.action === 'string' ? s.action : '',
+          importance: VALID_IMPORTANCE.includes(s.importance) ? s.importance : 'important',
+          resolved_by: Array.isArray(s.resolved_by) ? s.resolved_by.filter(x => typeof x === 'string') : []
         };
       })
       .slice(0, 12);
@@ -590,6 +602,16 @@ Be honest about "absent" — do not stretch to find a connection that isn't ther
     // Enforce the safety rule server-side too: additive fields are never "verified"
     out.changes.forEach(c => {
       if (['skills_add','accomplishments_add','summary_append'].includes(c.apply.field)) c.verified = false;
+    });
+
+    // Ensure every change has a stable id, then drop any resolved_by pointing
+    // at a change that doesn't exist (hallucinated, or filtered out above).
+    // Without this the client's projected score could credit a fix that can
+    // never actually be applied.
+    out.changes.forEach((c, i) => { if (!c.id || typeof c.id !== 'string') c.id = 'c' + (i + 1); });
+    const changeIds = new Set(out.changes.map(c => c.id));
+    out.skills_coverage.forEach(s => {
+      s.resolved_by = (s.resolved_by || []).filter(id => changeIds.has(id));
     });
 
     res.json({ success: true, result: out });
