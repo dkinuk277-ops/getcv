@@ -3445,6 +3445,26 @@ $('#tlClearBtn').addEventListener('click', ()=>{
   toast('Cleared — paste a new job description.', 3000);
 });
 
+// Rotating loading words for the Tailor analysis — no time estimate, since
+// AI response times vary and a wrong guess reads worse than no guess at all.
+const TL_LOADING_WORDS = ['Analysing', 'Thinking', 'Comparing', 'Curating', 'Articulating', 'Fixing', 'Updating', 'Finishing up'];
+let tlLoadingTimer = null;
+function tlStartLoadingWords(){
+  const el = $('#tlLoadingWord');
+  if(!el) return;
+  let i = 0;
+  el.textContent = TL_LOADING_WORDS[0];
+  clearInterval(tlLoadingTimer);
+  tlLoadingTimer = setInterval(()=>{
+    i = (i + 1) % TL_LOADING_WORDS.length;
+    el.textContent = TL_LOADING_WORDS[i];
+  }, 1600);
+}
+function tlStopLoadingWords(){
+  clearInterval(tlLoadingTimer);
+  tlLoadingTimer = null;
+}
+
 $('#tlAnalyse').addEventListener('click', async ()=>{
   const jd = $('#tlJD').value.trim();
   if(jd.length < 80) return tlError('#tlErr', 'Please paste the full job description — at least a few sentences.');
@@ -3452,6 +3472,7 @@ $('#tlAnalyse').addEventListener('click', async ()=>{
   tlStep(2);
   $('#tlLoading').style.display = 'block';
   $('#tlResults').classList.add('hidden');
+  tlStartLoadingWords();
   try{
     const out = await api('/api/tailor', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -3468,6 +3489,8 @@ $('#tlAnalyse').addEventListener('click', async ()=>{
   }catch(err){
     tlStep(1);
     tlError('#tlErr', err.message || 'Tailoring failed — please try again.');
+  }finally{
+    tlStopLoadingWords();
   }
 });
 
