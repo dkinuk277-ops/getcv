@@ -185,6 +185,35 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-leg-item .sk{flex-shrink:0;pointer-events:none;opacity:.85}
 .tl-leg-txt{font-size:11.5px;color:var(--ink-soft);line-height:1.4}
 .tl-legend-top{background:#F8FAFC;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.sk.absent{background:#FEE2E2;color:#7F1D1D;border:1px solid #FCA5A5}
+.sk.absent::before{content:"! "}
+/* ---- Requirement-by-requirement comparison table ---- */
+.tl-hl-key{font-size:11px;color:var(--ink-soft);margin:2px 0 7px}
+.cvhl{background:#FEF3C7;color:#7A4B07;border-radius:3px;padding:0 4px;font-weight:700}
+.tl-table-wrap{border:1px solid var(--line);border-radius:10px;overflow:auto;background:var(--card);margin-bottom:16px}
+.tl-table{width:100%;border-collapse:collapse;font-size:12px;min-width:760px}
+.tl-table th{text-align:left;padding:9px 10px;font-weight:700;color:var(--ink-soft);background:#F8FAFC;border-bottom:1px solid var(--line);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+.tl-table td{padding:10px;vertical-align:top;border-bottom:1px solid var(--line);line-height:1.5;color:var(--ink-soft)}
+.tl-table tr:last-child td{border-bottom:none}
+.tl-table td.c-req{color:var(--ink);font-weight:600}
+.tl-table td.c-emp{color:var(--ink);white-space:nowrap}
+.tl-table .emp-dates{display:block;font-size:10.5px;color:var(--ink-soft);font-weight:400}
+.tl-table td.c-act strong{color:var(--ink);font-weight:700}
+.tl-grouphead td{background:#F8FAFC;border-top:2px solid #CBD5E1}
+.tl-grouphead b{display:block;font-size:12px;color:var(--ink);margin-bottom:2px}
+.tl-grouphead span{font-size:11px;color:var(--ink-soft);line-height:1.45}
+.tl-table-empty{padding:14px;text-align:center;font-size:12px;color:var(--ink-soft)}
+/* ---- Apply-changes bar ---- */
+.tl-applybar{border:1px solid var(--line);border-radius:11px;overflow:hidden;margin-bottom:14px}
+.tl-applybar-head{padding:13px 15px;border-bottom:1px solid var(--line);background:#F8FAFC}
+.tl-applybar-title{font-size:14px;font-weight:800;color:var(--ink);margin-bottom:3px}
+.tl-applybar-sub{font-size:12px;color:var(--ink-soft);line-height:1.5}
+.tl-applybar .tl-changebar{padding:10px 15px 0;margin-bottom:0}
+.tl-applybar #tlChanges{padding:6px 15px 13px}
+.tl-editedtag{display:inline-block;font-size:10.5px;font-weight:700;color:#15803D;background:#DCFCE7;border-radius:4px;padding:2px 7px;margin-top:5px}
+.tl-resetsug{font-size:11px;color:var(--accent);cursor:pointer;font-weight:700;margin-left:auto}
+.tl-resetsug:hover{text-decoration:underline}
+.d-old-strike{text-decoration:line-through}
 .tl-savenote{font-size:11px;color:var(--ink-soft);margin-top:4px;min-height:14px}
 .tl-restore-banner{background:#EEF4FF;border:1px solid #C7D9F5;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;font-weight:600;color:#1E3A8A}
 .tl-disclaimer-top{background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:12px 16px;margin-bottom:14px}
@@ -2210,11 +2239,12 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
           </ul>
         </div>
         <div class="tl-legend-top">
-          <p class="tl-cov-label" style="margin-top:0">What the colours below mean:</p>
+          <p class="tl-cov-label" style="margin-top:0">What the matching statuses mean:</p>
           <div class="tl-cov-legend">
-            <div class="tl-leg-item"><span class="sk have">Found</span><span class="tl-leg-txt">This skill or requirement is clearly present in your resume — no action needed.</span></div>
-            <div class="tl-leg-item"><span class="sk partial">Partial</span><span class="tl-leg-txt">Related experience exists but isn't stated in the same words as the job description — worth rewording.</span></div>
-            <div class="tl-leg-item"><span class="sk missing">Missing</span><span class="tl-leg-txt">Not mentioned anywhere in your resume — add it below if you genuinely have this experience.</span></div>
+            <div class="tl-leg-item"><span class="sk have">Matched</span><span class="tl-leg-txt">This requirement is clearly present in your CV — no action needed.</span></div>
+            <div class="tl-leg-item"><span class="sk partial">Partial</span><span class="tl-leg-txt">You've done this, but worded it differently to the job description — worth rewording.</span></div>
+            <div class="tl-leg-item"><span class="sk missing">Missing</span><span class="tl-leg-txt">Related experience exists, but this specific requirement isn't stated.</span></div>
+            <div class="tl-leg-item"><span class="sk absent">Not found</span><span class="tl-leg-txt">Nothing in your CV relates to this at all — a genuine gap, not a wording problem.</span></div>
           </div>
         </div>
         <div class="ats-tiles">
@@ -2224,7 +2254,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
           </div>
           <div class="ats-tile tile-found">
             <div class="ats-tile-num" id="tlFoundNum">0</div>
-            <div class="ats-tile-label">✓ Found</div>
+            <div class="ats-tile-label">✓ Matched</div>
           </div>
           <div class="ats-tile tile-partial">
             <div class="ats-tile-num" id="tlPartialNum">0</div>
@@ -2243,21 +2273,30 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
           <div class="match-info">
             <h4 id="tlMatchTitle">Your resume vs. this job</h4>
             <p id="tlMatchSummary"></p>
-            <p class="tl-cov-label">Keyword &amp; skill coverage — what the ATS software this job likely uses would look for:</p>
-            <div class="skill-cover" id="tlCoverage"></div>
             <p class="tl-cov-label">Template format check — will your CV's layout be read correctly by ATS software, regardless of what it says:</p>
             <div class="tl-parse" id="tlParse"></div>
             <div class="tl-boost-tip" id="tlBoostTip"></div>
           </div>
         </div>
-        <div class="tl-changebar">
-          <b id="tlChangeCount">0 proposed changes</b>
-          <span style="display:flex;gap:7px">
-            <button class="btn btn-ghost" id="tlAcceptAll" type="button">Accept all verified</button>
-            <button class="btn btn-ghost" id="tlRejectAll" type="button">Reject all</button>
-          </span>
+
+        <p class="tl-cov-label">Requirement-by-requirement comparison — what this job asks for, against what your CV actually says:</p>
+        <p class="tl-hl-key"><span class="cvhl">highlighted text</span> = wording in your CV that doesn't line up with the job</p>
+        <div class="tl-table-wrap"><table class="tl-table" id="tlCompareTable"><tbody id="tlCompareBody"></tbody></table></div>
+
+        <div class="tl-applybar">
+          <div class="tl-applybar-head">
+            <div class="tl-applybar-title">Ready to apply these changes?</div>
+            <div class="tl-applybar-sub">Edit any wording before applying — what you write is what gets used. Nothing is saved until you accept the preview.</div>
+          </div>
+          <div class="tl-changebar">
+            <b id="tlChangeCount">0 proposed changes</b>
+            <span style="display:flex;gap:7px">
+              <button class="btn btn-ghost" id="tlAcceptAll" type="button">Select all verified</button>
+              <button class="btn btn-ghost" id="tlRejectAll" type="button">Clear all</button>
+            </span>
+          </div>
+          <div id="tlChanges"></div>
         </div>
-        <div id="tlChanges"></div>
         <div class="tl-err" id="tlErr2"></div>
         <div class="tl-actions">
           <button class="btn btn-ghost" id="tlBack" type="button">← Back</button>
@@ -2364,7 +2403,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260820a"></script>
+<script src="app.js?v=20260820b"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
