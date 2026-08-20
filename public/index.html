@@ -619,6 +619,7 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .btn:hover{filter:brightness(.96)}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-ghost{background:var(--accent-soft);color:var(--accent)}
+.btn-ghost:disabled{opacity:.45;cursor:not-allowed}
 .btn-ai{background:var(--ai-soft);color:var(--ai);font-size:12.5px;padding:6px 12px}
 .btn-danger{color:var(--danger);font-size:12.5px;padding:6px 10px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
@@ -2361,7 +2362,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260819f"></script>
+<script src="app.js?v=20260819g"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
