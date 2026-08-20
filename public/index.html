@@ -190,6 +190,11 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 /* ---- Requirement-by-requirement comparison table ---- */
 .tl-hl-key{font-size:11px;color:var(--ink-soft);margin:2px 0 7px}
 .cvhl{background:#FEF3C7;color:#7A4B07;border-radius:3px;padding:0 4px;font-weight:700}
+.tl-projbar{background:#ECFDF5;border:1px solid #A7F3D0;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#065F46;line-height:1.5}
+.tl-projbar b{font-weight:800}
+.tl-projbar b.up{color:#047857;font-size:15px}
+.tl-ceiling{background:#F8FAFC;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--ink-soft);line-height:1.5}
+.tl-ceiling b{color:var(--ink);font-weight:800}
 .tl-box{width:96vw}
 @media(max-width:1240px){.tl-box{max-width:96vw!important}}
 .tl-table-wrap{border:1px solid var(--line);border-radius:10px;overflow:auto;background:var(--card);margin-bottom:16px}
@@ -2272,6 +2277,8 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
             <div class="ats-tile-label">Format Risk</div>
           </div>
         </div>
+        <div class="tl-projbar hidden" id="tlProjected"></div>
+        <div class="tl-ceiling hidden" id="tlCeiling"></div>
         <div class="match-band">
           <div class="match-info">
             <h4 id="tlMatchTitle">Your resume vs. this job</h4>
@@ -2406,7 +2413,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260820c"></script>
+<script src="app.js?v=20260820d"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
