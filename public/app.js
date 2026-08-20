@@ -3310,10 +3310,17 @@ $('#btnConfirmDelete').addEventListener('click', async ()=>{
 // ============================================================
 let tailorResult = null;
 const TL_SESSION_KEY = 'reeve_tailor_session';
+// Bump whenever the shape of a tailor result changes. A saved session from an
+// older schema is missing fields the current UI renders (employer, cv_text,
+// cv_highlight, action), which would show as empty table columns — so on a
+// version mismatch we keep the pasted JD but drop the stale result and ask
+// for a re-run rather than rendering a half-empty table.
+const TL_SCHEMA_VERSION = 2;
 
 function tlSaveSession(extra){
   try{
     const data = {
+      v: TL_SCHEMA_VERSION,
       jobTitle: $('#tlTitle').value.trim(),
       company: $('#tlCompany').value.trim(),
       jobDescription: $('#tlJD').value,
@@ -3328,7 +3335,16 @@ function tlSaveSession(extra){
 function tlLoadSession(){
   try{
     const raw = localStorage.getItem(TL_SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if(!raw) return null;
+    const data = JSON.parse(raw);
+    // Old-schema result: keep the pasted JD so the user doesn't lose their
+    // typing, but discard the result — rendering it would leave the
+    // comparison table's newer columns blank.
+    if(data && data.v !== TL_SCHEMA_VERSION){
+      data.result = null;
+      data.staleSchema = true;
+    }
+    return data;
   }catch(e){ return null; }
 }
 
@@ -3389,7 +3405,12 @@ document.querySelectorAll('.js-tailor').forEach(b => b.addEventListener('click',
     $('#tlTitle').value = saved.jobTitle || '';
     $('#tlCompany').value = saved.company || '';
     $('#tlJD').value = saved.jobDescription || '';
-    if(banner) banner.classList.remove('hidden');
+    if(banner){
+      banner.classList.remove('hidden');
+      banner.textContent = saved.staleSchema
+        ? '📄 We kept your pasted job, but the analysis needs re-running to show the full comparison — click Analyse & Tailor below.'
+        : '📄 Welcome back — we restored your last pasted job and results.';
+    }
     if(saved.result){
       // Full parsed results already exist for this exact pasted JD — show
       // them straight away instead of making the user re-run the analysis.
