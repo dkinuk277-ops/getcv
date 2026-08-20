@@ -3551,7 +3551,12 @@ function renderTailorResults(){
     list.appendChild(card);
   });
 
-  $('#tlChangeCount').textContent = (r.changes || []).length + ' proposed change' + ((r.changes||[]).length===1?'':'s');
+  const nChanges = (r.changes || []).length;
+  $('#tlChangeCount').textContent = nChanges === 0
+    ? '✓ No suggested changes — your resume already covers this job well'
+    : nChanges + ' proposed change' + (nChanges===1?'':'s');
+  $('#tlAcceptAll').disabled = nChanges === 0;
+  $('#tlRejectAll').disabled = nChanges === 0;
   updateTailorCount();
 }
 
@@ -3630,7 +3635,8 @@ function updateTailorCount(){
 }
 
 $('#tlAcceptAll').addEventListener('click', ()=>{
-  if(!tailorResult || !Array.isArray(tailorResult.changes)) return;
+  if(!tailorResult || !Array.isArray(tailorResult.changes) || !tailorResult.changes.length) return;
+  let accepted = 0;
   document.querySelectorAll('#tlChanges .diff-card').forEach((card)=>{
     // Look up by the card's own data-ci index rather than trusting forEach's
     // iteration order to line up with tailorResult.changes — if a card ever
@@ -3642,16 +3648,20 @@ $('#tlAcceptAll').addEventListener('click', ()=>{
     const cb = card.querySelector('input');
     if(!c || !cb) return;
     cb.checked = !!c.verified;            // accept-all only turns on VERIFIED ones
+    if(cb.checked) accepted++;
     card.classList.toggle('rejected', !cb.checked);
   });
   updateTailorCount();
+  toast(accepted ? `Accepted ${accepted} verified change${accepted===1?'':'s'}.` : 'None of the suggested changes were verified — nothing to accept.', 3000);
 });
 $('#tlRejectAll').addEventListener('click', ()=>{
+  if(!document.querySelectorAll('#tlChanges .diff-card').length) return;
   document.querySelectorAll('#tlChanges .diff-card input').forEach(cb=>{
     cb.checked = false;
     cb.closest('.diff-card').classList.add('rejected');
   });
   updateTailorCount();
+  toast('Rejected all suggested changes.', 3000);
 });
 $('#tlBack').addEventListener('click', ()=> tlStep(1));
 
