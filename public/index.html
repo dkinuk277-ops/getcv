@@ -190,13 +190,16 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 /* ---- Requirement-by-requirement comparison table ---- */
 .tl-hl-key{font-size:11px;color:var(--ink-soft);margin:2px 0 7px}
 .cvhl{background:#FEF3C7;color:#7A4B07;border-radius:3px;padding:0 4px;font-weight:700}
+.tl-box{width:96vw}
+@media(max-width:1240px){.tl-box{max-width:96vw!important}}
 .tl-table-wrap{border:1px solid var(--line);border-radius:10px;overflow:auto;background:var(--card);margin-bottom:16px}
-.tl-table{width:100%;border-collapse:collapse;font-size:12px;min-width:760px}
+.tl-table{width:100%;border-collapse:collapse;font-size:12px;min-width:900px}
 .tl-table th{text-align:left;padding:9px 10px;font-weight:700;color:var(--ink-soft);background:#F8FAFC;border-bottom:1px solid var(--line);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
 .tl-table td{padding:10px;vertical-align:top;border-bottom:1px solid var(--line);line-height:1.5;color:var(--ink-soft)}
 .tl-table tr:last-child td{border-bottom:none}
 .tl-table td.c-req{color:var(--ink);font-weight:600}
 .tl-table td.c-emp{color:var(--ink);white-space:nowrap}
+.tl-table td .sk{display:inline-block;white-space:nowrap}
 .tl-table .emp-dates{display:block;font-size:10.5px;color:var(--ink-soft);font-weight:400}
 .tl-table td.c-act strong{color:var(--ink);font-weight:700}
 .tl-grouphead td{background:#F8FAFC;border-top:2px solid #CBD5E1}
@@ -2182,7 +2185,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <!-- ===== Tailor-for-Job modal ===== -->
 <div class="modal" id="tailorModal" role="dialog" aria-modal="true">
-  <div class="modal-box" style="max-width:860px">
+  <div class="modal-box tl-box" style="max-width:1180px">
     <button class="modal-close" data-close type="button">&times;</button>
     <div class="tl-head">
       <h2>🎯 Tailor your CV to Job Description <span class="pro-chip">★ PRO</span></h2>
@@ -2403,7 +2406,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260820b"></script>
+<script src="app.js?v=20260820c"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
