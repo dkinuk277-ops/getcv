@@ -3640,6 +3640,30 @@ function tlHighlight(text, needle){
   return safe.slice(0, at) + '<span class="cvhl">' + safeNeedle + '</span>' + safe.slice(at + safeNeedle.length);
 }
 
+// Same substring-highlight logic as tlHighlight, but for the post-apply
+// review cards (different visual context, own class so the two can be
+// styled independently even though they currently match).
+function tlHighlightRev(text, needle){
+  const safe = esc(text || '');
+  if(!needle) return safe;
+  const safeNeedle = esc(needle);
+  const at = safe.indexOf(safeNeedle);
+  if(at === -1) return safe;
+  return safe.slice(0, at) + '<span class="tl-revhl">' + safeNeedle + '</span>' + safe.slice(at + safeNeedle.length);
+}
+
+// Line-level diff between an original block of text and its replacement.
+// Deliberately NOT trusting the AI's own old_text/new_text framing for
+// this — the AI may rewrite an entire bullet block as one string even
+// when only one line meaningfully changed, so this compares the ACTUAL
+// before/after line sets to find exactly which lines are new, regardless
+// of how much of the block the AI's replacement touched.
+function tlDiffLines(oldText, newText){
+  const oldLines = new Set(String(oldText||'').split('\n').map(s=>s.trim()).filter(Boolean));
+  return String(newText||'').split('\n').map(s=>s.trim()).filter(Boolean)
+    .map(line => ({ text: line, changed: !oldLines.has(line) }));
+}
+
 // Splits "Kaseya (2021-2024)" into name + dates so the dates can sit
 // on their own line; falls back to the whole string when there's no match.
 function tlEmployerCell(employer){
@@ -3653,6 +3677,14 @@ function tlEmployerCell(employer){
 // Renders the "Suggested fix" + "Apply" cells for a set of linked change
 // indices. Returns {fixHtml, applyHtml} — kept together because the Apply
 // checkbox's default state depends on the same changes the fix cell shows.
+// Truncates the new wording into a one-line collapsed summary — the full
+// before/after only appears once the row is expanded, which keeps a long
+// table scannable instead of forcing every diff open at once.
+function tlFixSummary(newTexts){
+  const t = newTexts.length > 64 ? newTexts.slice(0, 61) + '…' : newTexts;
+  return 'Reword to "' + t + '"';
+}
+
 function tlFixCell(idxList, changes, rowKey){
   if(!idxList.length){
     return { fixHtml: '', applyHtml: '' };
@@ -3667,12 +3699,18 @@ function tlFixCell(idxList, changes, rowKey){
     ? `<span class="tl-fix-warn">⚠ Reeve can't verify this from your CV — only apply if it's true.</span>` : '';
   const canEdit = idxList.length === 1;
 
+  // Collapsed by default: a chevron + one-line summary + Edit, all on the
+  // same header row. Expanding reveals the full before/after underneath.
   const fixHtml = `<div class="tl-fixwrap" data-ci="${idxList.join(',')}" data-rowkey="${rowKey}">
-      <div class="tl-fixview">
+      <div class="tl-fixhead">
+        <span class="tl-fixtoggle" aria-label="Expand"><i class="tl-chev">▸</i></span>
+        <span class="tl-fixsum">${esc(tlFixSummary(newTexts))}</span>
+        ${canEdit ? `<span class="tl-fix-edit">✎ Edit</span>` : ''}
+      </div>
+      <div class="tl-fixview hidden">
         ${oldTexts ? `<div class="tl-fix-current">${esc(oldTexts)}</div>` : ''}
         <div><span class="tl-fix-arrow">→</span> <span class="tl-fix-new">${esc(newTexts)}</span></div>
         ${warn}
-        ${canEdit ? `<span class="tl-fix-edit">✎ Edit</span>` : ''}
       </div>
     </div>`;
 
@@ -3795,6 +3833,24 @@ function tlWireTableRows(allChanges){
     cb.addEventListener('change', updateTailorCount);
   });
 
+  // Collapse/expand: click the chevron or the summary text to reveal the
+  // full before/after. Collapsed is the default so a long table of many
+  // gaps stays scannable rather than opening every diff at once.
+  document.querySelectorAll('#tlCompareTable .tl-fixwrap').forEach(wrap=>{
+    const toggle = wrap.querySelector('.tl-fixtoggle');
+    const sum = wrap.querySelector('.tl-fixsum');
+    const view = wrap.querySelector('.tl-fixview');
+    if(!toggle || !view) return;
+    const doToggle = ()=>{
+      const willOpen = view.classList.contains('hidden');
+      view.classList.toggle('hidden', !willOpen);
+      toggle.querySelector('.tl-chev').textContent = willOpen ? '▾' : '▸';
+      toggle.setAttribute('aria-label', willOpen ? 'Collapse' : 'Expand');
+    };
+    toggle.addEventListener('click', doToggle);
+    if(sum) sum.addEventListener('click', doToggle);
+  });
+
   document.querySelectorAll('#tlCompareTable .tl-fixwrap').forEach(wrap=>{
     const idx = Number(wrap.dataset.ci); // only single-change wraps render an Edit link
     const c = allChanges[idx];
@@ -3804,8 +3860,11 @@ function tlWireTableRows(allChanges){
 
     const original = { new_text: c.new_text, new_value: Array.isArray(c.apply.new_value) ? c.apply.new_value.slice() : c.apply.new_value };
 
-    editLink.addEventListener('click', ()=>{
+    editLink.addEventListener('click', (e)=>{
+      e.stopPropagation(); // don't also trigger the collapse toggle
       const view = wrap.querySelector('.tl-fixview');
+      view.classList.remove('hidden'); // editing needs the body visible
+      const chev = wrap.querySelector('.tl-chev'); if(chev) chev.textContent = '▾';
       const isArray = Array.isArray(c.apply.new_value);
       const ta = el('textarea', {class:'tl-edit-ta-row'});
       ta.value = isArray ? c.apply.new_value.join('\n') : String(c.apply.new_value);
@@ -3839,6 +3898,8 @@ function tlWireTableRows(allChanges){
         }
         const newSpan = view.querySelector('.tl-fix-new');
         if(newSpan) newSpan.textContent = c.new_text;
+        const sum = wrap.querySelector('.tl-fixsum');
+        if(sum) sum.textContent = tlFixSummary(c.new_text);
         let tag = view.querySelector('.tl-editedtag-sm');
         if(c.new_text !== original.new_text){
           if(!tag){ tag = el('span', {class:'tl-editedtag-sm'}); tag.textContent = '✎ Edited by you'; view.appendChild(tag); }
@@ -4018,25 +4079,116 @@ function tlHighlightChanges(changes, acceptedIdx, base){
   });
 }
 
-// STEP 2 → STEP 3: render the full tailored resume with highlights in an iframe
+// Builds the post-apply review: one card per section actually touched by
+// the accepted changes, each showing the FULL surrounding content (not a
+// single isolated line) with only the genuinely new/changed text marked.
+function tlBuildReviewSections(accepted){
+  const changes = tailorResult.changes;
+  const touched = accepted.map(i => changes[i]).filter(Boolean);
+  const tailored = applyTailorChanges(R, changes, accepted);
+  let html = '';
+
+  // Professional summary
+  const wholeOne  = touched.find(c => c.apply.field === 'summary');
+  const appendOne = touched.find(c => c.apply.field === 'summary_append');
+  if(wholeOne || appendOne){
+    const finalSummary = tailored.summary || '';
+    const body = wholeOne
+      ? `<span class="tl-revhl">${esc(finalSummary)}</span>`
+      : tlHighlightRev(finalSummary, appendOne.apply.new_value);
+    html += `<div class="tl-review-card">
+      <div class="tl-review-label">Professional summary</div>
+      <p>${body}</p>
+      <span class="tl-review-caption"><i>${wholeOne ? '↻ Summary rewritten' : '+ Sentence added'}</i></span>
+    </div>`;
+  }
+
+  // Experience — one card per role that had a bullet rewrite, showing every
+  // bullet in that role with only the lines that actually changed marked.
+  const expByIdx = new Map();
+  touched.filter(c => c.apply.field === 'experience_desc' && Number.isInteger(c.apply.exp_index))
+    .forEach(c => expByIdx.set(c.apply.exp_index, c));
+  expByIdx.forEach((c, idx) => {
+    const job = tailored.experience[idx];
+    const origJob = R.experience[idx];
+    if(!job) return;
+    const lines = tlDiffLines(origJob ? origJob.desc : '', job.desc);
+    const li = lines.map(l => `<li>${l.changed ? `<span class="tl-revhl">${esc(l.text)}</span>` : esc(l.text)}</li>`).join('');
+    const changedCount = lines.filter(l => l.changed).length;
+    const wasNote = c.old_text ? ` — was "${esc(c.old_text.length > 90 ? c.old_text.slice(0,87)+'…' : c.old_text)}"` : '';
+    html += `<div class="tl-review-card">
+      <div class="tl-review-role">${esc(job.company||'')}${job.title ? ' · '+esc(job.title):''} <span class="tl-review-roledates">${esc(job.start||'')}${job.end?(' – '+esc(job.end)):''}</span></div>
+      <div class="tl-review-label">Bullets</div>
+      <ul>${li}</ul>
+      <span class="tl-review-caption"><i>↻ ${changedCount} bullet${changedCount===1?'':'s'} changed in this role${wasNote}</i></span>
+    </div>`;
+  });
+
+  // Skills — every chip shown, new ones marked; pure reorders get a note
+  // instead of false highlights since nothing in the set actually changed.
+  if(touched.some(c => c.apply.field === 'skills' || c.apply.field === 'skills_add')){
+    const origSet = new Set((R.skills||[]).map(s => s.trim()));
+    const finalSkills = tailored.skills || [];
+    const addedCount = finalSkills.filter(s => !origSet.has(s.trim())).length;
+    const chips = finalSkills.map(s =>
+      `<span class="tl-review-chip${!origSet.has(s.trim())?' new':''}">${esc(s)}</span>`).join('');
+    html += `<div class="tl-review-card">
+      <div class="tl-review-label">Skills</div>
+      <div class="tl-review-chips">${chips}</div>
+      <span class="tl-review-caption"><i>${addedCount>0 ? '+ '+addedCount+' new skill'+(addedCount===1?'':'s')+' added' : '↻ Reordered to prioritize this job'}</i></span>
+    </div>`;
+  }
+
+  // Accomplishments — appended lines only, marked as new.
+  if(touched.some(c => c.apply.field === 'accomplishments_add')){
+    const origSet = new Set((R.accomplishments||[]).map(s => s.trim()));
+    const finalAcc = tailored.accomplishments || [];
+    const li = finalAcc.map(a =>
+      `<li>${!origSet.has(a.trim()) ? `<span class="tl-revhl">${esc(a)}</span>` : esc(a)}</li>`).join('');
+    html += `<div class="tl-review-card">
+      <div class="tl-review-label">Accomplishments</div>
+      <ul>${li}</ul>
+      <span class="tl-review-caption"><i>+ New line${(finalAcc.length - (R.accomplishments||[]).length)===1?'':'s'} added</i></span>
+    </div>`;
+  }
+
+  if(!html) html = '<p style="font-size:12.5px;color:var(--ink-soft)">No section changes to preview.</p>';
+  return html;
+}
+
+// Animates the small score-rise ring on the review screen between two
+// REAL values — the baseline before any of this was applied, and the
+// true score for exactly what got accepted. Not a forecast: both numbers
+// are facts about a specific, already-decided selection.
+function tlAnimateRise(fromPct, toPct){
+  const wrap = document.querySelector('.tl-scorerise-ring');
+  const label = $('#tlRiseScore');
+  if(!wrap || !label) return;
+  const dur = 1100, start = performance.now();
+  function step(now){
+    const t = Math.min(1, (now-start)/dur);
+    const cur = Math.round(fromPct + (toPct-fromPct)*t);
+    label.textContent = cur + '%';
+    wrap.style.background = `conic-gradient(#10B981 0 ${cur}%, #D1FAE5 ${cur}% 100%)`;
+    if(t<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// STEP 2 → STEP 3: build the section-by-section review in place and show
+// the real score rising from baseline to what was actually selected.
 $('#tlApply').addEventListener('click', ()=>{
   const accepted = tlAcceptedIdx();
   if(!accepted.length) return;
-  const hlChanges = tlHighlightChanges(tailorResult.changes, accepted, R);
-  const hlR = applyTailorChanges(R, hlChanges, accepted);
-  // temporarily point the renderer at the highlighted copy
-  const saved = R;
-  R = hlR;
-  let html;
-  try { html = resumeHTML(false); } finally { R = saved; }
-  const markCSS = `mark.tl-hl{background:#FEF3C7;border-bottom:2px solid #E3B341;border-radius:2px;padding:0 2px;color:inherit}
-mark.tl-hl::after{content:"\\25CF tailored";font-size:8px;font-weight:800;color:#B45309;margin-left:4px;vertical-align:2px}
-body{zoom:.82}`;
-  html = html
-    .replace('</style>', markCSS + '</style>')
-    .split(HL_OPEN).join('<mark class="tl-hl">')
-    .split(HL_CLOSE).join('</mark>');
-  $('#tlPreviewFrame').srcdoc = html;
+
+  $('#tlReviewSections').innerHTML = tlBuildReviewSections(accepted);
+
+  const before = tlLastScore ? tlLastScore.now : 0;
+  const after  = tlLastScore ? tlLastScore.projected : before;
+  $('#tlRiseTitle').textContent = accepted.length + ' change' + (accepted.length===1?'':'s') + ' applied';
+  $('#tlRiseSub').textContent = before + '% → ' + after + '%';
+  tlAnimateRise(before, after);
+
   tlStep(3);
 });
 
