@@ -3462,16 +3462,9 @@ function renderTailorResults(){
   $('#tlMatchTitle').textContent = 'Your resume vs. ' + (jt || 'this job') + (co ? ' @ ' + co : '');
   $('#tlMatchSummary').textContent = r.match_summary || '';
 
-  // Coverage chips + tile counts
-  const cov = $('#tlCoverage'); cov.innerHTML = '';
-  let nFound=0, nPartial=0, nMissing=0;
-  (r.skills_coverage || []).forEach(s=>{
-    const status = s.status || 'partial';
-    if(status==='have') nFound++; else if(status==='missing') nMissing++; else nPartial++;
-    const chip = el('span', {class:'sk ' + status});
-    chip.textContent = s.skill + (s.note ? ' — ' + s.note : '');
-    cov.appendChild(chip);
-  });
+  // Comparison table + tile counts
+  const counts = renderCompareTable(r.skills_coverage || []);
+  const nFound = counts.have, nPartial = counts.partial, nMissing = counts.missing + counts.absent;
   $('#tlFoundNum').textContent = nFound;
   $('#tlPartialNum').textContent = nPartial;
   $('#tlMissingNum').textContent = nMissing;
@@ -3508,10 +3501,25 @@ function renderTailorResults(){
         </span>
       </div>
       <div class="diff-body">
-        ${c.old_text ? `<div class="d-old">${esc(c.old_text)}</div>` : ''}
+        ${c.old_text ? `<div class="d-old d-old-strike">${esc(c.old_text)}</div>` : ''}
         <div class="d-new">${esc(c.new_text)}</div>
         ${!c.verified ? `<div class="d-warn">⚠ Reeve can't verify this from your resume — it defaults to OFF. Only enable it if it's true.</div>` : ''}
       </div>`;
+    // Remember the AI's original wording so "Reset to suggestion" can restore
+    // it after the user edits — editing shouldn't be a one-way door.
+    const original = { new_text: c.new_text, new_value: Array.isArray(c.apply.new_value) ? c.apply.new_value.slice() : c.apply.new_value };
+
+    function markEdited(){
+      if(card.querySelector('.tl-editedtag')) return;
+      const tag = el('div', {class:'tl-editedtag'});
+      tag.textContent = '✎ Edited by you';
+      card.querySelector('.diff-body').appendChild(tag);
+    }
+    function clearEdited(){
+      const tag = card.querySelector('.tl-editedtag');
+      if(tag) tag.remove();
+    }
+
     card.querySelector('input').addEventListener('change', e=>{
       card.classList.toggle('rejected', !e.target.checked);
       updateTailorCount();
@@ -3531,6 +3539,16 @@ function renderTailorResults(){
         dnew.after(ta);
         ta.focus();
         btn.textContent = '💾 Save edit';
+        // Offer a way back to the AI's wording while editing.
+        if(!card.querySelector('.tl-resetsug')){
+          const reset = el('span', {class:'tl-resetsug'});
+          reset.textContent = '↺ Reset to suggestion';
+          reset.addEventListener('click', ()=>{
+            const box = card.querySelector('.tl-edit-ta');
+            if(box) box.value = Array.isArray(original.new_value) ? original.new_value.join('\n') : String(original.new_value);
+          });
+          card.querySelector('.diff-head').lastElementChild.appendChild(reset);
+        }
       } else {
         const ta = body.querySelector('.tl-edit-ta');
         if(ta){
@@ -3546,6 +3564,9 @@ function renderTailorResults(){
         dnew.textContent = c.new_text;
         dnew.style.display = '';
         btn.textContent = '✎ Edit';
+        const rs = card.querySelector('.tl-resetsug'); if(rs) rs.remove();
+        // Flag it only if the wording actually differs from the suggestion.
+        if(c.new_text !== original.new_text) markEdited(); else clearEdited();
       }
     });
     list.appendChild(card);
@@ -3558,6 +3579,94 @@ function renderTailorResults(){
   $('#tlAcceptAll').disabled = nChanges === 0;
   $('#tlRejectAll').disabled = nChanges === 0;
   updateTailorCount();
+}
+
+// ============================================================
+// REQUIREMENT-BY-REQUIREMENT COMPARISON TABLE
+// Renders each JD requirement against what the CV actually says,
+// with the mismatching phrase highlighted inside the user's own
+// wording. Rows where nothing in the CV relates at all ("absent")
+// are grouped last under their own heading — those are real gaps,
+// not rewording jobs, and conflating the two misleads the user.
+// Returns per-status counts for the dashboard tiles.
+// ============================================================
+const TL_STATUS_LABEL = { have:'Matched', partial:'Partial', missing:'Missing', absent:'Not found' };
+
+// Wraps the mismatching phrase in a highlight span. Everything is
+// escaped first, then the (also-escaped) needle is located in the
+// escaped haystack — so escaping can never split the match.
+function tlHighlight(text, needle){
+  const safe = esc(text || '');
+  if(!needle) return safe;
+  const safeNeedle = esc(needle);
+  const at = safe.indexOf(safeNeedle);
+  if(at === -1) return safe;
+  return safe.slice(0, at) + '<span class="cvhl">' + safeNeedle + '</span>' + safe.slice(at + safeNeedle.length);
+}
+
+// Splits "Kaseya (2021-2024)" into name + dates so the dates can sit
+// on their own line; falls back to the whole string when there's no match.
+function tlEmployerCell(employer){
+  const e = String(employer || '').trim();
+  if(!e) return '<span style="color:var(--ink-soft)">—</span>';
+  const m = e.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+  if(m) return esc(m[1]) + '<span class="emp-dates">' + esc(m[2]) + '</span>';
+  return esc(e);
+}
+
+function renderCompareTable(coverage){
+  const counts = { have:0, partial:0, missing:0, absent:0 };
+  // Look the table itself up — this function rewrites the table's entire
+  // innerHTML (thead + tbody), so caching a tbody reference here would go
+  // stale the moment we render once.
+  const table = $('#tlCompareTable');
+  if(!table) return counts;
+
+  const rows = (coverage || []).filter(s => s && s.skill);
+  rows.forEach(s => { const st = s.status || 'partial'; if(counts[st] !== undefined) counts[st]++; });
+
+  if(!rows.length){
+    table.innerHTML = '<tbody><tr><td colspan="5" class="tl-table-empty">No requirement breakdown available for this job.</td></tr></tbody>';
+    return counts;
+  }
+
+  const header = `<tr>
+      <th style="width:13%">Employer</th>
+      <th style="width:20%">What the job asks for</th>
+      <th style="width:26%">What your CV shows</th>
+      <th style="width:12%">Matching status</th>
+      <th style="width:29%">Your action</th>
+    </tr>`;
+
+  const present = rows.filter(s => (s.status || 'partial') !== 'absent');
+  const absent  = rows.filter(s => (s.status || 'partial') === 'absent');
+  let html = '<thead>' + header + '</thead>';
+
+  const rowHtml = (s)=>{
+    const st = s.status || 'partial';
+    const cv = st === 'absent'
+      ? '<span style="color:var(--ink-soft)">Not mentioned anywhere</span>'
+      : (s.cv_text ? tlHighlight(s.cv_text, s.cv_highlight) : '<span style="color:var(--ink-soft)">—</span>');
+    const action = s.action || (st === 'have' ? 'No action needed' : (s.note || '—'));
+    return `<tr>
+      <td class="c-emp">${tlEmployerCell(s.employer)}</td>
+      <td class="c-req">${esc(s.skill)}</td>
+      <td>${cv}</td>
+      <td><span class="sk ${st}">${TL_STATUS_LABEL[st] || st}</span></td>
+      <td class="c-act">${esc(action)}</td>
+    </tr>`;
+  };
+
+  html += '<tbody>' + present.map(rowHtml).join('');
+  if(absent.length){
+    html += `<tr class="tl-grouphead"><td colspan="5">
+        <b>Asked for in the job, but nowhere in your CV</b>
+        <span>No related experience found under any employer — these are genuine gaps, not wording problems. Only add what's actually true for you.</span>
+      </td></tr>` + absent.map(rowHtml).join('');
+  }
+  html += '</tbody>';
+  table.innerHTML = html;
+  return counts;
 }
 
 // ============================================================
@@ -3630,7 +3739,7 @@ function renderAtsParseability(){
 
 function updateTailorCount(){
   const n = document.querySelectorAll('#tlChanges .diff-card input:checked').length;
-  $('#tlApply').textContent = `Preview ${n} change${n===1?'':'s'} →`;
+  $('#tlApply').textContent = n === 0 ? 'Select changes to preview' : `Apply ${n} change${n===1?'':'s'} and preview →`;
   $('#tlApply').disabled = n === 0;
 }
 
