@@ -3476,9 +3476,9 @@ function renderTailorResults(){
   $('#tlLoading').style.display = 'none';
   $('#tlResults').classList.remove('hidden');
 
-  // Match ring — animates 0 → score so it reads as "being calculated"
-  const pct = r.match_score || 0;
-  animateTlScore(pct);
+  // Match ring — deterministic score from the coverage rows so it can move
+  // as the user selects changes. Falls back to the model's holistic figure
+  // only when there's no requirement breakdown to compute from.
   const jt = $('#tlTitle').value.trim(), co = $('#tlCompany').value.trim();
   $('#tlMatchTitle').textContent = 'Your resume vs. ' + (jt || 'this job') + (co ? ' @ ' + co : '');
   $('#tlMatchSummary').textContent = r.match_summary || '';
@@ -3600,6 +3600,113 @@ function renderTailorResults(){
   $('#tlAcceptAll').disabled = nChanges === 0;
   $('#tlRejectAll').disabled = nChanges === 0;
   updateTailorCount();
+
+  // Cards exist now, so the projection can read their checkboxes.
+  if((r.skills_coverage || []).length){
+    tlRefreshScore(true);
+  } else {
+    animateTlScore(r.match_score || 0);
+    const proj = $('#tlProjected'); if(proj) proj.classList.add('hidden');
+    const cap = $('#tlCeiling'); if(cap) cap.classList.add('hidden');
+  }
+}
+
+// ============================================================
+// MATCH SCORING — deterministic, computed from the coverage rows.
+//
+// Why not just use the AI's match_score? Because the score has to MOVE
+// when the user selects changes. A holistic number from the model can't
+// be recomputed client-side as checkboxes toggle, so the projection
+// would never line up with the headline figure. Computing it here from
+// weighted requirement coverage makes both numbers consistent and
+// explainable: same inputs, same arithmetic, every time.
+// ============================================================
+const TL_WEIGHT = { critical: 3, important: 2, nice_to_have: 1 };
+const TL_CREDIT = { have: 1, partial: 0.5, missing: 0.25, absent: 0 };
+var tlLastScore = null;
+
+// Returns { now, projected, ceiling, closable, blocked }
+//  now       — score as the CV stands today
+//  projected — score if the currently-ticked changes are applied
+//  ceiling   — score if EVERY proposed change were applied
+//  blocked   — requirements no proposed change can fix (real gaps)
+function tlScore(coverage, selectedIds){
+  const rows = (coverage || []).filter(s => s && s.skill);
+  if(!rows.length) return { now: 0, projected: 0, ceiling: 0, closable: 0, blocked: 0 };
+
+  const sel = selectedIds instanceof Set ? selectedIds : new Set(selectedIds || []);
+  let total = 0, earnedNow = 0, earnedProj = 0, earnedMax = 0, blocked = 0, closable = 0;
+
+  rows.forEach(s => {
+    const w = TL_WEIGHT[s.importance] || TL_WEIGHT.important;
+    const credit = TL_CREDIT[s.status] !== undefined ? TL_CREDIT[s.status] : TL_CREDIT.partial;
+    const fixes = Array.isArray(s.resolved_by) ? s.resolved_by : [];
+    const hasFix = fixes.length > 0;
+    // A row counts as resolved only when EVERY change that fixes it is on.
+    const fixSelected = hasFix && fixes.every(id => sel.has(id));
+
+    total += w;
+    earnedNow  += w * credit;
+    earnedProj += w * (fixSelected ? 1 : credit);
+    earnedMax  += w * (hasFix ? 1 : credit);
+
+    if(credit < 1){ if(hasFix) closable++; else blocked++; }
+  });
+
+  const pct = (n) => total ? Math.round((n / total) * 100) : 0;
+  return { now: pct(earnedNow), projected: pct(earnedProj), ceiling: pct(earnedMax), closable, blocked };
+}
+
+// The ids of changes currently ticked in the apply bar.
+function tlSelectedChangeIds(){
+  const ids = new Set();
+  document.querySelectorAll('#tlChanges .diff-card').forEach(card => {
+    const cb = card.querySelector('input');
+    const idx = Number(card.dataset.ci);
+    const c = tailorResult && tailorResult.changes ? tailorResult.changes[idx] : null;
+    if(cb && cb.checked && c && c.id) ids.add(c.id);
+  });
+  return ids;
+}
+
+// Paints the ring without animating (used for live updates on toggle).
+function setTlRing(pct){
+  const ring = $('#tlRing'), label = $('#tlScore');
+  if(!ring || !label) return;
+  label.textContent = pct + '%';
+  ring.style.background = `conic-gradient(var(--accent) 0 ${pct}%, #E5E7EB ${pct}% 100%)`;
+}
+
+// Repaints the score ring, the projection line and the ceiling note.
+function tlRefreshScore(animate){
+  if(!tailorResult) return;
+  const s = tlScore(tailorResult.skills_coverage, tlSelectedChangeIds());
+  tlLastScore = s;
+
+  if(animate) animateTlScore(s.now); else setTlRing(s.now);
+
+  const proj = $('#tlProjected');
+  if(proj){
+    if(s.projected > s.now){
+      proj.classList.remove('hidden');
+      proj.innerHTML = `<b>${s.now}%</b> now &nbsp;→&nbsp; <b class="up">${s.projected}%</b> once you apply the changes you've selected`;
+    } else if(s.ceiling > s.now){
+      proj.classList.remove('hidden');
+      proj.innerHTML = `Select the suggested changes below to raise this score — up to <b class="up">${s.ceiling}%</b>`;
+    } else {
+      proj.classList.add('hidden');
+    }
+  }
+
+  const cap = $('#tlCeiling');
+  if(cap){
+    if(s.blocked > 0 && s.ceiling < 95){
+      cap.classList.remove('hidden');
+      cap.innerHTML = `Applying every suggestion takes this CV to <b>${s.ceiling}%</b>. The remainder rests on ${s.blocked} requirement${s.blocked===1?'':'s'} your CV doesn't currently evidence — rewording can't close ${s.blocked===1?'it':'those'}, and Reeve won't invent experience to inflate the number.`;
+    } else {
+      cap.classList.add('hidden');
+    }
+  }
 }
 
 // ============================================================
@@ -3762,6 +3869,9 @@ function updateTailorCount(){
   const n = document.querySelectorAll('#tlChanges .diff-card input:checked').length;
   $('#tlApply').textContent = n === 0 ? 'Select changes to preview' : `Apply ${n} change${n===1?'':'s'} and preview →`;
   $('#tlApply').disabled = n === 0;
+  // Every toggle path (single card, Select all, Clear all) lands here, so
+  // this is the one place the projected score needs recomputing.
+  tlRefreshScore(false);
 }
 
 $('#tlAcceptAll').addEventListener('click', ()=>{
