@@ -182,8 +182,9 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-cov-label{font-size:12px;font-weight:600;color:var(--ink);margin-top:12px;margin-bottom:2px}
 .tl-cov-legend{display:flex;flex-direction:column;gap:5px;margin-top:6px}
 .tl-leg-item{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.tl-leg-item .sk{flex-shrink:0}
+.tl-leg-item .sk{flex-shrink:0;pointer-events:none;opacity:.85}
 .tl-leg-txt{font-size:11.5px;color:var(--ink-soft);line-height:1.4}
+.tl-legend-top{background:#F8FAFC;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px}
 .tl-savenote{font-size:11px;color:var(--ink-soft);margin-top:4px;min-height:14px}
 .tl-restore-banner{background:#EEF4FF;border:1px solid #C7D9F5;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;font-weight:600;color:#1E3A8A}
 .tl-disclaimer-top{background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:12px 16px;margin-bottom:14px}
@@ -216,8 +217,6 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .ats-tile .score-ring>div{width:48px;height:48px}
 .ats-tile .score-ring b{font-size:14px}
 .ats-tile .score-ring span{font-size:7px}
-.tl-cov-legend{display:flex;gap:5px;margin-top:10px}
-.tl-cov-legend .sk{pointer-events:none;opacity:.85}
 .tl-parse{margin-top:10px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;line-height:1.4}
 .tl-parse.ok{background:#DCFCE7;color:#15803D}
 .tl-parse.risk{background:#FEF3C7;color:#B45309}
@@ -2210,6 +2209,14 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
             <li>It's an indication of your screening chances with the ATS software recruiters use — not a guarantee of getting an interview. That decision always stays with the recruiter.</li>
           </ul>
         </div>
+        <div class="tl-legend-top">
+          <p class="tl-cov-label" style="margin-top:0">What the colours below mean:</p>
+          <div class="tl-cov-legend">
+            <div class="tl-leg-item"><span class="sk have">Found</span><span class="tl-leg-txt">This skill or requirement is clearly present in your resume — no action needed.</span></div>
+            <div class="tl-leg-item"><span class="sk partial">Partial</span><span class="tl-leg-txt">Related experience exists but isn't stated in the same words as the job description — worth rewording.</span></div>
+            <div class="tl-leg-item"><span class="sk missing">Missing</span><span class="tl-leg-txt">Not mentioned anywhere in your resume — add it below if you genuinely have this experience.</span></div>
+          </div>
+        </div>
         <div class="ats-tiles">
           <div class="ats-tile main">
             <div class="score-ring" id="tlRing"><div><b id="tlScore">0%</b><span>match</span></div></div>
@@ -2237,11 +2244,6 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
             <h4 id="tlMatchTitle">Your resume vs. this job</h4>
             <p id="tlMatchSummary"></p>
             <p class="tl-cov-label">Keyword &amp; skill coverage — what the ATS software this job likely uses would look for:</p>
-            <div class="tl-cov-legend">
-              <div class="tl-leg-item"><span class="sk have">Found</span><span class="tl-leg-txt">This skill or requirement is clearly present in your resume — no action needed.</span></div>
-              <div class="tl-leg-item"><span class="sk partial">Partial</span><span class="tl-leg-txt">Related experience exists but isn't stated in the same words as the job description — worth rewording.</span></div>
-              <div class="tl-leg-item"><span class="sk missing">Missing</span><span class="tl-leg-txt">Not mentioned anywhere in your resume — add it below if you genuinely have this experience.</span></div>
-            </div>
             <div class="skill-cover" id="tlCoverage"></div>
             <p class="tl-cov-label">Template format check — will your CV's layout be read correctly by ATS software, regardless of what it says:</p>
             <div class="tl-parse" id="tlParse"></div>
@@ -2362,7 +2364,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260819g"></script>
+<script src="app.js?v=20260819h"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
