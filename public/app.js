@@ -3310,12 +3310,15 @@ $('#btnConfirmDelete').addEventListener('click', async ()=>{
 // ============================================================
 let tailorResult = null;
 const TL_SESSION_KEY = 'reeve_tailor_session';
-// Bump whenever the shape of a tailor result changes. A saved session from an
-// older schema is missing fields the current UI renders (employer, cv_text,
-// cv_highlight, action), which would show as empty table columns — so on a
-// version mismatch we keep the pasted JD but drop the stale result and ask
-// for a re-run rather than rendering a half-empty table.
-const TL_SCHEMA_VERSION = 2;
+// Bump whenever the shape of a tailor result changes — including adding a
+// field that only affects behavior rather than rendering (e.g. resolved_by
+// and importance, added for scoring/gap-links without touching the visible
+// table columns). A stale session that LOOKS complete can still silently
+// lack a field the newest code depends on, and nothing will error — it'll
+// just quietly not work (e.g. the "why isn't this 100%" links never
+// appearing). On any schema change, bump this so old sessions are dropped
+// and force a fresh analysis rather than rendering with missing data.
+const TL_SCHEMA_VERSION = 3;
 
 function tlSaveSession(extra){
   try{
