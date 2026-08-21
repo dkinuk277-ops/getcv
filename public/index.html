@@ -219,6 +219,7 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-applybar .tl-changebar{padding:10px 15px 0;margin-bottom:0}
 .tl-applybar #tlChanges{padding:6px 15px 13px}
 .tl-tablebar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.tl-topback{margin-bottom:8px}
 .tl-changecount{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:6px}
 .tl-tablemode.hidden{display:none}
 .tl-table td.c-fix{min-width:220px}
@@ -2319,6 +2320,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         </div>
 
         <div class="tl-tablemode" id="tlTableMode">
+          <div class="tl-topback"><button class="btn btn-ghost" id="tlBackTop" type="button">← Back</button></div>
           <div class="tl-tablebar">
             <p class="tl-cov-label" style="margin:0">Every requirement, one row each — edit or apply the fix directly, and your score updates as you go.</p>
             <span style="display:flex;gap:7px">
@@ -2437,7 +2439,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260821c"></script>
+<script src="app.js?v=20260821d"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
