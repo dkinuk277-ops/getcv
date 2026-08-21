@@ -4113,6 +4113,58 @@ function tlHighlightChanges(changes, acceptedIdx, base){
   });
 }
 
+// Answers "the score went from 60% to 80% — where did the rest go?" by
+// splitting every requirement that isn't fully matched into two honest
+// categories: ones with a proposed fix the user chose not to apply
+// (reversible — they can go back and tick it), and ones with no proposed
+// fix at all (a genuine gap in the CV for this specific job, which no
+// amount of rewording closes). Fully matched requirements aren't part of
+// the gap at all, so they're excluded.
+function tlGapSummary(coverage, selectedIds){
+  const sel = selectedIds instanceof Set ? selectedIds : new Set(selectedIds || []);
+  const skipped = [], blocked = [];
+  (coverage || []).forEach(s=>{
+    const status = s.status || 'partial';
+    if(status === 'have') return; // already full credit — not part of any gap
+    const fixes = Array.isArray(s.resolved_by) ? s.resolved_by : [];
+    const hasFix = fixes.length > 0;
+    const fixApplied = hasFix && fixes.every(id => sel.has(id));
+    if(fixApplied) return; // this one just got resolved — no longer a gap
+    (hasFix ? skipped : blocked).push(s);
+  });
+  return { skipped, blocked };
+}
+
+function tlBuildGapSummaryHTML(accepted){
+  const sel = new Set();
+  accepted.forEach(i => { const c = tailorResult.changes[i]; if(c && c.id) sel.add(c.id); });
+  const { skipped, blocked } = tlGapSummary(tailorResult.skills_coverage, sel);
+
+  if(!skipped.length && !blocked.length){
+    return `<div class="tl-gapcard tl-gapcard-clear">✓ Nothing left unresolved — every requirement Reeve could identify for this job is either matched or fixed by what you just applied.</div>`;
+  }
+
+  let html = `<div class="tl-gapcard"><div class="tl-gapcard-title">Why isn't this 100%?</div>`;
+
+  if(skipped.length){
+    html += `<div class="tl-gap-block">
+      <b>${skipped.length} requirement${skipped.length===1?'':'s'} you chose not to apply</b>
+      <ul>${skipped.map(s=>`<li>${esc(s.skill)}</li>`).join('')}</ul>
+      <span class="tl-gap-note">Reeve had a suggested fix for these — go back to the table and tick them if you'd like them included.</span>
+    </div>`;
+  }
+  if(blocked.length){
+    html += `<div class="tl-gap-block">
+      <b>${blocked.length} requirement${blocked.length===1?'':'s'} with no available fix</b>
+      <ul>${blocked.map(s=>`<li>${esc(s.skill)}${s.action ? ' — '+esc(s.action) : ''}</li>`).join('')}</ul>
+      <span class="tl-gap-note">Genuine gaps for this specific job — rewording can't close these, and Reeve won't invent experience to raise the number.</span>
+    </div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
 // Builds the post-apply review: one card per section actually touched by
 // the accepted changes, each showing the FULL surrounding content (not a
 // single isolated line) with only the genuinely new/changed text marked.
@@ -4204,6 +4256,7 @@ $('#tlApply').addEventListener('click', ()=>{
   const accepted = tlAcceptedIdx();
   if(!accepted.length) return;
 
+  $('#tlGapSummary').innerHTML = tlBuildGapSummaryHTML(accepted);
   $('#tlReviewSections').innerHTML = tlBuildReviewSections(accepted);
   const nChanges = accepted.length;
   $('#tlReviewLabel').textContent = nChanges + ' change' + (nChanges===1?'':'s') + ' applied — here\'s exactly where they landed:';
