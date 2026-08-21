@@ -3423,6 +3423,7 @@ document.querySelectorAll('.js-tailor').forEach(b => b.addEventListener('click',
       tlLastScore = null; tlDisplayedScore = null; // fresh render context — recompute baseline cleanly
       $('#tlTableMode').classList.remove('hidden');
       $('#tlReviewMode').classList.add('hidden');
+      $('#tlPreviewPill').classList.remove('on','done'); // restoring always lands on table-mode, not review
       $('#tlLoading').style.display = 'none';
       $('#tlResults').classList.remove('hidden');
       tlStep(2);
@@ -3450,6 +3451,7 @@ $('#tlClearBtn').addEventListener('click', ()=>{
   const banner = $('#tlRestoreBanner'); if(banner) banner.classList.add('hidden');
   $('#tlErr').classList.remove('on');
   $('#tlResults').classList.add('hidden');
+  $('#tlPreviewPill').classList.remove('on','done'); // Preview isn't on tlStep()'s pill loop — reset it explicitly
   tlStep(1);
   setTimeout(()=> $('#tlJD').focus(), 40);
   toast('Cleared — paste a new job description.', 3000);
@@ -3497,6 +3499,7 @@ $('#tlAnalyse').addEventListener('click', async ()=>{
     tlSaveSession({});
     $('#tlTableMode').classList.remove('hidden');
     $('#tlReviewMode').classList.add('hidden');
+    $('#tlPreviewPill').classList.remove('on','done'); // fresh analysis always starts at table-mode
     renderTailorResults();
   }catch(err){
     tlStep(1);
@@ -4307,11 +4310,20 @@ $('#tlGoPreview').addEventListener('click', ()=>{
   $('#tlReviewMode').classList.remove('hidden');
   $('#tlSaveNamePrompt').classList.add('hidden');
   window.scrollTo?.(0, 0);
+
+  // Preview is a real stage in the flow even though it shares a pane with
+  // Review & apply — light its own pill and mark the prior step done.
+  document.querySelector('[data-tstep="2"]').classList.remove('on');
+  document.querySelector('[data-tstep="2"]').classList.add('done');
+  $('#tlPreviewPill').classList.add('on');
 });
 
 function tlGoBackToTable(){
   $('#tlReviewMode').classList.add('hidden');
   $('#tlTableMode').classList.remove('hidden');
+  $('#tlPreviewPill').classList.remove('on','done');
+  document.querySelector('[data-tstep="2"]').classList.remove('done');
+  document.querySelector('[data-tstep="2"]').classList.add('on');
 }
 $('#tlPrevBack').addEventListener('click', tlGoBackToTable);
 $('#tlPrevBackTop').addEventListener('click', tlGoBackToTable);
