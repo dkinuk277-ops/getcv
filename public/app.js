@@ -3883,6 +3883,11 @@ function tlWireTableRows(allChanges){
     editLink.addEventListener('click', (e)=>{
       e.stopPropagation(); // don't also trigger the collapse toggle
       const view = wrap.querySelector('.tl-fixview');
+      // Remember whether this row was collapsed before editing started, so
+      // Save/Cancel can put it back exactly as it was — editing shouldn't
+      // permanently expand a row that was collapsed, or collapse one the
+      // user had deliberately opened.
+      const wasHidden = view.classList.contains('hidden');
       view.classList.remove('hidden'); // editing needs the body visible
       const chev = wrap.querySelector('.tl-chev'); if(chev) chev.textContent = '▾';
       const isArray = Array.isArray(c.apply.new_value);
@@ -3900,6 +3905,12 @@ function tlWireTableRows(allChanges){
       wrap.append(ta, actions);
       ta.focus();
 
+      // Restores the row to whatever it looked like before Edit was clicked.
+      function restoreCollapseState(){
+        view.classList.toggle('hidden', wasHidden);
+        if(chev) chev.textContent = wasHidden ? '▸' : '▾';
+      }
+
       resetBtn.addEventListener('click', ()=>{
         ta.value = Array.isArray(original.new_value) ? original.new_value.join('\n') : String(original.new_value);
       });
@@ -3907,6 +3918,7 @@ function tlWireTableRows(allChanges){
         ta.remove(); actions.remove();
         wrap.classList.remove('tl-row-editing');
         view.style.display = '';
+        restoreCollapseState();
       });
       saveBtn.addEventListener('click', ()=>{
         if(isArray){
@@ -3927,6 +3939,7 @@ function tlWireTableRows(allChanges){
         ta.remove(); actions.remove();
         wrap.classList.remove('tl-row-editing');
         view.style.display = '';
+        restoreCollapseState();
         updateTailorCount();
       });
     });
@@ -4035,6 +4048,7 @@ $('#tlRejectAll').addEventListener('click', ()=>{
   toast('Cleared all selections.', 3000);
 });
 $('#tlBack').addEventListener('click', ()=> tlStep(1));
+$('#tlBackTop').addEventListener('click', ()=> tlStep(1));
 
 // Apply the accepted changes to a COPY of the resume, save it as a new record
 function applyTailorChanges(base, changes, acceptedIdx){
