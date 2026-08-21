@@ -3795,7 +3795,7 @@ function renderCompareTable(coverage, changes){
       applyHtml = '<span style="color:var(--ink-soft)">—</span>';
     }
 
-    return `<tr>
+    return `<tr id="tlrow-${coverage.indexOf(s)}">
       <td class="c-emp">${tlEmployerCell(s.employer)}</td>
       <td class="c-req">${esc(s.skill)}</td>
       <td>${cv}</td>
@@ -4016,8 +4016,6 @@ function renderAtsParseability(){
 
 function updateTailorCount(){
   const n = tlAcceptedIdx().length;
-  $('#tlApply').textContent = n === 0 ? 'Select changes to preview' : `Apply ${n} change${n===1?'':'s'} and preview →`;
-  $('#tlApply').disabled = n === 0;
   const totalActionable = document.querySelectorAll('#tlCompareTable input.tl-row-apply').length;
   $('#tlChangeCount').textContent = totalActionable === 0
     ? '✓ No suggested changes — your resume already covers this job well'
@@ -4025,8 +4023,12 @@ function updateTailorCount(){
   $('#tlAcceptAll').disabled = totalActionable === 0;
   $('#tlRejectAll').disabled = totalActionable === 0;
   // Every toggle path (single row, Apply all, Clear all, an edit) lands
-  // here, so this is the one place the projected score needs recomputing.
+  // here, so this is the one place the projected score AND the "why isn't
+  // this 100%" card need recomputing — both stay live in the table view
+  // itself, not gated behind a separate step.
   tlRefreshScore(false);
+  const gapBox = $('#tlGapSummary');
+  if(gapBox){ gapBox.innerHTML = tlBuildGapSummaryHTML(); tlWireGapSummary(); }
 }
 
 $('#tlAcceptAll').addEventListener('click', ()=>{
@@ -4135,22 +4137,25 @@ function tlGapSummary(coverage, selectedIds){
   return { skipped, blocked };
 }
 
-function tlBuildGapSummaryHTML(accepted){
-  const sel = new Set();
-  accepted.forEach(i => { const c = tailorResult.changes[i]; if(c && c.id) sel.add(c.id); });
-  const { skipped, blocked } = tlGapSummary(tailorResult.skills_coverage, sel);
+// Builds the "why isn't this 100%" card from whatever is CURRENTLY ticked
+// in the table right now (not tied to a prior Apply click) — reads the
+// live checkbox state directly so it's always accurate to what's on screen.
+function tlBuildGapSummaryHTML(){
+  if(!tailorResult) return '';
+  const coverage = tailorResult.skills_coverage || [];
+  const { skipped, blocked } = tlGapSummary(coverage, tlSelectedChangeIds());
 
   if(!skipped.length && !blocked.length){
-    return `<div class="tl-gapcard tl-gapcard-clear">✓ Nothing left unresolved — every requirement Reeve could identify for this job is either matched or fixed by what you just applied.</div>`;
+    return `<div class="tl-gapcard tl-gapcard-clear">✓ Nothing left unresolved — every requirement Reeve could identify for this job is either matched or ticked to be fixed.</div>`;
   }
 
   let html = `<div class="tl-gapcard"><div class="tl-gapcard-title">Why isn't this 100%?</div>`;
 
   if(skipped.length){
     html += `<div class="tl-gap-block">
-      <b>${skipped.length} requirement${skipped.length===1?'':'s'} you chose not to apply</b>
-      <ul>${skipped.map(s=>`<li>${esc(s.skill)}</li>`).join('')}</ul>
-      <span class="tl-gap-note">Reeve had a suggested fix for these — go back to the table and tick them if you'd like them included.</span>
+      <b>${skipped.length} requirement${skipped.length===1?'':'s'} you haven't applied yet</b>
+      <ul>${skipped.map(s=>`<li><a href="#" class="tl-gap-jump" data-jump="${coverage.indexOf(s)}">${esc(s.skill)}</a></li>`).join('')}</ul>
+      <span class="tl-gap-note">Reeve has a suggested fix for these — click one to jump to its row and tick it.</span>
     </div>`;
   }
   if(blocked.length){
@@ -4163,6 +4168,28 @@ function tlBuildGapSummaryHTML(accepted){
 
   html += `</div>`;
   return html;
+}
+
+// Wires the jump links so clicking one scrolls to the matching table row,
+// expands it if collapsed, and briefly flashes it — then re-renders the
+// gap card once the user acts on it (their tick will move it out of the
+// "skipped" list automatically on the next refresh).
+function tlWireGapSummary(){
+  const box = $('#tlGapSummary');
+  if(!box) return;
+  box.querySelectorAll('.tl-gap-jump').forEach(a=>{
+    a.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const row = document.getElementById('tlrow-' + a.dataset.jump);
+      if(!row) return;
+      row.scrollIntoView({behavior:'smooth', block:'center'});
+      const view = row.querySelector('.tl-fixview');
+      const toggle = row.querySelector('.tl-fixtoggle');
+      if(view && view.classList.contains('hidden') && toggle) toggle.click();
+      row.classList.add('tl-row-flash');
+      setTimeout(()=> row.classList.remove('tl-row-flash'), 1400);
+    });
+  });
 }
 
 // Builds the post-apply review: one card per section actually touched by
@@ -4250,50 +4277,73 @@ function tlBuildReviewSections(accepted){
 // from table-mode to review-mode, and animate the SAME ring the user has
 // been watching the whole time from its current true value up to the
 // true score for exactly what's being applied. No navigation to a
-// different pane, no separate ring — this is the one score, moving for
-// real, in the same window.
-$('#tlApply').addEventListener('click', ()=>{
+// Apply changes: the discrete "I'm done deciding" moment for everything
+// ticked in the table so far. Unlocks Preview — it doesn't navigate
+// anywhere itself, since the score and gap card are already live.
+$('#tlApplyChanges').addEventListener('click', ()=>{
+  const accepted = tlAcceptedIdx();
+  updateTailorCount(); // refresh score + gap card against the current ticks
+  $('#tlGoPreview').disabled = accepted.length === 0;
+  toast(accepted.length
+    ? `Applied ${accepted.length} change${accepted.length===1?'':'s'} — score updated above.`
+    : 'No changes selected yet — tick some rows first.', 3000);
+});
+
+// Preview: build the section-by-section review and switch views. This is
+// now a deliberate, separate step from Apply — it only shows WHERE things
+// land, it doesn't change the score (that already happened live).
+$('#tlGoPreview').addEventListener('click', ()=>{
   const accepted = tlAcceptedIdx();
   if(!accepted.length) return;
 
-  $('#tlGapSummary').innerHTML = tlBuildGapSummaryHTML(accepted);
   $('#tlReviewSections').innerHTML = tlBuildReviewSections(accepted);
   const nChanges = accepted.length;
   $('#tlReviewLabel').textContent = nChanges + ' change' + (nChanges===1?'':'s') + ' applied — here\'s exactly where they landed:';
 
   $('#tlTableMode').classList.add('hidden');
   $('#tlReviewMode').classList.remove('hidden');
-
-  // tlLastScore.projected is the true score for exactly this selection —
-  // animate the main ring from wherever it's currently sitting up to it.
-  if(tlLastScore && tlDisplayedScore !== tlLastScore.projected){
-    animateTlScoreBetween(tlDisplayedScore, tlLastScore.projected);
-    tlDisplayedScore = tlLastScore.projected;
-  }
+  $('#tlSaveNamePrompt').classList.add('hidden');
+  window.scrollTo?.(0, 0);
 });
 
-// Back: return to the table without losing any selections, and without
-// leaving the pane — the table's checkboxes were never touched, so
-// nothing needs re-rendering.
-$('#tlPrevBack').addEventListener('click', ()=>{
+function tlGoBackToTable(){
   $('#tlReviewMode').classList.add('hidden');
   $('#tlTableMode').classList.remove('hidden');
+}
+$('#tlPrevBack').addEventListener('click', tlGoBackToTable);
+$('#tlPrevBackTop').addEventListener('click', tlGoBackToTable);
+
+// Apply to resume: reveals the name prompt rather than saving immediately —
+// the user picks the name before anything is written. Both the top and
+// bottom buttons do the same thing, so it's reachable without scrolling.
+function tlOpenSaveNamePrompt(){
+  const jt = $('#tlTitle').value.trim(), co = $('#tlCompany').value.trim();
+  const defaultName = `${R.personal.name || 'CV'} — ${jt || 'Tailored'}${co ? ' @ ' + co : ''}`.slice(0, 80);
+  const input = $('#tlSaveNameInput');
+  if(!input.value.trim()) input.value = defaultName;
+  $('#tlSaveNamePrompt').classList.remove('hidden');
+  $('#tlSaveNamePrompt').scrollIntoView({behavior:'smooth', block:'center'});
+  input.focus();
+}
+$('#tlApplyToResumeTop').addEventListener('click', tlOpenSaveNamePrompt);
+$('#tlApplyToResumeBottom').addEventListener('click', tlOpenSaveNamePrompt);
+
+$('#tlSaveNameCancel').addEventListener('click', ()=>{
+  $('#tlSaveNamePrompt').classList.add('hidden');
 });
 
-// Save the CLEAN tailored resume (no tokens, no marks) and move to the
-// Saved pane (now step 3, since the old separate Preview step no longer
-// exists as its own pane).
-$('#tlPrevSave').addEventListener('click', async ()=>{
+// The actual save — only fires once the user confirms a name.
+$('#tlSaveNameConfirm').addEventListener('click', async ()=>{
   const accepted = tlAcceptedIdx();
   if(!accepted.length) return;
-  const btn = $('#tlPrevSave');
+  const name = $('#tlSaveNameInput').value.trim();
+  if(!name) return tlError('#tlErr3', 'Please enter a name for this resume.');
+  const btn = $('#tlSaveNameConfirm');
   btn.disabled = true;
   const orig = btn.textContent;
   btn.textContent = 'Saving…';
   try{
     const tailored = applyTailorChanges(R, tailorResult.changes, accepted);
-    const jt = $('#tlTitle').value.trim(), co = $('#tlCompany').value.trim();
-    const name = `${R.personal.name || 'CV'} — ${jt || 'Tailored'}${co ? ' @ ' + co : ''}`.slice(0, 80);
     const out = await api('/api/resumes', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ name, template: selectedTemplate, data: tailored })
