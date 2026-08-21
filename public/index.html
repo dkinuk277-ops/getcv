@@ -236,6 +236,13 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-fixview{margin-top:6px}
 .tl-fixview.hidden{display:none}
 .tl-gapcard{border:1px solid #FED7AA;background:#FFF7ED;border-radius:11px;padding:14px 16px;margin-bottom:14px}
+.tl-gap-jump{color:var(--accent);font-weight:700;cursor:pointer}
+.tl-gap-jump:hover{text-decoration:underline}
+.tl-row-flash{background:#FEF3C7!important;transition:background 1.2s}
+.tl-savename-prompt{border:1px solid var(--line);border-radius:11px;padding:16px;margin:16px 0;background:#F8FAFC}
+.tl-savename-prompt label{font-size:12px;font-weight:700;color:var(--ink);display:block;margin-bottom:6px}
+.tl-savename-prompt input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;box-sizing:border-box}
+.tl-savename-actions{display:flex;gap:8px;margin-top:12px;justify-content:flex-end}
 .tl-gapcard-clear{border-color:#A7F3D0;background:#ECFDF5;color:#065F46;font-size:12.5px;font-weight:600}
 .tl-gapcard-title{font-size:13px;font-weight:800;color:#9A3412;margin-bottom:8px}
 .tl-gap-block{margin-bottom:10px}
@@ -2280,6 +2287,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <span class="spin"></span> <span id="tlLoadingWord">Analysing</span>&hellip;
       </div>
       <div id="tlResults" class="hidden">
+        <div class="tl-topback"><button class="btn btn-ghost" id="tlBackTop" type="button">← Back</button></div>
         <div class="tl-disclaimer-top">
           <b class="tl-explainer-title" style="color:#9A3412">⚠ How to read this score</b>
           <ul class="tl-disclaimer-list">
@@ -2328,7 +2336,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         </div>
 
         <div class="tl-tablemode" id="tlTableMode">
-          <div class="tl-topback"><button class="btn btn-ghost" id="tlBackTop" type="button">← Back</button></div>
+          <div id="tlGapSummary"></div>
           <div class="tl-tablebar">
             <p class="tl-cov-label" style="margin:0">Every requirement, one row each — edit or apply the fix directly, and your score updates as you go.</p>
             <span style="display:flex;gap:7px">
@@ -2343,23 +2351,39 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
           <div class="tl-err" id="tlErr2"></div>
           <div class="tl-actions">
             <button class="btn btn-ghost" id="tlBack" type="button">← Back</button>
-            <button class="btn btn-primary" id="tlApply" type="button">Preview 0 changes →</button>
+            <span style="display:flex;gap:8px">
+              <button class="btn btn-ghost" id="tlApplyChanges" type="button">Apply changes</button>
+              <button class="btn btn-primary" id="tlGoPreview" type="button" disabled>Preview →</button>
+            </span>
           </div>
         </div>
 
         <div class="tl-tablemode hidden" id="tlReviewMode">
+          <div class="tl-actions" style="justify-content:space-between;margin-bottom:14px">
+            <button class="btn btn-ghost" id="tlPrevBackTop" type="button">← Back — adjust changes</button>
+            <button class="btn btn-primary" id="tlApplyToResumeTop" type="button">Apply to resume →</button>
+          </div>
           <p class="tl-cov-label" style="margin-top:0" id="tlReviewLabel">Applied — here's exactly where these changes landed:</p>
-          <div id="tlGapSummary"></div>
           <div class="tl-legend">
             <b class="tl-explainer-title">Legend</b>
             <div class="tl-leg-item"><mark class="tl-hl">amber highlight</mark><span class="tl-leg-txt">Content that changed or was added — shown in full context, not as an isolated line.</span></div>
             <div class="tl-leg-item"><span class="tl-legend-ok">✓</span><span class="tl-leg-txt">Highlights are for your review only — they never appear in your saved resume or downloaded file.</span></div>
           </div>
           <div id="tlReviewSections"></div>
+
+          <div class="tl-savename-prompt hidden" id="tlSaveNamePrompt">
+            <label for="tlSaveNameInput">Name this tailored resume</label>
+            <input id="tlSaveNameInput" type="text" maxlength="80">
+            <div class="tl-savename-actions">
+              <button class="btn btn-ghost" id="tlSaveNameCancel" type="button">Cancel</button>
+              <button class="btn btn-primary" id="tlSaveNameConfirm" type="button">💾 Save resume</button>
+            </div>
+          </div>
+
           <div class="tl-err" id="tlErr3"></div>
           <div class="tl-actions" style="justify-content:space-between">
             <button class="btn btn-ghost" id="tlPrevBack" type="button">← Back — adjust changes</button>
-            <button class="btn btn-primary" id="tlPrevSave" type="button">✓ Looks good — save &amp; load into builder</button>
+            <button class="btn btn-primary" id="tlApplyToResumeBottom" type="button">Apply to resume →</button>
           </div>
         </div>
       </div>
@@ -2448,7 +2472,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260821e"></script>
+<script src="app.js?v=20260821f"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
