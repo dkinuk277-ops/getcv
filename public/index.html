@@ -2420,6 +2420,17 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   </div>
 </div>
 
+<!-- ===== Editor: Completeness missing-fields popup ===== -->
+<div class="modal" id="completenessModal" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:520px">
+    <button class="modal-close" data-close type="button">&times;</button>
+    <div id="completenessModalBody"></div>
+    <div style="text-align:right;margin-top:16px">
+      <button class="btn btn-primary" data-close type="button">Got it</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== Refresh save-prompt modal ===== -->
 <div class="modal" id="refreshModal" role="dialog" aria-modal="true">
   <div class="modal-box" style="max-width:460px;text-align:center">
@@ -2489,7 +2500,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260823a"></script>
+<script src="app.js?v=20260823b"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
