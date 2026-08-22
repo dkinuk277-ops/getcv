@@ -1713,13 +1713,27 @@ function renderRail(){
   if(!rails.length) return;
   rails.forEach(r => r.innerHTML = '');
   const rail = { appendChild: node => rails.forEach((r,i)=> r.appendChild(i === rails.length-1 ? node : node.cloneNode(true))) };
+
+  // Mirror buildEditor()'s actual render order exactly: insights -> personal
+  // -> header-credential keys (in section_order sequence) -> body keys (in
+  // section_order sequence) -> extra sections. Previously this walked
+  // SECTION_META's own fixed declaration order instead, which ignores any
+  // drag-reordering the user did in the centre panel — that's what let the
+  // rail's sequence drift away from what's actually on screen.
+  if(!Array.isArray(R.section_order) || !R.section_order.length) R.section_order = DEFAULT_SECTION_ORDER.slice();
+  const metaByKey = new Map(SECTION_META.map(m => [m.key, m]));
+  const credKeys = R.section_order.filter(k => CRED_KEYS.includes(k));
+  const bodyKeys = R.section_order.filter(k => !CRED_KEYS.includes(k));
+  const orderedKeys = ['insights', 'personal', ...credKeys, ...bodyKeys].filter(k => metaByKey.has(k));
+
   const items = [
-    ...SECTION_META.map(m => {
+    ...orderedKeys.map(key => {
+      const m = metaByKey.get(key);
       let on;
-      if(m.key === 'insights') on = R.experience.length > 0;
+      if(key === 'insights') on = R.experience.length > 0;
       else if(m.always) on = true;
-      else on = R[m.key] && R[m.key].length > 0;
-      return {label:m.label, on, anchor:'sec-'+m.key, key:m.key};
+      else on = R[key] && R[key].length > 0;
+      return {label:m.label, on, anchor:'sec-'+key, key};
     }),
     ...R.extra_sections.map((s,i)=>({label:s.heading||'Extra', on:true, anchor:'sec-extra-'+i, key:'extra-'+i}))
   ];
@@ -1882,7 +1896,7 @@ function personalCard(){
 
 function summaryCard(){
   const c = el('div',{class:'card',id:'sec-summary'});
-  c.innerHTML = '<h2>Summary</h2>';
+  c.innerHTML = '<h2>Profile / Summary</h2>';
   const mbS = markBar('summary', R.summary||'');
   if(mbS) c.appendChild(mbS);
   const fieldErrs = getFieldErrors('summary');
@@ -1902,7 +1916,7 @@ function summaryCard(){
 
 // Generic list sections (experience / education / certifications / projects)
 const LIST_DEFS = {
-  experience:{title:'Work experience', fields:[
+  experience:{title:'Experience', fields:[
     ['title','Job title'],['company','Company'],['location','Location'],
     ['start','Start (e.g. Mar 2019)'],['end','End (or Present)']], text:['desc','Responsibilities'], ai:true,
     blank:()=>({title:'',company:'',location:'',start:'',end:'',duration:0,desc:''})},
