@@ -923,6 +923,12 @@ header{background-image:var(--rv-sheen),var(--rv-glossy);border-bottom:1px solid
 body:has(#view-landing.on) header,
 body:has(#view-landing.on) .ticker,
 body:has(#view-landing.on) .app-footer{ display:none; }
+/* Builder is a locked, non-scrolling 100vh layout — the footer is a real
+   flex sibling in that layout, not an overlay, so its height was directly
+   subtracted from the workspace's available space. Hiding it here gives
+   that space back to the panels, same as the landing page already does. */
+body:has(#view-pro.on) .app-footer,
+body:has(#view-fresher.on) .app-footer{ display:none; }
 #view-landing{ padding:0; max-width:none; color:var(--rv-ink); }
 #view-landing section{ position:relative; }
 .ld-shiny{background:linear-gradient(110deg,#BFF5DC 0%,#FFF 42%,#F7E9B8 50%,#FFF 58%,#BFF5DC 100%);
