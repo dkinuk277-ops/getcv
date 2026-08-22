@@ -282,6 +282,7 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .ats-tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:14px}
 @media(max-width:640px){.ats-tiles{grid-template-columns:repeat(3,1fr)}}
 .ats-tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 6px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;min-height:96px;position:relative;overflow:hidden;transition:transform .18s ease,box-shadow .18s ease;cursor:default}
+.ats-tile.tile-found,.ats-tile.tile-partial,.ats-tile.tile-missing{cursor:pointer}
 .ats-tile::before{content:"";position:absolute;top:0;left:0;right:0;height:50%;background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0));pointer-events:none}
 .ats-tile:hover{transform:translateY(-3px);box-shadow:0 6px 16px rgba(60,60,60,.18),0 0 0 1px rgba(60,60,60,.12)}
 .ats-tile.tile-found:hover{box-shadow:0 6px 16px rgba(21,128,61,.30),0 0 0 1px rgba(21,128,61,.25)}
@@ -2307,15 +2308,15 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
             <div class="score-ring" id="tlRing"><div><b id="tlScore">0%</b><span>match</span></div></div>
             <div class="ats-tile-label">Match Score</div>
           </div>
-          <div class="ats-tile tile-found">
+          <div class="ats-tile tile-found" id="tlTileFound" role="button" tabindex="0">
             <div class="ats-tile-num" id="tlFoundNum">0</div>
             <div class="ats-tile-label">✓ Matched</div>
           </div>
-          <div class="ats-tile tile-partial">
+          <div class="ats-tile tile-partial" id="tlTilePartial" role="button" tabindex="0">
             <div class="ats-tile-num" id="tlPartialNum">0</div>
             <div class="ats-tile-label">≈ Partial</div>
           </div>
-          <div class="ats-tile tile-missing">
+          <div class="ats-tile tile-missing" id="tlTileMissing" role="button" tabindex="0">
             <div class="ats-tile-num" id="tlMissingNum">0</div>
             <div class="ats-tile-label">✗ Missing</div>
           </div>
@@ -2477,7 +2478,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260822b"></script>
+<script src="app.js?v=20260822c"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
