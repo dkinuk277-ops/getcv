@@ -4029,12 +4029,11 @@ function updateTailorCount(){
   $('#tlAcceptAll').disabled = totalActionable === 0;
   $('#tlRejectAll').disabled = totalActionable === 0;
   // Every toggle path (single row, Apply all, Clear all, an edit) lands
-  // here, so this is the one place the projected score AND the "why isn't
-  // this 100%" card need recomputing — both stay live in the table view
-  // itself, not gated behind a separate step.
+  // here — the score stays live, but the "why isn't this 100%" breakdown
+  // deliberately does NOT: showing it before anything has been applied
+  // makes no sense (nothing has happened yet to explain). It only appears
+  // as a popup when the user clicks Apply changes — see that handler.
   tlRefreshScore(false);
-  const gapBox = $('#tlGapSummary');
-  if(gapBox){ gapBox.innerHTML = tlBuildGapSummaryHTML(); tlWireGapSummary(); }
 }
 
 $('#tlAcceptAll').addEventListener('click', ()=>{
@@ -4152,10 +4151,11 @@ function tlBuildGapSummaryHTML(){
   const { skipped, blocked } = tlGapSummary(coverage, tlSelectedChangeIds());
 
   if(!skipped.length && !blocked.length){
-    return `<div class="tl-gapcard tl-gapcard-clear">✓ Nothing left unresolved — every requirement Reeve could identify for this job is either matched or ticked to be fixed.</div>`;
+    return `<h2 style="margin-bottom:6px">✓ Nothing left unresolved</h2>
+      <p style="font-size:13px;color:var(--ink-soft)">Every requirement Reeve could identify for this job is either matched or has just been applied.</p>`;
   }
 
-  let html = `<div class="tl-gapcard"><div class="tl-gapcard-title">Why isn't this 100%?</div>`;
+  let html = `<h2 style="margin-bottom:10px">Why isn't this 100%?</h2>`;
 
   if(skipped.length){
     html += `<div class="tl-gap-block">
@@ -4172,20 +4172,19 @@ function tlBuildGapSummaryHTML(){
     </div>`;
   }
 
-  html += `</div>`;
   return html;
 }
 
-// Wires the jump links so clicking one scrolls to the matching table row,
-// expands it if collapsed, and briefly flashes it — then re-renders the
-// gap card once the user acts on it (their tick will move it out of the
-// "skipped" list automatically on the next refresh).
+// Wires the jump links inside the gap popup: clicking one closes the
+// popup, scrolls to the matching table row, expands it if collapsed, and
+// briefly flashes it so the row that needs attention is unmistakable.
 function tlWireGapSummary(){
-  const box = $('#tlGapSummary');
+  const box = $('#tlGapModalBody');
   if(!box) return;
   box.querySelectorAll('.tl-gap-jump').forEach(a=>{
     a.addEventListener('click', (e)=>{
       e.preventDefault();
+      $('#tlGapModal').classList.remove('open');
       const row = document.getElementById('tlrow-' + a.dataset.jump);
       if(!row) return;
       row.scrollIntoView({behavior:'smooth', block:'center'});
@@ -4281,18 +4280,23 @@ function tlBuildReviewSections(accepted){
 // are facts about a specific, already-decided selection.
 // Apply: build the section-by-section review, switch the pane's content
 // from table-mode to review-mode, and animate the SAME ring the user has
-// been watching the whole time from its current true value up to the
-// true score for exactly what's being applied. No navigation to a
 // Apply changes: the discrete "I'm done deciding" moment for everything
-// ticked in the table so far. Unlocks Preview — it doesn't navigate
-// anywhere itself, since the score and gap card are already live.
+// ticked in the table so far. Unlocks Preview, and — only now, after
+// something has actually been applied — shows what's genuinely left
+// unresolved as a popup. Showing this before any changes exist would be
+// meaningless, since nothing has happened yet to explain.
 $('#tlApplyChanges').addEventListener('click', ()=>{
   const accepted = tlAcceptedIdx();
-  updateTailorCount(); // refresh score + gap card against the current ticks
+  updateTailorCount(); // refresh the score against the current ticks
   $('#tlGoPreview').disabled = accepted.length === 0;
+
   toast(accepted.length
     ? `Applied ${accepted.length} change${accepted.length===1?'':'s'} — score updated above.`
-    : 'No changes selected yet — tick some rows first.', 3000);
+    : 'Nothing ticked yet — here\'s what that leaves unresolved.', 3000);
+
+  $('#tlGapModalBody').innerHTML = tlBuildGapSummaryHTML();
+  tlWireGapSummary();
+  $('#tlGapModal').classList.add('open');
 });
 
 // Preview: build the section-by-section review and switch views. This is
