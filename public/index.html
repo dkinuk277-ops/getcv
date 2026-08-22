@@ -180,7 +180,8 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-explainer-list li{font-size:12.5px;color:var(--ink-soft);line-height:1.55;margin-bottom:7px}
 .tl-explainer-list li:last-child{margin-bottom:0}
 .tl-cov-label{font-size:12px;font-weight:600;color:var(--ink);margin-top:12px;margin-bottom:2px}
-.tl-cov-legend{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.tl-cov-legend{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-top:6px}
+@media(max-width:640px){.tl-cov-legend{grid-template-columns:1fr}}
 .tl-leg-item{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .tl-leg-item .sk{flex-shrink:0;pointer-events:none;opacity:.85}
 .tl-leg-txt{font-size:11.5px;color:var(--ink-soft);line-height:1.4}
@@ -197,9 +198,9 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-ceiling b{color:var(--ink);font-weight:800}
 .tl-box{width:96vw}
 @media(max-width:1240px){.tl-box{max-width:96vw!important}}
-.tl-table-wrap{border:1px solid var(--line);border-radius:10px;overflow:auto;background:var(--card);margin-bottom:16px}
+.tl-table-wrap{border:2px solid #0FA968;border-radius:10px;overflow:auto;background:var(--card);margin-bottom:16px;max-height:460px;box-shadow:0 0 0 1px rgba(15,169,104,.15),0 4px 16px rgba(15,169,104,.18)}
 .tl-table{width:100%;border-collapse:collapse;font-size:12px;min-width:900px}
-.tl-table th{text-align:left;padding:9px 10px;font-weight:700;color:var(--ink-soft);background:#F8FAFC;border-bottom:1px solid var(--line);font-size:10.5px;text-transform:uppercase;letter-spacing:.03em}
+.tl-table th{text-align:left;padding:9px 10px;font-weight:700;color:#fff;background:linear-gradient(180deg,#12B87A,#0B8A55);border-bottom:1px solid #0B8A55;font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;z-index:2}
 .tl-table td{padding:10px;vertical-align:top;border-bottom:1px solid var(--line);line-height:1.5;color:var(--ink-soft)}
 .tl-table tr:last-child td{border-bottom:none}
 .tl-table td.c-req{color:var(--ink);font-weight:600}
@@ -274,13 +275,15 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-table td.c-apply input[disabled]{opacity:.5}
 .tl-savenote{font-size:11px;color:var(--ink-soft);margin-top:4px;min-height:14px}
 .tl-restore-banner{background:#EEF4FF;border:1px solid #C7D9F5;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;font-weight:600;color:#1E3A8A}
-.tl-disclaimer-top{background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:12px 16px;margin-bottom:14px}
-.tl-disclaimer-top b{display:block;font-size:12.5px;color:#9A3412;margin-bottom:4px}
-.tl-disclaimer-list{margin:0;padding-left:18px}
-.tl-disclaimer-list li{font-size:12px;color:#7C2D12;line-height:1.55;margin-bottom:5px}
+.tl-disclaimer-top{background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:12px 14px;margin-bottom:0;display:flex;flex-direction:column;justify-content:center}
+.tl-disclaimer-top b{display:block;font-size:11.5px;color:#9A3412;margin-bottom:4px}
+.tl-disclaimer-list{margin:0;padding-left:16px}
+.tl-disclaimer-list li{font-size:10.5px;color:#7C2D12;line-height:1.45;margin-bottom:4px}
 .tl-disclaimer-list li:last-child{margin-bottom:0}
-.ats-tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:14px}
-@media(max-width:640px){.ats-tiles{grid-template-columns:repeat(3,1fr)}}
+.tl-scorehead{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:14px;align-items:stretch}
+@media(max-width:760px){.tl-scorehead{grid-template-columns:1fr}}
+.ats-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:0}
+@media(max-width:640px){.ats-tiles{grid-template-columns:repeat(2,1fr)}}
 .ats-tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 6px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center;min-height:96px;position:relative;overflow:hidden;transition:transform .18s ease,box-shadow .18s ease;cursor:default}
 .ats-tile.tile-found,.ats-tile.tile-partial,.ats-tile.tile-missing{cursor:pointer}
 .ats-tile::before{content:"";position:absolute;top:0;left:0;right:0;height:50%;background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0));pointer-events:none}
@@ -2287,12 +2290,32 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
       </div>
       <div id="tlResults" class="hidden">
         <div class="tl-topback"><button class="btn btn-ghost" id="tlBackTop" type="button">← Back</button></div>
-        <div class="tl-disclaimer-top">
-          <b class="tl-explainer-title" style="color:#9A3412">⚠ How to read this score</b>
-          <ul class="tl-disclaimer-list">
-            <li>Based only on matching skills named in the job description against skills already evidenced in your resume — nothing invented or newly added.</li>
-            <li>It's an indication of your screening chances with the ATS software recruiters use — not a guarantee of getting an interview. That decision always stays with the recruiter.</li>
-          </ul>
+        <div class="tl-scorehead">
+          <div class="ats-tiles">
+            <div class="ats-tile main">
+              <div class="score-ring" id="tlRing"><div><b id="tlScore">0%</b><span>match</span></div></div>
+              <div class="ats-tile-label">Match Score</div>
+            </div>
+            <div class="ats-tile tile-found" id="tlTileFound" role="button" tabindex="0">
+              <div class="ats-tile-num" id="tlFoundNum">0</div>
+              <div class="ats-tile-label">✓ Matched</div>
+            </div>
+            <div class="ats-tile tile-partial" id="tlTilePartial" role="button" tabindex="0">
+              <div class="ats-tile-num" id="tlPartialNum">0</div>
+              <div class="ats-tile-label">≈ Partial</div>
+            </div>
+            <div class="ats-tile tile-missing" id="tlTileMissing" role="button" tabindex="0">
+              <div class="ats-tile-num" id="tlMissingNum">0</div>
+              <div class="ats-tile-label">✗ Missing</div>
+            </div>
+          </div>
+          <div class="tl-disclaimer-top">
+            <b class="tl-explainer-title" style="color:#9A3412">⚠ How to read this score</b>
+            <ul class="tl-disclaimer-list">
+              <li>Based only on matching skills named in the job description against skills already evidenced in your resume — nothing invented or newly added.</li>
+              <li>It's an indication of your screening chances with the ATS software recruiters use — not a guarantee of getting an interview. That decision always stays with the recruiter.</li>
+            </ul>
+          </div>
         </div>
         <div class="tl-legend-top">
           <p class="tl-cov-label" style="margin-top:0">What the matching statuses mean:</p>
@@ -2301,24 +2324,6 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
             <div class="tl-leg-item"><span class="sk partial">Partial</span><span class="tl-leg-txt">You've done this, but worded it differently to the job description — worth rewording.</span></div>
             <div class="tl-leg-item"><span class="sk missing">Missing</span><span class="tl-leg-txt">Related experience exists, but this specific requirement isn't stated.</span></div>
             <div class="tl-leg-item"><span class="sk absent">Not found</span><span class="tl-leg-txt">Nothing in your CV relates to this at all — a genuine gap, not a wording problem.</span></div>
-          </div>
-        </div>
-        <div class="ats-tiles">
-          <div class="ats-tile main">
-            <div class="score-ring" id="tlRing"><div><b id="tlScore">0%</b><span>match</span></div></div>
-            <div class="ats-tile-label">Match Score</div>
-          </div>
-          <div class="ats-tile tile-found" id="tlTileFound" role="button" tabindex="0">
-            <div class="ats-tile-num" id="tlFoundNum">0</div>
-            <div class="ats-tile-label">✓ Matched</div>
-          </div>
-          <div class="ats-tile tile-partial" id="tlTilePartial" role="button" tabindex="0">
-            <div class="ats-tile-num" id="tlPartialNum">0</div>
-            <div class="ats-tile-label">≈ Partial</div>
-          </div>
-          <div class="ats-tile tile-missing" id="tlTileMissing" role="button" tabindex="0">
-            <div class="ats-tile-num" id="tlMissingNum">0</div>
-            <div class="ats-tile-label">✗ Missing</div>
           </div>
         </div>
         <div class="match-band">
@@ -2478,7 +2483,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260822c"></script>
+<script src="app.js?v=20260822d"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
