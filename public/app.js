@@ -3775,7 +3775,7 @@ function renderCompareTable(coverage, changes){
   allChanges.forEach((c, i) => { if(c.id) idxByChangeId.set(c.id, i); });
 
   let rowKey = 0;
-  const rowHtml = (s)=>{
+  const rowHtml = (s, groupStatus)=>{
     const st = s.status || 'partial';
     const cv = st === 'absent'
       ? '<span style="color:var(--ink-soft)">Not mentioned anywhere</span>'
@@ -3800,7 +3800,7 @@ function renderCompareTable(coverage, changes){
       applyHtml = '<span style="color:var(--ink-soft)">—</span>';
     }
 
-    return `<tr id="tlrow-${coverage.indexOf(s)}">
+    return `<tr id="tlrow-${coverage.indexOf(s)}" class="tl-grouprow-${groupStatus || st}">
       <td class="c-emp">${tlEmployerCell(s.employer)}</td>
       <td class="c-req">${esc(s.skill)}</td>
       <td>${cv}</td>
@@ -3810,15 +3810,25 @@ function renderCompareTable(coverage, changes){
     </tr>`;
   };
 
-  const present = rows.filter(s => (s.status || 'partial') !== 'absent');
-  const absent  = rows.filter(s => (s.status || 'partial') === 'absent');
-  let html = header + '<tbody>' + present.map(rowHtml).join('');
-  if(absent.length){
-    html += `<tr class="tl-grouphead"><td colspan="6">
-        <b>Asked for in the job, but nowhere in your CV</b>
-        <span>No related experience found under any employer — these are genuine gaps, not wording problems. Only add what's actually true for you.</span>
-      </td></tr>` + absent.map(rowHtml).join('');
-  }
+  const GROUP_INFO = {
+    have:    { label: 'Already matched',                heading: 'Already matched',   caption: 'These already meet what the job is looking for — no changes needed.' },
+    partial: { label: 'Worded differently than the job', heading: 'Worded differently than the job asks for', caption: 'You likely have this experience — reword to match the job\'s language.' },
+    missing: { label: 'Related experience, not stated',  heading: 'Related experience exists, but this isn\'t stated', caption: 'Something adjacent is in your CV — add a line that states this directly if it\'s true.' },
+    absent:  { label: 'Asked for, but nowhere in your CV', heading: 'Asked for in the job, but nowhere in your CV', caption: 'No related experience found under any employer — these are genuine gaps, not wording problems. Only add what\'s actually true for you.' }
+  };
+
+  let html = header + '<tbody>';
+  ['have','partial','missing','absent'].forEach(status=>{
+    const group = rows.filter(s => (s.status || 'partial') === status);
+    if(!group.length) return;
+    const info = GROUP_INFO[status];
+    html += `<tr class="tl-grouphead" id="tlgroup-${status}">
+        <td colspan="6">
+          <b>${esc(info.heading)}</b>
+          <span>${esc(info.caption)}</span>
+        </td>
+      </tr>` + group.map(s => rowHtml(s, status)).join('');
+  });
 
   // Any proposed change not claimed by a requirement row (e.g. a broad
   // summary rewrite) still gets a row, so it's applicable and never hidden.
@@ -4127,6 +4137,34 @@ function tlBuildGapSummaryHTML(){
 // Wires the jump links inside the gap popup: clicking one closes the
 // popup, scrolls to the matching table row, expands it if collapsed, and
 // briefly flashes it so the row that needs attention is unmistakable.
+// Clicking a status tile scrolls to that group's header in the table and
+// briefly flashes every row in it. "Missing" covers two real statuses
+// (missing + absent) since its tile count already combines them — clicking
+// it jumps to whichever of those groups appears first and flashes both.
+function tlJumpToGroup(statuses){
+  for(const st of statuses){
+    const header = document.getElementById('tlgroup-' + st);
+    if(header){
+      header.scrollIntoView({behavior:'smooth', block:'start'});
+      break;
+    }
+  }
+  statuses.forEach(st=>{
+    document.querySelectorAll('.tl-grouprow-' + st).forEach(row=>{
+      row.classList.remove('tl-row-flash');
+      void row.offsetWidth; // restart the animation if clicked again quickly
+      row.classList.add('tl-row-flash');
+      setTimeout(()=> row.classList.remove('tl-row-flash'), 1400);
+    });
+  });
+}
+$('#tlTileFound').addEventListener('click', ()=> tlJumpToGroup(['have']));
+$('#tlTilePartial').addEventListener('click', ()=> tlJumpToGroup(['partial']));
+$('#tlTileMissing').addEventListener('click', ()=> tlJumpToGroup(['missing','absent']));
+[$('#tlTileFound'), $('#tlTilePartial'), $('#tlTileMissing')].forEach(tile=>{
+  tile.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); tile.click(); } });
+});
+
 function tlWireGapSummary(){
   const box = $('#tlGapModalBody');
   if(!box) return;
