@@ -3527,7 +3527,6 @@ function renderTailorResults(){
   $('#tlPartialNum').textContent = counts.partial;
   $('#tlMissingNum').textContent = counts.missing + counts.absent;
 
-  renderAtsParseability();
   updateTailorCount();
 
   if((r.skills_coverage || []).length){
@@ -3968,56 +3967,6 @@ function animateTlScore(pct){
     if(t<1) requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
-}
-
-// ============================================================
-// ATS PARSEABILITY CHECK — deterministic, no AI call.
-// Flags whether the currently selected template's layout is
-// likely to be misread by real ATS parsing software (multi-column,
-// sidebar, timeline graphics, banner headers) and offers a one-click
-// switch to the ATS-safe plain template. This is separate from the
-// content match score above: this checks the *container*, that
-// checks the *content*.
-// ============================================================
-const ATS_RISKY_LAYOUTS = {
-  sidebar:  'multi-column layout — some ATS parsers read columns left-to-right across the page and scramble section order',
-  twocol:   'two-column layout — content can be read out of order by some ATS parsers',
-  timeline: 'graphical timeline elements — decorative graphics can be skipped or misread',
-  banner:   'header content sits inside a styled banner — some parsers miss text placed in graphic bands'
-};
-
-function renderAtsParseability(){
-  const box = $('#tlParse');
-  const tile = $('#tlFormatTile');
-  const tileIcon = $('#tlFormatIcon');
-  if(!box) return;
-  const t = getTemplate();
-  const risk = t.layout && ATS_RISKY_LAYOUTS[t.layout];
-  box.innerHTML = '';
-  box.classList.remove('ok','risk');
-  if(tile){ tile.classList.remove('ok','risk'); tile.classList.add(risk ? 'risk' : 'ok'); }
-  if(tileIcon) tileIcon.textContent = risk ? '⚠' : '✓';
-  if(risk){
-    box.classList.add('risk');
-    box.innerHTML = `⚠ <span>You've selected the <b>${esc(t.name)}</b> template for this resume, which uses a ${esc(risk)}. ATS software may misread or skip this content when it scans your file — meaning a recruiter might never see it, regardless of how strong the wording is. <a class="tl-switch-ats" id="tlSwitchAts">Switch to ATS Plain</a> to remove this risk for this application.</span>`;
-    const link = box.querySelector('#tlSwitchAts');
-    if(link) link.addEventListener('click', ()=>{
-      selectedTemplate = 'ats-plain';
-      renderTemplateGrid();
-      const sel = $('#tplSelName'); if(sel) sel.textContent = getTemplate().name;
-      renderLivePreview();
-      if($('#previewModal').classList.contains('open')) injectResumeInto([$('#previewBody')]);
-      if(document.getElementById('sec-personal')) buildEditor();
-      renderAtsParseability();
-      toast('Switched to ATS Plain for this resume.', 3500);
-    });
-  } else {
-    box.classList.add('ok');
-    box.innerHTML = `✓ <span>You've selected the <b>${esc(t.name)}</b> template for this resume. It uses a single, top-to-bottom column — the layout ATS software reads most reliably, so nothing in it risks being skipped or read out of order during automated screening.</span>`;
-    if(t.photo){
-      box.innerHTML += ` <span style="font-weight:600">Note: this template includes a photo — a small number of ATS setups strip photos on import, so the photo itself (not your text) may not carry through.</span>`;
-    }
-  }
 }
 
 function updateTailorCount(){
