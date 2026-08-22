@@ -1031,7 +1031,6 @@ function analyzeQualityScore(){
     });
   });
   vs=Math.max(30,Math.round(vs)); gs=Math.max(35,Math.round(gs)); tes=Math.max(30,Math.round(tes));
-  var overall=Math.round((vs+gs+tes)/3);
   // Per-error reward: fixing ALL errors of a type brings that sub-score to exactly 100
   var typeCounts={vocab:0,grammar:0,texterror:0};
   errs.forEach(function(e){typeCounts[e.type]++;});
@@ -1041,8 +1040,96 @@ function analyzeQualityScore(){
   });
   var bySection={};
   errs.forEach(function(e){if(!bySection[e.section])bySection[e.section]=[];bySection[e.section].push(e);});
-  return {overall:overall,vocabulary:vs,grammar:gs,texterror:tes,errors:errs,issuesBySection:bySection};
+  var structure = analyzeStructure();
+  var completeness = analyzeCompleteness();
+  var overall=Math.round((vs+gs+tes+structure.score+completeness.score)/5);
+  return {overall:overall,vocabulary:vs,grammar:gs,texterror:tes,structure:structure.score,
+    completeness:completeness.score,structureInfo:structure,completenessInfo:completeness,
+    errors:errs,issuesBySection:bySection};
 }
+
+// ============================================================
+// STRUCTURE — does the chosen template's layout actually get read
+// correctly by ATS screening software? Deterministic, no AI call: reuses
+// the same layout classification carried on each TEMPLATES entry. This
+// checks the CONTAINER (the file's shape), not the content.
+// ============================================================
+var STRUCTURE_RISKY_LAYOUTS = {
+  sidebar:  'a multi-column layout \u2014 some ATS parsers read columns left-to-right across the page and scramble section order',
+  twocol:   'a two-column layout \u2014 content can be read out of order by some ATS parsers',
+  timeline: 'graphical timeline elements \u2014 decorative graphics can be skipped or misread',
+  banner:   'header content sitting inside a styled banner \u2014 some parsers miss text placed in graphic bands'
+};
+function analyzeStructure(){
+  var t = getTemplate();
+  var risk = t.layout && STRUCTURE_RISKY_LAYOUTS[t.layout];
+  return { score: risk ? 55 : 100, risky: !!risk, reason: risk || '', templateName: t.name, hasPhoto: !!t.photo };
+}
+
+// ============================================================
+// COMPLETENESS — are the fields an ATS actually extracts (dates, titles,
+// contact details) genuinely filled in? A deliberately conservative
+// checklist: only fields where being empty is essentially always a
+// mistake, never fields where leaving them blank can be a legitimate,
+// reasonable choice (location, photo, end date on a current role,
+// graduation year, grade).
+// ============================================================
+function analyzeCompleteness(){
+  var checks = [];
+  var p = R.personal || {};
+  [['name','Name'],['email','Email'],['phone','Phone'],['linkedin','LinkedIn']].forEach(function(f){
+    checks.push({ok: !!(p[f[0]] && String(p[f[0]]).trim()), secKey:'personal',
+      target:'#sec-personal input[data-p="'+f[0]+'"]', label:f[1]+' \u2014 Personal details'});
+  });
+  checks.push({ok: !!(R.summary && R.summary.trim()), secKey:'summary',
+    target:'#sec-summary .q-editable', label:'Profile / Summary'});
+  checks.push({ok: (R.skills||[]).length>0, secKey:'skills',
+    target:'#sec-skills input', label:'Skills \u2014 add at least one'});
+  (R.experience||[]).forEach(function(e,i){
+    var roleLabel = e.title || e.company || ('Role '+(i+1));
+    [['title','Job title'],['company','Company'],['start','Start date']].forEach(function(f){
+      checks.push({ok: !!(e[f[0]] && String(e[f[0]]).trim()), secKey:'experience_'+i,
+        target:'#sec-experience .entry[data-ix="'+i+'"] input[data-f="'+f[0]+'"]',
+        label:f[1]+' \u2014 '+roleLabel});
+    });
+    checks.push({ok: !!(e.desc && e.desc.trim()), secKey:'experience_'+i,
+      target:'#sec-experience .entry[data-ix="'+i+'"] .q-editable',
+      label:'Responsibilities \u2014 '+roleLabel});
+  });
+  (R.education||[]).forEach(function(ed,i){
+    var eduLabel = ed.degree || ed.institution || ('Entry '+(i+1));
+    [['degree','Degree'],['institution','Institution']].forEach(function(f){
+      checks.push({ok: !!(ed[f[0]] && String(ed[f[0]]).trim()), secKey:'education_'+i,
+        target:'#sec-education .entry[data-ix="'+i+'"] input[data-f="'+f[0]+'"]',
+        label:f[1]+' \u2014 '+eduLabel});
+    });
+  });
+  var total = checks.length;
+  var okCount = checks.filter(function(c){return c.ok;}).length;
+  var score = total ? Math.round((okCount/total)*100) : 100;
+  return { score: score, missing: checks.filter(function(c){return !c.ok;}) };
+}
+
+// Completeness has no per-error reward pipeline like Vocabulary/Grammar/Text
+// Errors do (it's presence-of-data, not a list of text errors), so it needs
+// its own lightweight live-refresh: a debounced, delegated listener that
+// recomputes just the Completeness number and updates the tile — without
+// doing a full editor rebuild, which would steal focus mid-typing.
+var _completenessDebounce;
+document.addEventListener('input', function(e){
+  var t = e.target;
+  if(!t || !t.matches || !(t.matches('input[data-p]') || t.matches('input[data-f]') || t.matches('.q-editable'))) return;
+  clearTimeout(_completenessDebounce);
+  _completenessDebounce = setTimeout(function(){
+    if(!R.quality_score) return;
+    var c = analyzeCompleteness();
+    R.quality_score.completeness = c.score;
+    R.quality_score.completenessInfo = c;
+    R.quality_score.overall = Math.round((R.quality_score.vocabulary + R.quality_score.grammar +
+      R.quality_score.texterror + R.quality_score.structure + R.quality_score.completeness) / 5);
+    refreshQualityDashboard();
+  }, 700);
+});
 
 function getScoreSeverity(score){
   if(score>=85)return{color:'#10B981',label:'Excellent \xb7 Perfect'};
@@ -1389,6 +1476,12 @@ function refreshQualityDashboard(){
   var ve=document.getElementById('qdash-vocab');if(ve)ve.textContent=qs.vocabulary+'%';
   var ge=document.getElementById('qdash-grammar');if(ge)ge.textContent=qs.grammar+'%';
   var ce=document.getElementById('qdash-texterror');if(ce)ce.textContent=qs.texterror+'%';
+  var ste=document.getElementById('qdash-structure');if(ste)ste.textContent=qs.structure+'%';
+  var coe=document.getElementById('qdash-completeness');if(coe)coe.textContent=qs.completeness+'%';
+  var std=document.getElementById('qdash-structure-detail');
+  if(std) std.textContent = qs.structureInfo.risky ? '1 layout issue' : 'Layout is safe';
+  var cod=document.getElementById('qdash-completeness-detail');
+  if(cod){ var mc=(qs.completenessInfo.missing||[]).length; cod.textContent = mc+' field'+(mc!==1?'s':'')+' missing'; }
   var uf=qs.errors.filter(function(e){return !e.fixed;});
   var vc=uf.filter(function(e){return e.type==='vocab';}).length;
   var gc=uf.filter(function(e){return e.type==='grammar';}).length;
@@ -1421,6 +1514,60 @@ function jumpToTextErrors(){
     target.classList.add('tl-row-flash');
     setTimeout(function(){ target.classList.remove('tl-row-flash'); }, 1400);
   });
+}
+
+// Structure is a template-level fix, not a field-level one — there's nothing
+// to jump to inside the editor, so clicking either confirms the layout is
+// safe or opens the template picker so the user can switch away from a
+// risky one, reusing the same modal the Templates button already opens.
+function handleStructureClick(){
+  var info = R.quality_score && R.quality_score.structureInfo;
+  if(!info) return;
+  if(info.risky){
+    toast('The "'+info.templateName+'" template uses '+info.reason+'. Pick a single-column template below.', 5000);
+    openTemplatesModal();
+  } else {
+    toast('The "'+info.templateName+'" template uses a single-column layout \u2014 nothing to fix here.', 3500);
+  }
+}
+
+// Completeness lists each missing field individually (unlike Text Errors'
+// flash-the-whole-section approach) because the gaps here are scattered,
+// specific fields across many different cards — a jump-link per field is
+// more precise than flashing every card that has any gap in it.
+function openCompletenessModal(){
+  var info = R.quality_score && R.quality_score.completenessInfo;
+  if(!info) return;
+  var body = document.getElementById('completenessModalBody');
+  if(!body) return;
+  if(!info.missing.length){
+    body.innerHTML = '<h2 style="margin-bottom:6px">\u2713 Nothing missing</h2>'
+      + '<p style="font-size:13px;color:var(--ink-soft)">Every field screening software looks for is filled in.</p>';
+  } else {
+    body.innerHTML = '<h2 style="margin-bottom:10px">'+info.missing.length+' field'+(info.missing.length!==1?'s':'')+' missing</h2>'
+      + '<ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.8">'
+      + info.missing.map(function(m,i){
+          return '<li><a href="#" class="tl-gap-jump" data-target="'+i+'">'+esc(m.label)+'</a></li>';
+        }).join('')
+      + '</ul>';
+    body.querySelectorAll('.tl-gap-jump').forEach(function(a){
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        var m = info.missing[+a.dataset.target];
+        document.getElementById('completenessModal').classList.remove('open');
+        var el2 = document.querySelector(m.target);
+        if(!el2) return;
+        el2.scrollIntoView({behavior:'smooth', block:'center'});
+        var flashTarget = el2.closest('.entry') || el2.closest('.card') || el2;
+        flashTarget.classList.remove('tl-row-flash');
+        void flashTarget.offsetWidth;
+        flashTarget.classList.add('tl-row-flash');
+        setTimeout(function(){ flashTarget.classList.remove('tl-row-flash'); }, 1400);
+        if(typeof el2.focus === 'function') el2.focus();
+      });
+    });
+  }
+  document.getElementById('completenessModal').classList.add('open');
 }
 
 var _fixToastTimer;
@@ -1472,6 +1619,8 @@ function buildEditor(){
   const vc = unfixed.filter(function(e){return e.type==='vocab';}).length;
   const gc = unfixed.filter(function(e){return e.type==='grammar';}).length;
   const tec = unfixed.filter(function(e){return e.type==='texterror';}).length;
+  const structRisky = qs.structureInfo.risky;
+  const missingCount = (qs.completenessInfo.missing||[]).length;
   const qCard = el('div', {class: 'card quality-card', id: 'sec-quality'});
   qCard.innerHTML = '<div class="qdash-row">'
     + '<div class="qdash-score-wrap">'
@@ -1483,19 +1632,29 @@ function buildEditor(){
     + '<div class="qdash-label" id="qdash-label" style="color:'+severity.color+'">'+severity.label+'</div>'
     + '</div></div>'
     + '<div class="qdash-subs">'
-    + '<div class="qsub qsub-vocab"><div class="qsub-label">Vocabulary</div>'
+    + '<div class="qsub qsub-vocab" title="Flags weak or vague phrasing \u2014 e.g. &quot;responsible for&quot; instead of &quot;managed&quot;."><div class="qsub-label">Vocabulary</div>'
     + '<div class="qsub-val" id="qdash-vocab">'+qs.vocabulary+'%</div>'
     + '<div class="qsub-detail" id="qdash-vocab-detail">'+vc+' issue'+(vc!==1?'s':'')+' remaining</div></div>'
-    + '<div class="qsub qsub-grammar"><div class="qsub-label">Grammar</div>'
+    + '<div class="qsub qsub-grammar" title="Checks for double spaces, missing punctuation, and inconsistent tense."><div class="qsub-label">Grammar</div>'
     + '<div class="qsub-val" id="qdash-grammar">'+qs.grammar+'%</div>'
     + '<div class="qsub-detail" id="qdash-grammar-detail">'+gc+' issue'+(gc!==1?'s':'')+' remaining</div></div>'
-    + '<div class="qsub qsub-texterror" id="qsub-texterror-tile" style="cursor:pointer" title="Click to jump to flagged text"><div class="qsub-label">Text Errors</div>'
+    + '<div class="qsub qsub-texterror" id="qsub-texterror-tile" style="cursor:pointer" title="Flags common misspellings against a curated list of frequently misspelled words. Click to jump to them."><div class="qsub-label">Text Errors</div>'
     + '<div class="qsub-val" id="qdash-texterror">'+qs.texterror+'%</div>'
     + '<div class="qsub-detail" id="qdash-texterror-detail">'+tec+' issue'+(tec!==1?'s':'')+' remaining</div></div>'
+    + '<div class="qsub qsub-structure" id="qsub-structure-tile" style="cursor:pointer" title="Checks whether your chosen template\u2019s layout can be read correctly by ATS screening software \u2014 the shape of the file, not what it says. Click to review."><div class="qsub-label">Structure</div>'
+    + '<div class="qsub-val" id="qdash-structure" style="'+(structRisky?'color:#B45309':'')+'">'+qs.structure+'%</div>'
+    + '<div class="qsub-detail" id="qdash-structure-detail">'+(structRisky?'1 layout issue':'Layout is safe')+'</div></div>'
+    + '<div class="qsub qsub-completeness" id="qsub-completeness-tile" style="cursor:pointer" title="Checks whether key fields \u2014 dates, titles, contact details \u2014 are filled in, since screening software looks for these directly. Click to see what\u2019s missing."><div class="qsub-label">Completeness</div>'
+    + '<div class="qsub-val" id="qdash-completeness" style="'+(missingCount>0?'color:#B45309':'')+'">'+qs.completeness+'%</div>'
+    + '<div class="qsub-detail" id="qdash-completeness-detail">'+missingCount+' field'+(missingCount!==1?'s':'')+' missing</div></div>'
     + '</div></div>';
   ed.appendChild(qCard);
   var terTile = document.getElementById('qsub-texterror-tile');
   if(terTile) terTile.addEventListener('click', jumpToTextErrors);
+  var structTile = document.getElementById('qsub-structure-tile');
+  if(structTile) structTile.addEventListener('click', handleStructureClick);
+  var compTile = document.getElementById('qsub-completeness-tile');
+  if(compTile) compTile.addEventListener('click', openCompletenessModal);
 
   // AI Builder bar sits directly below the quality dashboard
   var aiBar = document.getElementById('aiBuilderBar');
