@@ -296,18 +296,10 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .ats-tile.tile-missing{background:#FEE2E2;border-color:#FCA5A5}
 .ats-tile.tile-missing .ats-tile-num{color:#B91C1C}
 .ats-tile.tile-missing .ats-tile-label{color:#991B1B}
-.ats-tile#tlFormatTile.ok{background:#DCFCE7;border-color:#86EFAC}
-.ats-tile#tlFormatTile.ok .ats-tile-label{color:#166534}
-.ats-tile#tlFormatTile.risk{background:#FEF3C7;border-color:#FCD34D}
-.ats-tile#tlFormatTile.risk .ats-tile-label{color:#92400E}
 .ats-tile .score-ring{width:66px;height:66px}
 .ats-tile .score-ring>div{width:48px;height:48px}
 .ats-tile .score-ring b{font-size:14px}
 .ats-tile .score-ring span{font-size:7px}
-.tl-parse{margin-top:10px;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;line-height:1.4}
-.tl-parse.ok{background:#DCFCE7;color:#15803D}
-.tl-parse.risk{background:#FEF3C7;color:#B45309}
-.tl-parse a.tl-switch-ats{color:inherit;text-decoration:underline;cursor:pointer;font-weight:800;white-space:nowrap}
 .tl-boost-tip{margin-top:10px;padding:9px 12px;border-radius:8px;background:#F0FDF4;border:1px solid #BBF7D0;font-size:12px;color:#166534;line-height:1.5}
 .tl-boost-tip b{font-weight:800}
 .tl-changebar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:11px;font-size:13px;color:var(--ink)}
@@ -2322,17 +2314,11 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
             <div class="ats-tile-num" id="tlMissingNum">0</div>
             <div class="ats-tile-label">✗ Missing</div>
           </div>
-          <div class="ats-tile" id="tlFormatTile">
-            <div class="ats-tile-icon" id="tlFormatIcon">—</div>
-            <div class="ats-tile-label">Format Risk</div>
-          </div>
         </div>
         <div class="match-band">
           <div class="match-info">
             <h4 id="tlMatchTitle">Your resume vs. this job</h4>
             <p id="tlMatchSummary"></p>
-            <p class="tl-cov-label">Template format check — will your CV's layout be read correctly by ATS software, regardless of what it says:</p>
-            <div class="tl-parse" id="tlParse"></div>
           </div>
         </div>
 
@@ -2486,7 +2472,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260822a"></script>
+<script src="app.js?v=20260822b"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
