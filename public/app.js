@@ -913,7 +913,7 @@ const EDITOR_ORDER = ['personal','skills','summary','projects','experience','cer
 
 // ---- Quality Score Analysis (Vocabulary, Grammar, Context) ----
 function analyzeQualityScore(){
-  var errs=[], eid=0, vs=100, gs=100, cs=100;
+  var errs=[], eid=0, vs=100, gs=100, tes=100;
   var WEAK = {
     'very':{p:3,s:'use "highly" or remove'},'good':{p:5,s:'replace with specific adjective'},
     'bad':{p:5,s:'use "ineffective" or "problematic"'},'stuff':{p:8,s:'replace with specific term'},
@@ -983,43 +983,65 @@ function analyzeQualityScore(){
       gs-=4;
     }
   });
-  // Context: per-LINE metric detection \u2014 highlights the exact lines that need numbers.
-  // Language-neutral: digits, %, currency symbols work in any language.
-  (R.experience||[]).forEach(function(e,i){
-    var lines=(e.desc||'').split(/\n/);
-    var flagged=0;
-    lines.forEach(function(line){
-      var t=line.trim();
-      if(t.length<40) return;               // skip short/heading lines
-      if(/[0-9]/.test(t)) return;            // already has a number/metric
-      if(flagged>=3) return;                 // cap 3 per job to avoid overload
-      errs.push({id:'q'+(eid++),type:'context',section:'experience',secKey:'experience_'+i,
-        location:'Experience \u2014 '+(e.title||'Job '+(i+1)),match:'',line:t,
-        desc:'This line has no measurable impact \u2014 add numbers (people trained, % reduced, \u00a3/$ saved, audits completed)',fixed:false});
-      cs-=4; flagged++;
+  // Text Errors: common misspellings, checked against a curated list of known
+  // wrong-spelling -> correct-spelling pairs (not a full dictionary). This
+  // deliberately never flags real names, acronyms, or technical jargon,
+  // because it only matches EXACT known-wrong words — nothing else is ever
+  // compared against a dictionary, so there's no false-positive risk on
+  // company names, product names, or domain terms.
+  var MISSPELLINGS = {
+    'recieve':'receive','recieved':'received','acheive':'achieved','acheived':'achieved',
+    'seperate':'separate','seperated':'separated','definately':'definitely',
+    'managment':'management','enviroment':'environment','goverment':'government',
+    'occured':'occurred','occuring':'occurring','sucessful':'successful',
+    'sucessfully':'successfully','commited':'committed','commitee':'committee',
+    'accomodate':'accommodate','accomodation':'accommodation','begining':'beginning',
+    'wich':'which','untill':'until','recieveing':'receiving','excelent':'excellent',
+    'expirience':'experience','experiance':'experience','oppurtunity':'opportunity',
+    'oppurtunities':'opportunities','collegue':'colleague','colleage':'colleague',
+    'liason':'liaison','lisence':'license','maintainance':'maintenance',
+    'neccessary':'necessary','negociate':'negotiate','ocassion':'occasion',
+    'persue':'pursue','priviledge':'privilege','profesional':'professional',
+    'proffesional':'professional','reccomend':'recommend','reccomendation':'recommendation',
+    'relevent':'relevant','responsability':'responsibility','responsibile':'responsible',
+    'sucess':'success','supercede':'supersede','tommorow':'tomorrow',
+    'wether':'whether','writen':'written','achievment':'achievement',
+    'acheivement':'achievement','analyse':'analyze','buisness':'business',
+    'calender':'calendar','comittee':'committee','concious':'conscious',
+    'consistant':'consistent','coordinat':'coordinate','deveop':'develop',
+    'developement':'development','effecient':'efficient','effeciency':'efficiency',
+    'guage':'gauge','hierachy':'hierarchy','independant':'independent',
+    'interupt':'interrupt','judgement':'judgment',
+    'knowlege':'knowledge','leadershp':'leadership',
+    'noticable':'noticeable','overal':'overall',
+    'personel':'personnel','posession':'possession','preceed':'precede',
+    'presance':'presence','recomend':'recommend','strenghten':'strengthen',
+    'succes':'success','techincal':'technical','techinal':'technical'
+  };
+  Object.keys(vocabSections).forEach(function(secKey){
+    var info=vocabSections[secKey], sec=secKey.replace(/_\d+$/,'');
+    Object.keys(MISSPELLINGS).forEach(function(wrong){
+      var re=new RegExp('\\b'+wrong+'\\b','gi'), m;
+      while((m=re.exec(info.text))!==null){
+        errs.push({id:'q'+(eid++),type:'texterror',section:sec,secKey:secKey,
+          location:info.label,match:m[0],
+          desc:'"'+m[0]+'" \u2014 did you mean "'+MISSPELLINGS[wrong]+'"?',fixed:false});
+        tes-=4;
+      }
     });
   });
-  (R.experience||[]).forEach(function(e,i){
-    var vagueRe=/did various|various things|different tasks|many responsibilities|handled different/gi, vm;
-    while((vm=vagueRe.exec(e.desc||''))!==null){
-      errs.push({id:'q'+(eid++),type:'context',section:'experience',secKey:'experience_'+i,
-        location:'Experience \u2014 '+(e.title||'Job '+(i+1)),match:vm[0],
-        desc:'"'+vm[0]+'" is vague \u2014 be specific',fixed:false});
-      cs-=5;
-    }
-  });
-  vs=Math.max(30,Math.round(vs)); gs=Math.max(35,Math.round(gs)); cs=Math.max(30,Math.round(cs));
-  var overall=Math.round((vs+gs+cs)/3);
+  vs=Math.max(30,Math.round(vs)); gs=Math.max(35,Math.round(gs)); tes=Math.max(30,Math.round(tes));
+  var overall=Math.round((vs+gs+tes)/3);
   // Per-error reward: fixing ALL errors of a type brings that sub-score to exactly 100
-  var typeCounts={vocab:0,grammar:0,context:0};
+  var typeCounts={vocab:0,grammar:0,texterror:0};
   errs.forEach(function(e){typeCounts[e.type]++;});
-  var typeScores={vocab:vs,grammar:gs,context:cs};
+  var typeScores={vocab:vs,grammar:gs,texterror:tes};
   errs.forEach(function(e){
     e.reward = typeCounts[e.type]>0 ? (100 - typeScores[e.type]) / typeCounts[e.type] : 0;
   });
   var bySection={};
   errs.forEach(function(e){if(!bySection[e.section])bySection[e.section]=[];bySection[e.section].push(e);});
-  return {overall:overall,vocabulary:vs,grammar:gs,context:cs,errors:errs,issuesBySection:bySection};
+  return {overall:overall,vocabulary:vs,grammar:gs,texterror:tes,errors:errs,issuesBySection:bySection};
 }
 
 function getScoreSeverity(score){
@@ -1092,8 +1114,8 @@ function qualityField(text,fieldErrors,onInput){
 
   // Show hint badges below field for ALL errors (including ones without match text)
   var hintsDiv=el('div',{class:'q-hints'});
-  var colors={vocab:'#10B981',grammar:'#F59E0B',context:'#6366F1'};
-  var labels={vocab:'Vocabulary',grammar:'Grammar',context:'Context'};
+  var colors={vocab:'#10B981',grammar:'#F59E0B',texterror:'#6366F1'};
+  var labels={vocab:'Vocabulary',grammar:'Grammar',texterror:'Text Errors'};
   fieldErrors.forEach(function(err){
     if(err.fixed)return;
     var hint=el('div',{class:'q-hint','data-hintid':err.id});
@@ -1213,27 +1235,14 @@ function showAIPreview(err, fieldEl, hintEl, btn, original, suggestion){
   box.querySelector('.btn-accept').addEventListener('click',function(){
     var text=(ta.value||'').trim();
     if(!text){ ta.style.borderColor='#DC2626'; ta.focus(); return; }
-    var ph=text.match(/\[[A-Za-z]\]/g)||[];
-    if(ph.length && !confirm('This still contains '+ph.length+' unfilled placeholder'
-        +(ph.length>1?'s':'')+' ('+ph.join(' ')+').\n\nApply anyway? The line stays flagged until you replace them with real numbers.')) return;
 
     var edited = text !== suggestion;
-    var stillFlagged = (err.type==='context' && ph.length>0);
     applyAIFix(err, fieldEl, original, text);   // apply what is IN THE BOX
     box.remove();
 
-    if(stillFlagged){
-      // Text improved but the metric is still a placeholder \u2014 say so plainly
-      hintEl.querySelector('.q-hint-text').textContent =
-        'Text rewritten \u2014 now replace '+ph.join(' ')+' with your real numbers to clear this';
-      btn.style.display='inline-flex';
-      btn.disabled=false;
-      btn.textContent='\u2726 Fix by AI';
-    } else {
-      hintEl.classList.add('q-hint-done');
-      hintEl.appendChild(el('span',{class:'q-hint-fixed-tag'},
-        edited ? '\u2713 Applied (your edit)' : '\u2713 Fixed by AI'));
-    }
+    hintEl.classList.add('q-hint-done');
+    hintEl.appendChild(el('span',{class:'q-hint-fixed-tag'},
+      edited ? '\u2713 Applied (your edit)' : '\u2713 Fixed by AI'));
   });
 
   box.querySelector('.btn-reject').addEventListener('click',function(){
@@ -1273,18 +1282,7 @@ function applyAIFix(err, fieldEl, original, suggestion){
   // 2. Sync data model via the field's input pipeline
   fieldEl.dispatchEvent(new Event('input', {bubbles:true}));
 
-  // 3. A context fix that still carries [X] placeholders is NOT a real fix \u2014
-  //    the line has no measurable impact until a real number replaces the bracket.
-  //    Keep it flagged and do not move the score.
-  if(err.type==='context' && /\[[A-Za-z]\]/.test(suggestion)){
-    err.line = suggestion.trim();          // re-target the error at the new text
-    fieldEl.innerHTML = markupWithErrors(qFieldText(fieldEl),
-      (fieldEl._qErrors||[]).filter(function(e){return !e.fixed;}));
-    fieldEl._qOrigLen = qFieldText(fieldEl).trim().length;
-    return;
-  }
-
-  // 4. Score up + UI refresh (markErrorFixed handles dashboard, rail, toast)
+  // 3. Score up + UI refresh (markErrorFixed handles dashboard, rail, toast)
   markErrorFixed(err, fieldEl);
 }
 
@@ -1331,31 +1329,6 @@ function scanFieldForFixes(fieldEl){
         if(/[.!?]$/.test(lower)) markErrorFixed(err,fieldEl);
         return;
       }
-      // Context LINE errors: fixed when a matching line now contains a number.
-      // Match = current line shares >=40% of the original line's words (unicode-safe).
-      if(err.type==='context' && err.line){
-        var origWords=err.line.toLowerCase().split(/\s+/).filter(function(w){return w.length>3;});
-        var curLines=text.split(/\n/);
-        for(var ci=0;ci<curLines.length;ci++){
-          var cl=curLines[ci].trim(); if(cl.length<20) continue;
-          if(!/[0-9]/.test(cl)) continue;          // must now contain a number
-          var clLower=cl.toLowerCase(), hits=0;
-          for(var wi=0;wi<origWords.length;wi++){
-            if(clLower.indexOf(origWords[wi])>=0) hits++;
-          }
-          if(origWords.length>0 && hits/origWords.length>=0.4){
-            markErrorFixed(err,fieldEl);
-            break;
-          }
-        }
-        return;
-      }
-      // Context field-level: metrics anywhere in field
-      if(err.type==='context'){
-        var hasMetrics=/[0-9]/.test(text);
-        if(hasMetrics) markErrorFixed(err,fieldEl);
-        return;
-      }
       return;
     }
 
@@ -1376,7 +1349,7 @@ function scanFieldForFixes(fieldEl){
 function markErrorFixed(err,fieldEl){
   var qs=R.quality_score;
   err.fixed=true;
-  var scoreKey=err.type==='vocab'?'vocabulary':err.type==='grammar'?'grammar':'context';
+  var scoreKey=err.type==='vocab'?'vocabulary':err.type==='grammar'?'grammar':'texterror';
   // Use per-error reward so fixing ALL errors reaches exactly 100%
   var reward = err.reward || 4;
   qs[scoreKey]=Math.min(100, qs[scoreKey]+reward);
@@ -1384,7 +1357,7 @@ function markErrorFixed(err,fieldEl){
   var remaining=qs.errors.filter(function(e){return !e.fixed && e.type===err.type;}).length;
   if(remaining===0) qs[scoreKey]=100;
   qs[scoreKey]=Math.round(qs[scoreKey]);
-  qs.overall=Math.round((qs.vocabulary+qs.grammar+qs.context)/3);
+  qs.overall=Math.round((qs.vocabulary+qs.grammar+qs.texterror)/3);
   // Clean up highlight span if it still exists in DOM
   if(fieldEl){
     var span=fieldEl.querySelector('[data-errid="'+err.id+'"]');
@@ -1415,14 +1388,39 @@ function refreshQualityDashboard(){
   var ri=document.getElementById('qdash-ring-inner');if(ri){ri.textContent=qs.overall+'%';ri.style.color=sev.color;}
   var ve=document.getElementById('qdash-vocab');if(ve)ve.textContent=qs.vocabulary+'%';
   var ge=document.getElementById('qdash-grammar');if(ge)ge.textContent=qs.grammar+'%';
-  var ce=document.getElementById('qdash-context');if(ce)ce.textContent=qs.context+'%';
+  var ce=document.getElementById('qdash-texterror');if(ce)ce.textContent=qs.texterror+'%';
   var uf=qs.errors.filter(function(e){return !e.fixed;});
   var vc=uf.filter(function(e){return e.type==='vocab';}).length;
   var gc=uf.filter(function(e){return e.type==='grammar';}).length;
-  var cc=uf.filter(function(e){return e.type==='context';}).length;
+  var cc=uf.filter(function(e){return e.type==='texterror';}).length;
   var vd=document.getElementById('qdash-vocab-detail');if(vd)vd.textContent=vc+' issue'+(vc!==1?'s':'')+' remaining';
   var gd=document.getElementById('qdash-grammar-detail');if(gd)gd.textContent=gc+' issue'+(gc!==1?'s':'')+' remaining';
-  var cd=document.getElementById('qdash-context-detail');if(cd)cd.textContent=cc+' issue'+(cc!==1?'s':'')+' remaining';
+  var cd=document.getElementById('qdash-texterror-detail');if(cd)cd.textContent=cc+' issue'+(cc!==1?'s':'')+' remaining';
+}
+
+// Clicking the Text Errors tile scrolls to and briefly flashes every field
+// that currently has an unfixed misspelling — fixing each one (by typing the
+// correction) removes it from this list and raises the tile's score
+// automatically via the same reward mechanism every other check already uses.
+function jumpToTextErrors(){
+  var qs=R.quality_score; if(!qs) return;
+  var secKeys=[]; var seen={};
+  qs.errors.filter(function(e){return e.type==='texterror' && !e.fixed;}).forEach(function(e){
+    if(!seen[e.secKey]){ seen[e.secKey]=true; secKeys.push(e.secKey); }
+  });
+  if(!secKeys.length) return;
+  var first=true;
+  secKeys.forEach(function(secKey){
+    var m=secKey.match(/^experience_(\d+)$/);
+    var target = m ? document.querySelector('#sec-experience .entry[data-ix="'+m[1]+'"]')
+                    : document.getElementById('sec-'+secKey);
+    if(!target) return;
+    if(first){ target.scrollIntoView({behavior:'smooth', block:'center'}); first=false; }
+    target.classList.remove('tl-row-flash');
+    void target.offsetWidth;
+    target.classList.add('tl-row-flash');
+    setTimeout(function(){ target.classList.remove('tl-row-flash'); }, 1400);
+  });
 }
 
 var _fixToastTimer;
@@ -1473,7 +1471,7 @@ function buildEditor(){
   const unfixed = qs.errors.filter(function(e){return !e.fixed;});
   const vc = unfixed.filter(function(e){return e.type==='vocab';}).length;
   const gc = unfixed.filter(function(e){return e.type==='grammar';}).length;
-  const cc = unfixed.filter(function(e){return e.type==='context';}).length;
+  const tec = unfixed.filter(function(e){return e.type==='texterror';}).length;
   const qCard = el('div', {class: 'card quality-card', id: 'sec-quality'});
   qCard.innerHTML = '<div class="qdash-row">'
     + '<div class="qdash-score-wrap">'
@@ -1491,11 +1489,13 @@ function buildEditor(){
     + '<div class="qsub qsub-grammar"><div class="qsub-label">Grammar</div>'
     + '<div class="qsub-val" id="qdash-grammar">'+qs.grammar+'%</div>'
     + '<div class="qsub-detail" id="qdash-grammar-detail">'+gc+' issue'+(gc!==1?'s':'')+' remaining</div></div>'
-    + '<div class="qsub qsub-context"><div class="qsub-label">Context</div>'
-    + '<div class="qsub-val" id="qdash-context">'+qs.context+'%</div>'
-    + '<div class="qsub-detail" id="qdash-context-detail">'+cc+' issue'+(cc!==1?'s':'')+' remaining</div></div>'
+    + '<div class="qsub qsub-texterror" id="qsub-texterror-tile" style="cursor:pointer" title="Click to jump to flagged text"><div class="qsub-label">Text Errors</div>'
+    + '<div class="qsub-val" id="qdash-texterror">'+qs.texterror+'%</div>'
+    + '<div class="qsub-detail" id="qdash-texterror-detail">'+tec+' issue'+(tec!==1?'s':'')+' remaining</div></div>'
     + '</div></div>';
   ed.appendChild(qCard);
+  var terTile = document.getElementById('qsub-texterror-tile');
+  if(terTile) terTile.addEventListener('click', jumpToTextErrors);
 
   // AI Builder bar sits directly below the quality dashboard
   var aiBar = document.getElementById('aiBuilderBar');
@@ -4711,7 +4711,7 @@ function runAIBuilder(){
   window._aiBeforeByType={
     vocab:_pre.filter(function(e){return e.type==='vocab';}).length,
     grammar:_pre.filter(function(e){return e.type==='grammar';}).length,
-    context:_pre.filter(function(e){return e.type==='context';}).length
+    texterror:_pre.filter(function(e){return e.type==='texterror';}).length
   };
 
   fetch('/api/ai-builder',{
@@ -4834,15 +4834,15 @@ function applyAIUnits(units, placeholders, mode, topic){
     } else {
     // Report by what ACTUALLY changed, category by category
     var after = (R.quality_score && R.quality_score.errors) ? R.quality_score.errors : [];
-    var before = window._aiBeforeByType || {vocab:0,grammar:0,context:0};
+    var before = window._aiBeforeByType || {vocab:0,grammar:0,texterror:0};
     var afterBy = {
       vocab:   after.filter(function(e){return e.type==='vocab';}).length,
       grammar: after.filter(function(e){return e.type==='grammar';}).length,
-      context: after.filter(function(e){return e.type==='context';}).length
+      texterror: after.filter(function(e){return e.type==='texterror';}).length
     };
 
-    var LABEL={vocab:'vocabulary',grammar:'grammar &amp; punctuation',context:'context'};
-    var WORD ={vocab:'weak phrase',grammar:'grammar issue',context:'line'};
+    var LABEL={vocab:'vocabulary',grammar:'grammar &amp; punctuation',texterror:'spelling'};
+    var WORD ={vocab:'weak phrase',grammar:'grammar issue',texterror:'misspelling'};
     var total=0;
     ['grammar','vocab'].forEach(function(t){
       var n=before[t]-afterBy[t];
