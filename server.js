@@ -498,7 +498,7 @@ Return JSON with EXACTLY this shape:
       "employer": "<where this maps to in the resume: an employer name with dates e.g. 'Kaseya (2021-2024)', or 'Skills section', or 'Across roles', or 'Not in your CV' when status is absent>",
       "cv_text": "<the candidate's OWN wording from their resume that relates to this requirement, quoted as close to verbatim as possible. Empty string when status is absent.>",
       "cv_highlight": "<the EXACT substring of cv_text that does not line up with the JD's language, so it can be highlighted. Must appear verbatim inside cv_text. Empty string if status is have or absent.>",
-      "action": "<specific instruction. For partial: name the exact change, e.g. 'Change \\"managed the compliance programme\\" to \\"designed and owned the enterprise GRC strategy\\"'. For missing/absent: say what to add and where, and be explicit that they should only add it if genuinely true. For have: 'No action needed'.>",
+      "action": "<specific instruction. For partial: name the exact change, e.g. 'Change \\"managed the compliance programme\\" to \\"designed and owned the enterprise GRC strategy\\"'. For missing/absent: state plainly what is missing and where it would go if the candidate genuinely has it. For have: 'No action needed'. Never add career advice, interview coaching, or commentary on how to handle the gap (no 'disclose this in an interview', no 'consider developing this skill') — state the fact and stop.>",
       "importance": "critical" | "important" | "nice_to_have",
       "resolved_by": [<array of change ids from the "changes" array below that, if applied, would make this requirement fully evidenced. Empty array if no proposed change fixes it.>]
     }
@@ -536,7 +536,7 @@ skills_coverage status semantics — these drive a side-by-side comparison table
 - "missing": related or adjacent experience exists somewhere, but this specific requirement is not stated. cv_text = the closest related thing they DO have.
 - "absent": nothing anywhere in the resume relates to this at all — a genuinely new domain, tool or credential for this candidate. cv_text and cv_highlight must both be empty strings. Order these LAST in the array.
 
-Be honest about "absent" — do not stretch to find a connection that isn't there. A candidate is better served by knowing a real gap exists than by a false reassurance. Never suggest they claim something untrue; for absent items the action should be conditional ("if you have done X, add it under...") or should acknowledge the gap plainly.
+Be honest about "absent" — do not stretch to find a connection that isn't there. A candidate is better served by knowing a real gap exists than by a false reassurance. Never suggest they claim something untrue; for absent items the action should be conditional ("if you have done X, add it under...") or should state the gap as a plain fact. Do not add advice about interviews, disclosure, or how to develop the missing skill — that is outside what this field is for.
 
 SCORING LINKAGE — this drives a live "projected score" as the candidate selects changes, so accuracy matters:
 - "importance": how much this requirement matters to THIS job. "critical" = named as a must-have or central to the role; "important" = clearly expected; "nice_to_have" = desirable/preferred.
