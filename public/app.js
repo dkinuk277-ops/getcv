@@ -798,13 +798,6 @@ function insightsCard(){
   cInsights.innerHTML = `
     <h2 style="position:relative">
       <span class="titlec">Career Insights</span>
-      <span class="tools-right">
-        <label class="switch ${R.chart_prefs.timeline?'on':''}" title="Display in exported resume">
-          <input type="checkbox" data-pref="timeline" ${R.chart_prefs.timeline?'checked':''}>
-          <span class="slider"></span>
-        </label>
-        <button class="chev" type="button">▾</button>
-      </span>
     </h2>
     <div class="body">
       <button class="edit-btn" data-ed="tl" type="button" style="margin-bottom:8px">✎ Edit timeline</button>
@@ -818,13 +811,6 @@ function insightsCard(){
   cDomain.innerHTML = `
     <h2 style="position:relative">
       <span class="titlec">Domain Expertise</span>
-      <span class="tools-right">
-        <label class="switch ${R.chart_prefs.domains?'on':''}" title="Display in exported resume">
-          <input type="checkbox" data-pref="domains" ${R.chart_prefs.domains?'checked':''}>
-          <span class="slider"></span>
-        </label>
-        <button class="chev" type="button">▾</button>
-      </span>
     </h2>
     <div class="body">
       <button class="edit-btn" data-ed="dm" type="button" style="margin-bottom:8px">✎ Edit domains</button>
@@ -838,48 +824,11 @@ function insightsCard(){
   cTenure.innerHTML = `
     <h2 style="position:relative">
       <span class="titlec">Tenure Ranking</span>
-      <span class="tools-right">
-        <label class="switch ${R.chart_prefs.tenure?'on':''}" title="Display in exported resume">
-          <input type="checkbox" data-pref="tenure" ${R.chart_prefs.tenure?'checked':''}>
-          <span class="slider"></span>
-        </label>
-        <button class="chev" type="button">▾</button>
-      </span>
     </h2>
     <div class="body">
       <div data-holder="tr">${tr || '<div class="chart-empty">Add work experience with dates to see tenure ranking.</div>'}</div>
     </div>`;
   cards.push(cTenure);
-  
-  // Wire up toggle switches for all three cards
-  cards.forEach(card => {
-    card.querySelectorAll('.switch input').forEach(cb=>{
-      cb.addEventListener('change', ()=>{
-        R.chart_prefs[cb.dataset.pref] = cb.checked;
-        cb.closest('.switch').classList.toggle('on');
-        toast(cb.checked ? 'Chart will appear in your resume' : 'Chart removed from your resume (still visible here)');
-        renderLivePreview();
-      });
-    });
-  });
-  
-  // Wire up chevron collapse buttons for all three cards
-  cards.forEach(card => {
-    const chevBtn = card.querySelector('.chev');
-    if(chevBtn) {
-      chevBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        card.classList.toggle('collapsed');
-      });
-    }
-    // Title bar click to collapse (except button clicks)
-    const h2 = card.querySelector('h2');
-    if(h2) {
-      h2.addEventListener('click', e => {
-        if(!e.target.closest('.chev, .switch')) card.classList.toggle('collapsed');
-      });
-    }
-  });
   
   // ----- Editor wiring -----
   const editors = {
@@ -1598,6 +1547,12 @@ function buildEditor(){
 
   // ---- restructure every section header into: [left tools][centred title][right tools] ----
   const TOGGLABLE = new Set(['summary','skills','certifications','languages','projects','accomplishments','courses','experience','education']);
+  // Career Insights, Domain Expertise and Tenure Ranking are toggled through
+  // R.chart_prefs (different keys than their section id) rather than
+  // R.section_prefs like every other section — this map lets the shared
+  // header builder below treat them the same way without a separate
+  // duplicate switch/chevron implementation living in insightsCard().
+  const CHART_PREF_KEY = {insights:'timeline', domain:'domains', tenure:'tenure'};
   const order = R.section_order || [];
   const groupOf = k => CRED_KEYS.includes(k) ? 'cred' : 'body';
   const groupKeys = k => order.filter(x => groupOf(x) === groupOf(k));
@@ -1624,6 +1579,7 @@ function buildEditor(){
 
     // RIGHT: In-resume switch + chevron
     const right = el('span',{class:'sec-tools-right'});
+    const chartPrefKey = CHART_PREF_KEY[key];
     if(!pinned && TOGGLABLE.has(key)){
       const sw = el('label',{class:'switch sec-switch',title:'Show or hide this section in your exported resume'});
       sw.innerHTML = `<input type="checkbox" data-sec="${key}" ${R.section_prefs[key]!==false?'checked':''}><span class="slider"></span><span class="sw-lbl">In resume</span>`;
@@ -1631,6 +1587,15 @@ function buildEditor(){
       sw.querySelector('input').addEventListener('change', e=>{
         R.section_prefs[key] = e.target.checked;
         toast(e.target.checked ? 'Section will appear in your resume' : 'Section hidden from your resume (still editable here)');
+        renderLivePreview();
+      });
+    } else if(!pinned && chartPrefKey){
+      const sw = el('label',{class:'switch sec-switch',title:'Show or hide this chart in your exported resume'});
+      sw.innerHTML = `<input type="checkbox" data-chart="${chartPrefKey}" ${R.chart_prefs[chartPrefKey]?'checked':''}><span class="slider"></span><span class="sw-lbl">In resume</span>`;
+      right.appendChild(sw);
+      sw.querySelector('input').addEventListener('change', e=>{
+        R.chart_prefs[chartPrefKey] = e.target.checked;
+        toast(e.target.checked ? 'Chart will appear in your resume' : 'Chart removed from your resume (still visible here)');
         renderLivePreview();
       });
     }
