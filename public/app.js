@@ -3168,16 +3168,10 @@ function showView(id){
   // entirely on the landing view (see the body:has(#view-landing.on) rule).
   const foot = document.querySelector('.app-footer');
   if(foot && foot.parentElement !== document.body) document.body.appendChild(foot);
-  // The rail-bottom chip only exists inside the Pro/Fresher builders. Everywhere
-  // else (home, account, landing) the account control is back in the header,
-  // same as before this change.
-  const hasRail = (id==='pro' || id==='fresher');
-  if(currentUser && hasRail) refreshUserChips();
-  // Set the header's visibility AFTER refreshUserChips(), which unconditionally
-  // shows it — otherwise a rail view's "hide the header" would be immediately
-  // undone by that call.
+  // The header avatar is the single account control now, shown on every
+  // view whenever someone's signed in.
   const hdr = $('#hdrRight');
-  if(hdr) hdr.style.display = (currentUser && !hasRail) ? 'flex' : 'none';
+  if(hdr) hdr.style.display = currentUser ? 'flex' : 'none';
   closeUserMenu();
   window.scrollTo({top:0});
 }
@@ -3265,10 +3259,7 @@ function refreshUserChips(){
   const display = currentUser.name || currentUser.email;
   const initial = (display[0] || '?').toUpperCase();
   const hAvatar = $('#hdrAvatar'); if(hAvatar) hAvatar.textContent = initial;
-  const hTxt = $('#hdrUserText'); if(hTxt) hTxt.textContent = display;
   $('#hdrRight').style.display = 'flex';
-  document.querySelectorAll('[data-avatar]').forEach(el => el.textContent = initial);
-  document.querySelectorAll('[data-username]').forEach(el => el.textContent = display);
   const umA = $('#umAvatar'); if(umA) umA.textContent = initial;
   const umN = $('#umName'); if(umN) umN.textContent = display;
   const umE = $('#umEmail'); if(umE) umE.textContent = currentUser.email || '';
@@ -3281,7 +3272,6 @@ $('#liPw').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
 $('#btnSignup').addEventListener('click', doSignup);
 $('#goSignup').addEventListener('click', ()=> showView('signup'));
 $('#goLogin').addEventListener('click', ()=> showView('login'));
-$('#btnLogout').addEventListener('click', doLogout);
 $('#tilePro').addEventListener('click', ()=> enterModule('pro'));
 $('#tileFresher').addEventListener('click', ()=> enterModule('fresher'));
 document.querySelectorAll('.js-home').forEach(b => b.addEventListener('click', goHome));
@@ -3448,8 +3438,8 @@ async function openAccount(){
   }
 }
 
-// Clicking the header user pill opens the account view
-$('#hdrUser').addEventListener('click', openAccount);
+// Clicking the header avatar opens the account popover in place.
+$('#hdrUser').addEventListener('click', (e)=>{ e.stopPropagation(); toggleUserMenu($('#hdrUser')); });
 
 // ============================================================
 // Rail-bottom account popover — opens in place next to whichever chip
@@ -3474,19 +3464,25 @@ function toggleUserMenu(chip){
 
   refreshUserChips();
   const r = chip.getBoundingClientRect();
-  // Chip sits at the bottom of the rail, so the menu opens upward with its
-  // bottom edge pinned just above the chip — never off the top of the screen.
-  m.style.width = Math.max(220, r.width) + 'px';
-  m.style.left = r.left + 'px';
-  m.style.bottom = (window.innerHeight - r.top + 8) + 'px';
-  m.style.top = 'auto';
+  const openDown = r.top < window.innerHeight / 2;
+  m.style.width = '220px';
+  if(openDown){
+    // Header avatar sits top-right — open below it, right edge aligned to
+    // the chip's right edge so the menu never runs off the side of the page.
+    m.style.top = (r.bottom + 8) + 'px';
+    m.style.bottom = 'auto';
+    m.style.right = (window.innerWidth - r.right) + 'px';
+    m.style.left = 'auto';
+  } else {
+    m.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+    m.style.top = 'auto';
+    m.style.left = r.left + 'px';
+    m.style.right = 'auto';
+  }
   m.classList.add('open');
   chip.classList.add('open');
   requestAnimationFrame(()=> m.classList.add('in'));
 }
-
-document.querySelectorAll('.js-railuser').forEach(chip =>
-  chip.addEventListener('click', (e)=>{ e.stopPropagation(); toggleUserMenu(chip); }));
 
 document.addEventListener('click', (e)=>{
   const m = $('#userMenu');
