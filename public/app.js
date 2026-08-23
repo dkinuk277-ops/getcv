@@ -4901,10 +4901,82 @@ function hideAIBuilder(){
   if(bar) bar.classList.add('hidden');
 }
 
+// Enter in the box runs the command. Previously only the Run button worked,
+// so hitting Enter looked like the bar had ignored the request entirely.
+document.addEventListener('DOMContentLoaded', function(){
+  var inp=document.getElementById('aiBuilderInput');
+  if(!inp) return;
+  inp.addEventListener('keydown', function(e){
+    if(e.key==='Enter'){
+      e.preventDefault();
+      var b=document.getElementById('aiBuilderBtn');
+      if(!b || !b.disabled) runAIBuilder();
+    }
+  });
+});
+
 function setAICommand(cmd){
   document.getElementById('aiBuilderInput').value = cmd;
   document.getElementById('aiBuilderInput').focus();
 }
+
+// Reset the progress card back to a resting state. Every no-op and error path
+// must call this — previously they left the bar sitting at 4% with the card
+// open, which read as "frozen" even though the request had already finished.
+function resetAIProgress(){
+  var sp=document.getElementById('aiProgSpinner'); if(sp) sp.style.display='none';
+  var fill=document.getElementById('aiProgFill'); if(fill) fill.style.width='0%';
+  var btn=document.getElementById('aiBuilderBtn');
+  if(btn){ btn.disabled=false; btn.textContent='Run'; }
+  if(window._aiTicker){ clearInterval(window._aiTicker); window._aiTicker=null; }
+}
+
+// Show a plain message in the progress card without any bar or spinner.
+function aiProgressMessage(html){
+  resetAIProgress();
+  var prog=document.getElementById('aiBuilderProgress');
+  if(prog){ prog.classList.remove('hidden'); prog.style.display='block'; }
+  var t=document.getElementById('aiProgTitle'); if(t) t.innerHTML=html;
+  var log=document.getElementById('aiProgSections');
+  if(log){ log.className=''; log.innerHTML=''; }
+}
+
+// The fix flow makes one Claude call per section server-side, so a multi-section
+// run legitimately takes 30-60s. Without this the bar sat at 4% the whole time
+// with nothing moving, which is indistinguishable from a hang. Creep the bar
+// toward 85% and name what's likely being worked on so it's visibly alive.
+function startAIProgressTicker(unitLabels){
+  var fill=document.getElementById('aiProgFill');
+  var title=document.getElementById('aiProgTitle');
+  var pct=4, i=0;
+  if(window._aiTicker) clearInterval(window._aiTicker);
+  window._aiTicker=setInterval(function(){
+    pct += pct<50 ? 1.6 : pct<75 ? 0.7 : 0.2;
+    if(pct>85) pct=85;
+    if(fill) fill.style.width=pct.toFixed(1)+'%';
+    if(title && unitLabels && unitLabels.length){
+      var n=Math.min(unitLabels.length-1, Math.floor(pct/(86/unitLabels.length)));
+      if(n!==i){ i=n; }
+      title.textContent='Rewriting '+unitLabels[i]+'\u2026 ('+(i+1)+' of '+unitLabels.length+')';
+    }
+  }, 400);
+}
+
+// Best guess at which sections the server will work on, purely so the ticker
+// can name them. Mirrors buildUnits() server-side; if it's wrong the bar still
+// moves, it just labels generically.
+function guessAIUnitLabels(){
+  var out=[];
+  if(R.summary && String(R.summary).trim()) out.push('Summary');
+  (R.experience||[]).forEach(function(e,i){
+    if(e && e.desc && String(e.desc).trim()) out.push(e.title || ('Job '+(i+1)));
+  });
+  if((R.skills||[]).length) out.push('Skills');
+  if((R.accomplishments||[]).length) out.push('Accomplishments');
+  return out.length?out:['your resume'];
+}
+
+var AI_BUILDER_TIMEOUT_MS = 120000;
 
 function runAIBuilder(){
   var inputEl=document.getElementById('aiBuilderInput');
@@ -4919,7 +4991,8 @@ function runAIBuilder(){
   document.getElementById('aiProgSpinner').style.display='';
   document.getElementById('aiProgTitle').textContent='Reading your resume\u2026';
   document.getElementById('aiProgFill').style.width='4%';
-  document.getElementById('aiProgSections').innerHTML='';
+  var logEl=document.getElementById('aiProgSections');
+  logEl.className=''; logEl.innerHTML='';
 
   // Snapshot issue counts by type, so the log reports only what actually changed
   var _pre=(analyzeQualityScore().errors||[]);
@@ -4930,42 +5003,83 @@ function runAIBuilder(){
     texterror:_pre.filter(function(e){return e.type==='texterror';}).length
   };
 
-  fetch('/api/ai-builder',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({command:input,resume:R})
-  })
+  startAIProgressTicker(guessAIUnitLabels());
+
+  // Hard timeout — without this a stalled server left the spinner running
+  // forever with no way for the user to tell it had died.
+  var ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  var timedOut=false;
+  var timer=setTimeout(function(){
+    timedOut=true;
+    if(ctrl) ctrl.abort();
+  }, AI_BUILDER_TIMEOUT_MS);
+
+  var opts={method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({command:input,resume:R})};
+  if(ctrl) opts.signal=ctrl.signal;
+
+  fetch('/api/ai-builder',opts)
   .then(function(r){return r.json();})
   .then(function(data){
+    clearTimeout(timer);
     if(!data.success) throw new Error(data.error||'Builder failed');
     if(data.mode==='add' || data.mode==='delete' || data.mode==='update'){
+      if(window._aiTicker){ clearInterval(window._aiTicker); window._aiTicker=null; }
       applyStructuralChange(data);
       return;
     }
     if(!data.units || !data.units.length){
-      document.getElementById('aiProgSpinner').style.display='none';
-      document.getElementById('aiProgTitle').textContent =
-        data.note==='no-fix-intent'
-          ? '\u2139 Try: "fix all issues", "fix grammar in summary", "write more about risk and data under experience"'
-          : data.note==='no-target-content'
-            ? '\u2139 That section is empty — add some content first.'
-            : data.note==='no-target-section'
-              ? '\u2139 Which section? Try "add a skill: Python" or "delete my last job".'
-              : data.note==='no-item-detected'
-                ? '\u2139 I couldn\u2019t tell what to add — try being more specific, e.g. "add skill: Kubernetes".'
-                : (data.note==='ambiguous-delete' || data.note==='ambiguous-update')
-                  ? '\u2139 Not sure which one you mean — try naming it, or say "last" / "first".'
-                  : '\u2139 Nothing to fix for that request.';
-      btn.disabled=false; btn.textContent='Run';
+      aiProgressMessage(aiNoteMessage(data, input));
       return;
     }
+    if(window._aiTicker){ clearInterval(window._aiTicker); window._aiTicker=null; }
     applyAIUnits(data.units, data.placeholders||0, data.mode, data.topic);
   })
   .catch(function(err){
+    clearTimeout(timer);
+    if(timedOut || (err && err.name==='AbortError')){
+      aiProgressMessage('<b style="color:#B45309">Took too long and was cancelled.</b><br>'
+        + '<span style="font-weight:400">Nothing on your resume was changed. Try one section at a time, e.g. "fix grammar in summary".</span>');
+      return;
+    }
     console.error('AI Builder error:',err);
-    document.getElementById('aiProgSpinner').style.display='none';
-    document.getElementById('aiProgTitle').textContent='\u2717 '+(err.message||'Something went wrong \u2014 try again');
-    btn.disabled=false; btn.textContent='Run';
+    aiProgressMessage('<b style="color:#B45309">Something went wrong \u2014 '+esc(err.message||'try again')+'</b><br>'
+      + '<span style="font-weight:400">Nothing on your resume was changed.</span>');
   });
+}
+
+// Turn a server "note" into a message that names what the user actually typed
+// and what to try instead, rather than the one-size-fits-all hint that used to
+// fire for every unrecognised command.
+function aiNoteMessage(data, input){
+  var q='\u201c'+esc(input)+'\u201d';
+  var ex='<span style="font-weight:400">Name a section and an action, e.g. '
+    + '<b>add skill: Kubernetes</b>, <b>delete my last job</b>, <b>fix grammar in summary</b>.</span>';
+  switch(data.note){
+    case 'no-fix-intent':
+      return '<b>Didn\u2019t understand '+q+'.</b><br>'+ex;
+    case 'no-action-verb':
+      return '<b>Found your '+esc(data.section||'section')+' section, but not what to do with it.</b><br>'
+        + '<span style="font-weight:400">Start with add, update, delete or fix \u2014 e.g. '
+        + '<b>update '+esc(data.section||'section')+': \u2026</b></span>';
+    case 'no-target-section':
+      return '<b>Which section did you mean?</b><br>'+ex;
+    case 'no-target-content':
+      return '<b>That section is empty.</b><br>'
+        + '<span style="font-weight:400">Add some content to it first, then ask me to change it.</span>';
+    case 'no-item-detected':
+      return '<b>Couldn\u2019t tell what to add from '+q+'.</b><br>'
+        + '<span style="font-weight:400">Be specific, e.g. <b>add skill: Kubernetes</b> or '
+        + '<b>add certification: ISO 42001 Lead Auditor, BSI, 2025</b>.</span>';
+    case 'ambiguous-delete':
+    case 'ambiguous-update':
+      var names=(data.candidates||[]).slice(0,6).map(function(c){return '<b>'+esc(c)+'</b>';}).join(', ');
+      return '<b>Not sure which one you mean.</b><br>'
+        + '<span style="font-weight:400">'+(names?('Name it \u2014 '+names+' \u2014 or '):'Try ')
+        + 'say <b>last</b> or <b>first</b>.</span>';
+    default:
+      return '<b>Nothing to change for '+q+'.</b><br>'+ex;
+  }
 }
 
 // Write one unit back into R, preserving the exact data shape
@@ -5060,25 +5174,22 @@ function applyAIUnits(units, placeholders, mode, topic){
     var LABEL={vocab:'vocabulary',grammar:'grammar &amp; punctuation',texterror:'spelling'};
     var WORD ={vocab:'weak phrase',grammar:'grammar issue',texterror:'misspelling'};
     var total=0;
-    ['grammar','vocab'].forEach(function(t){
+    // texterror was missing from this list, so spelling fixes were applied but
+    // never reported — a run that corrected only misspellings said "nothing
+    // needed changing".
+    ['grammar','vocab','texterror'].forEach(function(t){
       var n=before[t]-afterBy[t];
       if(n>0){ total+=n; logLine('Fixed <b>'+LABEL[t]+'</b> \u2014 '+n+' '+WORD[t]+(n>1?'s':'')+' corrected'); }
     });
-    var cFixed = before.context - afterBy.context;
-    if(cFixed>0){ total+=cFixed; logLine('Fixed <b>context</b> \u2014 '+cFixed+' line'+(cFixed>1?'s':'')+' now carry real metrics'); }
-    if(afterBy.context>0){
-      logLine('Reviewed <b>context</b> \u2014 '+afterBy.context+' line'+(afterBy.context>1?'s':'')
-        +' still need your real numbers', true);
-    }
+    // The old "context" check was removed from the quality score; its reporting
+    // lines here compared undefined against undefined (NaN) and could never
+    // fire, so they've gone with it.
     if(skipped>0) logLine(skipped+' section'+(skipped>1?'s were':' was')+' left unchanged');
-    if(total===0 && afterBy.context===0 && skipped===0) logLine('Nothing needed changing \u2014 your resume is already clean');
+    if(total===0 && skipped===0) logLine('Nothing needed changing \u2014 your resume is already clean');
 
     title.innerHTML = total>0
       ? '\u2713 Complete \u2014 '+total+' fix'+(total>1?'es':'')+' applied'
-        + (afterBy.context? ', '+afterBy.context+' line'+(afterBy.context>1?'s':'')+' awaiting your numbers' : '')
-      : (afterBy.context
-          ? '\u2713 Complete \u2014 text improved, '+afterBy.context+' line'+(afterBy.context>1?'s':'')+' awaiting your numbers'
-          : '\u2713 Complete');
+      : '\u2713 Complete';
 
     var note=document.getElementById('aiPlaceholderNote');
     if(note){
@@ -5088,6 +5199,7 @@ function applyAIUnits(units, placeholders, mode, topic){
     }
     }
 
+    if(window._aiTicker){ clearInterval(window._aiTicker); window._aiTicker=null; }
     setTimeout(function(){ document.getElementById('aiVerifyModal').classList.add('show'); }, 500);
     var btn=document.getElementById('aiBuilderBtn');
     btn.disabled=false; btn.textContent='Run';
