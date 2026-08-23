@@ -5209,6 +5209,28 @@ function applyAIUnits(units, placeholders, mode, topic){
 // Apply a structural add/delete/update returned by /api/ai-builder.
 // Unlike applyAIUnits (many text-fix units, animated one by one), this is a
 // single direct mutation to R — the section array itself changes shape.
+// Apply a structural add/delete/update returned by /api/ai-builder.
+// Unlike applyAIUnits (many text-fix units, animated one by one), this is a
+// single direct mutation to R — the section array itself changes shape.
+//
+// Everything reported to the user afterwards is read back OUT of R after the
+// mutation, never taken from the server's response object. The two can differ:
+// an add to a flat section skips duplicates, and the index an item lands at is
+// only known once it's actually in the array. Reporting the request instead of
+// the result is how "added to X" ends up pointing at the wrong entry.
+var _lastStructural = null;
+
+var SECTION_LABEL = {
+  skills:'Skills', certifications:'Certifications', languages:'Languages',
+  projects:'Projects', accomplishments:'Accomplishments', courses:'Courses',
+  experience:'Experience', education:'Education'
+};
+var FIELD_LABEL = {
+  name:'Name', issuer:'Issuer', year:'Year', provider:'Provider', desc:'Description',
+  degree:'Degree', institution:'Institution', grade:'Grade', title:'Job title',
+  company:'Company', location:'Location', start:'Start date', end:'End date', value:'Value'
+};
+
 function applyStructuralChange(data){
   var fill=document.getElementById('aiProgFill');
   var title=document.getElementById('aiProgTitle');
@@ -5227,63 +5249,214 @@ function applyStructuralChange(data){
   }
 
   setTimeout(function(){
-    var ok = false, summary = '';
     var sec = data.section;
+    if(!Array.isArray(R[sec])) R[sec] = [];
+
+    // Snapshot before touching anything, so Undo can restore exactly.
+    var snapshot = JSON.parse(JSON.stringify(R[sec]));
+    var result = { mode:data.mode, section:sec, snapshot:snapshot,
+                   command:(document.getElementById('aiBuilderInput')||{}).value||'',
+                   ok:false, indexes:[], skipped:[], fields:[], label:'' };
 
     if(data.mode === 'add'){
-      if(!Array.isArray(R[sec])) R[sec] = [];
       if(Array.isArray(data.items)){
-        var added = [];
+        // Flat section (skills/languages/accomplishments): several strings,
+        // duplicates skipped. Record where each one actually landed.
         data.items.forEach(function(it){
           var exists = R[sec].some(function(x){ return String(x).toLowerCase() === String(it).toLowerCase(); });
-          if(!exists){ R[sec].push(it); added.push(it); }
+          if(exists){ result.skipped.push(String(it)); return; }
+          R[sec].push(it);
+          result.indexes.push(R[sec].length - 1);
         });
-        ok = added.length > 0;
-        summary = ok
-          ? ('Added <b>'+esc(added.join(', '))+'</b> to '+esc(sec))
-          : ('Already had '+esc(data.items.join(', '))+' in '+esc(sec));
+        result.ok = result.indexes.length > 0;
+        result.label = result.indexes.map(function(i){ return String(R[sec][i]); }).join(', ');
       } else if(data.item){
         R[sec].push(data.item);
-        ok = true;
-        var addLabel = data.item.name || data.item.title || data.item.degree || 'entry';
-        summary = 'Added <b>'+esc(addLabel)+'</b> to '+esc(sec);
+        var at = R[sec].length - 1;
+        result.indexes.push(at);
+        result.ok = true;
+        // Read the written entry back rather than echoing data.item.
+        var written = R[sec][at];
+        Object.keys(written).forEach(function(k){
+          result.fields.push({ key:k, value:String(written[k]==null?'':written[k]) });
+        });
+        result.label = written.name || written.title || written.degree || 'entry';
       }
     } else if(data.mode === 'delete'){
-      if(Array.isArray(R[sec]) && data.index >= 0 && data.index < R[sec].length){
+      if(data.index >= 0 && data.index < R[sec].length){
+        var removed = R[sec][data.index];
+        result.label = FLAT_SECTION_SET.has(sec) ? String(removed)
+          : (removed.name || removed.title || removed.degree || 'entry');
+        result.removedAt = data.index;
         R[sec].splice(data.index, 1);
-        ok = true;
-        summary = 'Deleted <b>'+esc(data.label||'item')+'</b> from '+esc(sec);
+        result.ok = true;
       }
     } else if(data.mode === 'update'){
-      if(Array.isArray(R[sec]) && data.index >= 0 && data.index < R[sec].length){
-        if(data.field === 'value'){ R[sec][data.index] = data.value; }
-        else { R[sec][data.index][data.field] = data.value; }
-        ok = true;
-        summary = 'Updated <b>'+esc(data.label||'item')+'</b> \u2014 '+esc(data.field)+' set to \u201c'+esc(data.value)+'\u201d';
+      if(data.index >= 0 && data.index < R[sec].length){
+        var before, after;
+        if(data.field === 'value'){
+          before = String(R[sec][data.index]);
+          R[sec][data.index] = data.value;
+          after = String(R[sec][data.index]);
+        } else {
+          before = String(R[sec][data.index][data.field]==null?'':R[sec][data.index][data.field]);
+          R[sec][data.index][data.field] = data.value;
+          after = String(R[sec][data.index][data.field]);
+        }
+        result.indexes.push(data.index);
+        result.fields.push({ key:data.field, was:before, value:after });
+        var itNow = R[sec][data.index];
+        result.label = FLAT_SECTION_SET.has(sec) ? String(itNow)
+          : (itNow.name || itNow.title || itNow.degree || 'entry');
+        result.ok = true;
       }
     }
 
     fill.style.width='100%';
     document.getElementById('aiProgSpinner').style.display='none';
-    logLine(ok ? summary : 'Could not apply that change \u2014 try again with more detail');
-    title.innerHTML = ok ? '\u2713 Complete' : '\u2717 Nothing changed';
+    if(window._aiTicker){ clearInterval(window._aiTicker); window._aiTicker=null; }
+
+    logLine(result.ok
+      ? (VERB_PAST[data.mode]||'Changed')+' <b>'+esc(result.label||'entry')+'</b> in '+esc(SECTION_LABEL[sec]||sec)
+      : 'Could not apply that change \u2014 try again with more detail');
+    title.innerHTML = result.ok ? '\u2713 Complete' : '\u2717 Nothing changed';
 
     var noteEl=document.getElementById('aiPlaceholderNote');
-    if(noteEl) noteEl.innerHTML = 'This was applied directly \u2014 double-check the details before you export.';
-
-    if(ok){
-      var scrollY=window.scrollY;
-      R.quality_score = analyzeQualityScore();
-      buildEditor();
-      window.scrollTo(0,scrollY);
-      renderRail();
-      if(typeof schedulePreview==='function') schedulePreview();
-      setTimeout(function(){ document.getElementById('aiVerifyModal').classList.add('show'); }, 400);
-    }
+    if(noteEl) noteEl.innerHTML = 'Only the fields you actually stated were filled in. Anything shown as blank was not invented \u2014 add it yourself.';
 
     var btn=document.getElementById('aiBuilderBtn');
     btn.disabled=false; btn.textContent='Run';
+
+    if(!result.ok){ _lastStructural=null; return; }
+
+    _lastStructural = result;
+    var scrollY=window.scrollY;
+    R.quality_score = analyzeQualityScore();
+    buildEditor();
+    window.scrollTo(0,scrollY);
+    renderRail();
+    if(typeof schedulePreview==='function') schedulePreview();
+
+    // Show WHAT landed and WHERE first; the hallucination check follows once
+    // this closes, so the user reads the facts before being asked to vouch
+    // for them.
+    setTimeout(function(){ openInsertConfirm(result); }, 350);
   }, 400);
+}
+
+var FLAT_SECTION_SET = new Set(['skills','languages','accomplishments']);
+var VERB_PAST = { add:'Added', delete:'Deleted', update:'Updated' };
+
+function openInsertConfirm(res){
+  var sec = res.section, secLabel = SECTION_LABEL[sec] || sec;
+  var total = (R[sec]||[]).length;
+  var head = document.getElementById('insertConfirmHead');
+  var body = document.getElementById('insertConfirmBody');
+  if(!body) return;
+
+  document.getElementById('insertConfirmIcon').innerHTML =
+    res.mode==='delete' ? '\u2716' : '\u2713';
+  document.getElementById('insertConfirmTitle').textContent =
+    (VERB_PAST[res.mode]||'Changed')+' '+(res.mode==='delete'?'from ':res.mode==='update'?'in ':'to ')+secLabel;
+
+  // Position is stated as the real 1-based slot in the section as it now
+  // stands, so "entry 3 of 3" always matches what the editor shows.
+  var where='';
+  if(res.mode==='delete'){
+    where = 'Removed from position '+(res.removedAt+1)+' \u2014 '+total+' '+(total===1?'entry':'entries')+' left';
+  } else if(res.indexes.length===1){
+    where = 'Entry '+(res.indexes[0]+1)+' of '+total+' under '+secLabel;
+  } else if(res.indexes.length>1){
+    where = res.indexes.length+' entries added \u2014 now '+total+' under '+secLabel;
+  }
+  document.getElementById('insertConfirmWhere').textContent = where;
+  if(head) head.style.background = res.mode==='delete'
+    ? 'linear-gradient(135deg,#DC2626,#991B1B)' : 'linear-gradient(135deg,#0FA968,#0B8A55)';
+
+  var html='';
+  if(res.command){
+    html += '<div class="ic-asked">You asked: \u201c'+esc(res.command)+'\u201d</div>';
+  }
+
+  if(res.fields.length){
+    html += '<div class="ic-tbl">'
+      + res.fields.map(function(f){
+          var lbl = FIELD_LABEL[f.key] || f.key;
+          var cell;
+          if(f.was !== undefined && f.was !== f.value){
+            cell = '<div class="ic-v"><span class="was">'+esc(f.was||'(blank)')+'</span> &rarr; <b>'+esc(f.value)+'</b></div>';
+          } else if(!String(f.value).trim()){
+            cell = '<div class="ic-v blank">left blank \u2014 you didn\u2019t say</div>';
+          } else {
+            cell = '<div class="ic-v">'+esc(f.value)+'</div>';
+          }
+          return '<div class="ic-row"><div class="ic-k">'+esc(lbl)+'</div>'+cell+'</div>';
+        }).join('')
+      + '</div>';
+  } else if(res.mode==='delete'){
+    html += '<div class="ic-tbl"><div class="ic-row"><div class="ic-k">Removed</div>'
+      + '<div class="ic-v">'+esc(res.label||'entry')+'</div></div></div>';
+  } else if(res.indexes.length){
+    html += '<ul class="ic-list">'
+      + res.indexes.map(function(i){ return '<li>'+esc(String(R[sec][i]))+'</li>'; }).join('')
+      + '</ul>';
+  }
+
+  if(res.skipped && res.skipped.length){
+    html += '<div class="ic-skip">Already in '+esc(secLabel)+', so not added again: <b>'
+      + esc(res.skipped.join(', '))+'</b></div>';
+  }
+
+  if(res.mode!=='delete' && res.indexes.length){
+    html += '<span class="ic-jump" onclick="jumpToInserted()">Show me in the editor</span>';
+  }
+
+  body.innerHTML = html;
+  document.getElementById('insertConfirmModal').classList.add('show');
+}
+
+// Close the insert summary, then hand straight to the hallucination check.
+function closeInsertConfirm(){
+  document.getElementById('insertConfirmModal').classList.remove('show');
+  setTimeout(function(){
+    var v=document.getElementById('aiVerifyModal');
+    if(v) v.classList.add('show');
+  }, 220);
+}
+
+// Undo restores the section array exactly as it was before the mutation.
+// Skips the verify modal entirely — there's nothing left to vouch for.
+function undoStructuralChange(){
+  var res=_lastStructural;
+  document.getElementById('insertConfirmModal').classList.remove('show');
+  if(!res){ return; }
+  R[res.section] = res.snapshot;
+  _lastStructural = null;
+  var scrollY=window.scrollY;
+  R.quality_score = analyzeQualityScore();
+  buildEditor();
+  window.scrollTo(0,scrollY);
+  renderRail();
+  if(typeof schedulePreview==='function') schedulePreview();
+  if(typeof toast==='function') toast('Reverted \u2014 '+(SECTION_LABEL[res.section]||res.section)+' is back as it was', 3000);
+}
+
+// Scroll to the entry that was just added or changed.
+function jumpToInserted(){
+  var res=_lastStructural;
+  if(!res || !res.indexes.length) return;
+  document.getElementById('insertConfirmModal').classList.remove('show');
+  var sec=res.section, ix=res.indexes[0];
+  setTimeout(function(){
+    var target = document.querySelector('#sec-'+sec+' .entry[data-ix="'+ix+'"]')
+              || document.getElementById('sec-'+sec);
+    if(!target) return;
+    target.scrollIntoView({behavior:'smooth', block:'center'});
+    target.classList.remove('tl-row-flash');
+    void target.offsetWidth;
+    target.classList.add('tl-row-flash');
+    setTimeout(function(){ target.classList.remove('tl-row-flash'); }, 1600);
+  }, 200);
 }
 
 function dismissAIModal(){
