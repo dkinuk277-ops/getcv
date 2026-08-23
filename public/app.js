@@ -3168,6 +3168,17 @@ function showView(id){
   // entirely on the landing view (see the body:has(#view-landing.on) rule).
   const foot = document.querySelector('.app-footer');
   if(foot && foot.parentElement !== document.body) document.body.appendChild(foot);
+  // The rail-bottom chip only exists inside the Pro/Fresher builders. Everywhere
+  // else (home, account, landing) the account control is back in the header,
+  // same as before this change.
+  const hasRail = (id==='pro' || id==='fresher');
+  if(currentUser && hasRail) refreshUserChips();
+  // Set the header's visibility AFTER refreshUserChips(), which unconditionally
+  // shows it — otherwise a rail view's "hide the header" would be immediately
+  // undone by that call.
+  const hdr = $('#hdrRight');
+  if(hdr) hdr.style.display = (currentUser && !hasRail) ? 'flex' : 'none';
+  closeUserMenu();
   window.scrollTo({top:0});
 }
 
@@ -3240,13 +3251,27 @@ async function doLogout(){
 
 function setUser(user){
   currentUser = user;
-  const display = user.name || user.email;
-  const initial = (display[0] || '?').toUpperCase();
-  const avatar = $('#hdrAvatar'); if(avatar) avatar.textContent = initial;
-  const txt = $('#hdrUserText'); if(txt) txt.textContent = display;
-  $('#hdrRight').style.display = 'flex';
+  refreshUserChips();
   showView('home');
   loadSavedList();
+}
+
+// Fill in every place the signed-in identity is shown: the header pill (used
+// on views without a rail — home, account, landing) and the two rail-bottom
+// chips inside the Pro and Fresher builders. All three must show the same
+// name/initial, so this is the one place that writes them.
+function refreshUserChips(){
+  if(!currentUser) return;
+  const display = currentUser.name || currentUser.email;
+  const initial = (display[0] || '?').toUpperCase();
+  const hAvatar = $('#hdrAvatar'); if(hAvatar) hAvatar.textContent = initial;
+  const hTxt = $('#hdrUserText'); if(hTxt) hTxt.textContent = display;
+  $('#hdrRight').style.display = 'flex';
+  document.querySelectorAll('[data-avatar]').forEach(el => el.textContent = initial);
+  document.querySelectorAll('[data-username]').forEach(el => el.textContent = display);
+  const umA = $('#umAvatar'); if(umA) umA.textContent = initial;
+  const umN = $('#umName'); if(umN) umN.textContent = display;
+  const umE = $('#umEmail'); if(umE) umE.textContent = currentUser.email || '';
 }
 
 // ---- wiring ----
@@ -3425,6 +3450,63 @@ async function openAccount(){
 
 // Clicking the header user pill opens the account view
 $('#hdrUser').addEventListener('click', openAccount);
+
+// ============================================================
+// Rail-bottom account popover — opens in place next to whichever chip
+// (Pro builder or Fresher builder) was clicked, rather than navigating away
+// from the resume the user is mid-edit on. Only one #userMenu exists in the
+// DOM; it's repositioned to whichever chip triggered it.
+// ============================================================
+function closeUserMenu(){
+  const m = $('#userMenu');
+  if(!m) return;
+  m.classList.remove('in');
+  setTimeout(()=> m.classList.remove('open'), 120);
+  document.querySelectorAll('.rail-user.open').forEach(b => b.classList.remove('open'));
+}
+
+function toggleUserMenu(chip){
+  const m = $('#userMenu');
+  if(!m || !currentUser) return;
+  const wasOpen = m.classList.contains('open') && chip.classList.contains('open');
+  closeUserMenu();
+  if(wasOpen) return;
+
+  refreshUserChips();
+  const r = chip.getBoundingClientRect();
+  // Chip sits at the bottom of the rail, so the menu opens upward with its
+  // bottom edge pinned just above the chip — never off the top of the screen.
+  m.style.width = Math.max(220, r.width) + 'px';
+  m.style.left = r.left + 'px';
+  m.style.bottom = (window.innerHeight - r.top + 8) + 'px';
+  m.style.top = 'auto';
+  m.classList.add('open');
+  chip.classList.add('open');
+  requestAnimationFrame(()=> m.classList.add('in'));
+}
+
+document.querySelectorAll('.js-railuser').forEach(chip =>
+  chip.addEventListener('click', (e)=>{ e.stopPropagation(); toggleUserMenu(chip); }));
+
+document.addEventListener('click', (e)=>{
+  const m = $('#userMenu');
+  if(!m || !m.classList.contains('open')) return;
+  const t = e.target;
+  if(t && t.closest && (t.closest('#userMenu') || t.closest('.js-railuser'))) return;
+  closeUserMenu();
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeUserMenu(); });
+window.addEventListener('resize', closeUserMenu);
+
+$('#umAccount').addEventListener('click', ()=>{ closeUserMenu(); openAccount(); });
+$('#umHome').addEventListener('click', ()=>{ closeUserMenu(); goHome(); });
+$('#umSaved').addEventListener('click', ()=>{
+  closeUserMenu();
+  const btn = document.querySelector('#view-'+currentModule+' .js-savedopen');
+  if(btn) btn.click();
+});
+$('#umLogout').addEventListener('click', ()=>{ closeUserMenu(); doLogout(); });
+
 $('#acctBackHome').addEventListener('click', goHome);
 $('#btnOpenDelete').addEventListener('click', ()=>{
   $('#delConfirm').value = '';
