@@ -1499,34 +1499,69 @@ function refreshQualityDashboard(){
   var cd=document.getElementById('qdash-texterror-detail');if(cd)cd.textContent=cc+' issue'+(cc!==1?'s':'')+' remaining';
 }
 
-// Clicking a dashboard tile scrolls through EVERY section that has an
-// unfixed issue of that type, one at a time — not just the first one, with
-// the rest silently flashing wherever they happen to be on the page (which
-// is invisible if they're off-screen). A short stagger between each stop
-// gives the user a guided tour of every flagged spot, not just the closest.
-function jumpToIssueType(type, niceLabel){
+// Vocabulary, Grammar and Text Errors each open a popup listing every
+// unfixed issue of that type, grouped by section, each one a jump link —
+// the same interaction model Completeness already uses. This replaces the
+// old jumpToIssueType() timed tour, which scrolled the page from section to
+// section on a 1.6s stagger and gave the user no chance to read or act on
+// anything before the page moved again.
+function openIssuesModal(type, niceLabel){
   var qs=R.quality_score; if(!qs) return;
-  var secKeys=[]; var seen={};
-  qs.errors.filter(function(e){return e.type===type && !e.fixed;}).forEach(function(e){
-    if(!seen[e.secKey]){ seen[e.secKey]=true; secKeys.push(e.secKey); }
-  });
-  if(!secKeys.length){ toast('No '+(niceLabel||type)+' issues left \u2014 nothing to jump to.', 3000); return; }
-  if(secKeys.length > 1){
-    toast('Showing '+secKeys.length+' section'+(secKeys.length===1?'':'s')+' with '+(niceLabel||type)+' issues\u2026', 2500);
+  var list=qs.errors.filter(function(e){ return e.type===type && !e.fixed; });
+  var body=document.getElementById('issuesModalBody');
+  if(!body) return;
+  if(!list.length){
+    body.innerHTML='<h2 style="margin-bottom:6px">\u2713 No '+esc(niceLabel)+' issues</h2>'
+      +'<p style="font-size:13px;color:var(--ink-soft)">Nothing left to fix here.</p>';
+  } else {
+    var groups=[], byKey={};
+    list.forEach(function(e){
+      if(!byKey[e.secKey]){ byKey[e.secKey]={label:e.location||e.secKey, items:[]}; groups.push(byKey[e.secKey]); }
+      byKey[e.secKey].items.push(e);
+    });
+    var html='<h2 style="margin-bottom:12px">'+list.length+' '+esc(niceLabel)+' issue'+(list.length!==1?'s':'')+'</h2>';
+    groups.forEach(function(g){
+      html+='<div style="margin-bottom:14px">'
+        +'<div style="font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-soft);margin-bottom:5px">'+esc(g.label)+'</div>'
+        +'<ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.85">'
+        +g.items.map(function(e){
+            return '<li><a href="#" class="tl-gap-jump" data-errjump="'+e.id+'">'+esc(e.desc)+'</a></li>';
+          }).join('')
+        +'</ul></div>';
+    });
+    body.innerHTML=html;
+    body.querySelectorAll('[data-errjump]').forEach(function(a){
+      a.addEventListener('click', function(ev){
+        ev.preventDefault();
+        var im=document.getElementById('issuesModal');
+        if(im) im.classList.remove('open');
+        jumpToError(a.getAttribute('data-errjump'));
+      });
+    });
   }
-  secKeys.forEach(function(secKey, i){
-    setTimeout(function(){
-      var m=secKey.match(/^experience_(\d+)$/);
-      var target = m ? document.querySelector('#sec-experience .entry[data-ix="'+m[1]+'"]')
-                      : document.getElementById('sec-'+secKey);
-      if(!target) return;
-      target.scrollIntoView({behavior:'smooth', block:'center'});
-      target.classList.remove('tl-row-flash');
-      void target.offsetWidth;
-      target.classList.add('tl-row-flash');
-      setTimeout(function(){ target.classList.remove('tl-row-flash'); }, 1400);
-    }, i * 1600);
-  });
+  var m=document.getElementById('issuesModal');
+  if(m) m.classList.add('open');
+}
+
+// Scroll to one specific flagged error. Prefers the exact highlighted word
+// span in the editor, falling back to the section card or experience/education
+// entry that contains it when the highlight isn't rendered (e.g. tense errors,
+// which flag a whole description rather than one match).
+function jumpToError(errId){
+  var qs=R.quality_score; if(!qs) return;
+  var err=qs.errors.filter(function(e){ return e.id===errId; })[0];
+  if(!err) return;
+  var span=document.querySelector('[data-errid="'+errId+'"]');
+  var em=err.secKey.match(/^(experience|education)_(\d+)$/);
+  var sec=em ? document.querySelector('#sec-'+em[1]+' .entry[data-ix="'+em[2]+'"]')
+             : document.getElementById('sec-'+err.secKey);
+  var target=span||sec;
+  if(!target) return;
+  target.scrollIntoView({behavior:'smooth', block:'center'});
+  target.classList.remove('tl-row-flash');
+  void target.offsetWidth;
+  target.classList.add('tl-row-flash');
+  setTimeout(function(){ target.classList.remove('tl-row-flash'); }, 1400);
 }
 
 // Structure is a template-level fix, not a field-level one — there's nothing
@@ -1668,11 +1703,11 @@ function buildEditor(){
     + '</div></div>';
   ed.appendChild(qCard);
   var vocabTile = document.getElementById('qsub-vocab-tile');
-  if(vocabTile) vocabTile.addEventListener('click', function(){ jumpToIssueType('vocab','vocabulary'); });
+  if(vocabTile) vocabTile.addEventListener('click', function(){ openIssuesModal('vocab','vocabulary'); });
   var grammarTile = document.getElementById('qsub-grammar-tile');
-  if(grammarTile) grammarTile.addEventListener('click', function(){ jumpToIssueType('grammar','grammar'); });
+  if(grammarTile) grammarTile.addEventListener('click', function(){ openIssuesModal('grammar','grammar'); });
   var terTile = document.getElementById('qsub-texterror-tile');
-  if(terTile) terTile.addEventListener('click', function(){ jumpToIssueType('texterror','text'); });
+  if(terTile) terTile.addEventListener('click', function(){ openIssuesModal('texterror','text'); });
   var structTile = document.getElementById('qsub-structure-tile');
   if(structTile) structTile.addEventListener('click', handleStructureClick);
   var compTile = document.getElementById('qsub-completeness-tile');
