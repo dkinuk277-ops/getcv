@@ -109,7 +109,51 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 @media(max-width:860px){.container{grid-template-columns:1fr}}
 
 /* ---------- Section rail (signature) ---------- */
-.rail{align-self:start}
+.rail{align-self:start;position:sticky;top:128px;display:flex;flex-direction:column;
+  min-height:calc(100vh - 168px);max-height:calc(100vh - 128px)}
+.rail>[data-rail], .rail>.rail-group{flex-shrink:0}
+
+/* ---------- Rail-bottom account chip (replaces the old header user pill
+   inside the builder, so the account menu lives where the rest of the
+   builder's navigation does, and it opens a popover in place instead of
+   navigating away from whatever the user is mid-edit on) ---------- */
+.rail-user{margin-top:auto;flex-shrink:0;display:flex;align-items:center;gap:9px;
+  padding:9px 10px;border-radius:12px;background:var(--card);border:1.5px solid var(--line);
+  cursor:pointer;font-family:inherit;text-align:left;width:100%;box-shadow:0 1px 2px rgba(26,32,40,.05);
+  transition:border-color .15s,box-shadow .15s}
+.rail-user:hover{border-color:var(--accent);box-shadow:0 2px 6px rgba(26,32,40,.1)}
+.rail-user.open{border-color:var(--accent)}
+.rail-user-avatar{width:28px;height:28px;border-radius:50%;background:#F2B63C;color:#4A3403;
+  font-weight:800;font-size:12.5px;display:inline-flex;align-items:center;justify-content:center;
+  flex-shrink:0;text-transform:uppercase}
+.rail-user-text{flex:1;min-width:0}
+.rail-user-name{display:block;font-size:12.5px;font-weight:700;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rail-user-chev{font-size:10px;color:var(--ink-soft);flex-shrink:0;transition:transform .15s}
+.rail-user.open .rail-user-chev{transform:rotate(180deg)}
+@media(max-width:860px){.rail-user{display:none}}
+
+.user-menu{position:fixed;z-index:400;width:220px;background:#fff;border:1px solid var(--line);
+  border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px;display:none;
+  opacity:0;transform:translateY(6px);transition:opacity .12s,transform .12s}
+.user-menu.open{display:block}
+.user-menu.in{opacity:1;transform:translateY(0)}
+.user-menu-head{display:flex;align-items:center;gap:10px;padding:10px 10px 11px;
+  border-bottom:1px solid var(--line);margin-bottom:6px}
+.user-menu-avatar{width:34px;height:34px;border-radius:50%;background:#F2B63C;color:#4A3403;
+  font-weight:800;font-size:14px;display:inline-flex;align-items:center;justify-content:center;
+  flex-shrink:0;text-transform:uppercase}
+.user-menu-idbox{min-width:0}
+.user-menu-name{font-size:12.5px;font-weight:800;color:var(--ink);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.user-menu-email{font-size:10.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-menu-item{display:block;width:100%;text-align:left;background:none;border:none;
+  font-family:inherit;font-size:12px;font-weight:600;color:var(--ink);padding:9px 10px;
+  border-radius:9px;cursor:pointer}
+.user-menu-item:hover{background:var(--paper)}
+.user-menu-item.danger{color:#B91C1C}
+.user-menu-item.danger:hover{background:#FEF2F2}
+.user-menu-sep{height:1px;background:var(--line);margin:5px 4px}
 .rail h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);margin-bottom:10px;font-family:'Inter'}
 /* ---------- Section rail: button boxes ---------- */
 .rail-item{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;font-size:13px;position:relative;
@@ -2092,6 +2136,11 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <div data-rail></div>
         <button class="rail-folder js-tplopen" type="button">Templates</button>
         <button class="rail-folder js-savedopen" type="button">Saved Resumes</button>
+        <button class="rail-user js-railuser" type="button" title="Your account">
+          <span class="rail-user-avatar" data-avatar></span>
+          <span class="rail-user-text"><span class="rail-user-name" data-username></span></span>
+          <span class="rail-user-chev">&#9662;</span>
+        </button>
       </nav>
       <div class="rail-split" title="Drag to resize · double-click to reset"><span class="pv-grip"><i></i><i></i><i></i></span></div>
       <main>
@@ -2158,6 +2207,11 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
       <div data-rail></div>
       <button class="rail-folder js-tplopen" type="button">Templates</button>
       <button class="rail-folder js-savedopen" type="button">Saved Resumes</button>
+      <button class="rail-user js-railuser" type="button" title="Your account">
+        <span class="rail-user-avatar" data-avatar></span>
+        <span class="rail-user-text"><span class="rail-user-name" data-username></span></span>
+        <span class="rail-user-chev">&#9662;</span>
+      </button>
     </nav>
     <div class="rail-split" title="Drag to resize · double-click to reset"><span class="pv-grip"><i></i><i></i><i></i></span></div>
     <main>
@@ -2282,6 +2336,22 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
       <button class="btn-verify" onclick="confirmAIChanges()">✓ Looks good, continue</button>
     </div>
   </div>
+</div>
+
+<!-- ===== Account popover, opened from the rail-bottom user chip ===== -->
+<div class="user-menu" id="userMenu">
+  <div class="user-menu-head">
+    <span class="user-menu-avatar" id="umAvatar"></span>
+    <div class="user-menu-idbox">
+      <div class="user-menu-name" id="umName"></div>
+      <div class="user-menu-email" id="umEmail"></div>
+    </div>
+  </div>
+  <button class="user-menu-item" id="umAccount" type="button">&#128100;&nbsp; Account</button>
+  <button class="user-menu-item" id="umSaved" type="button">&#128193;&nbsp; Saved Resumes</button>
+  <button class="user-menu-item" id="umHome" type="button">&#127968;&nbsp; Home</button>
+  <div class="user-menu-sep"></div>
+  <button class="user-menu-item danger" id="umLogout" type="button">&#8617;&nbsp; Log out</button>
 </div>
 
 <div class="ai-done-toast" id="aiDoneToast"><span style="font-size:16px">✅</span> All changes are done!</div>
@@ -2553,7 +2623,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260823i"></script>
+<script src="app.js?v=20260823j"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
