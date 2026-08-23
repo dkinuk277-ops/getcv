@@ -1502,6 +1502,18 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 /* AI Builder — narrative progress log */
 .ai-prog-log{display:flex;flex-direction:column;gap:4px}
+.q-ans{display:flex;flex-direction:column;gap:6px;font-size:11px;color:#4B5563;line-height:1.6}
+.q-row{display:flex;align-items:center;gap:9px}
+.q-dot{width:14px;text-align:center;font-weight:900;flex-shrink:0}
+.q-dot.ok{color:#0FA968}
+.q-dot.bad{color:#B45309}
+.q-name{flex:1;color:var(--ink);font-weight:700}
+.q-detail{color:var(--ink-soft)}
+.q-act{color:#0FA968;font-weight:800;text-decoration:underline;cursor:pointer;white-space:nowrap}
+.q-act:hover{color:#0B8A55}
+.q-act-sp{min-width:44px}
+.q-acts{display:flex;gap:14px;margin-top:8px;padding-top:9px;border-top:1px solid #F3F4F6}
+.q-caveat{font-size:9.5px;color:#9CA3AF;margin-top:9px;line-height:1.5}
 .ai-pl{font-size:10.5px;color:var(--ink-soft);display:flex;align-items:flex-start;gap:6px;
   opacity:0;transform:translateY(-3px);transition:all .3s}
 .ai-pl.in{opacity:1;transform:none}
@@ -2203,7 +2215,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
       <div style="font-size:10px;font-weight:800;color:#0B4A31;text-transform:uppercase;letter-spacing:.12em;text-align:center;margin-bottom:8px">✦ Ask AI Builder</div>
       <div style="display:flex;gap:0;background:#fff;border:2px solid #0FA968;border-radius:14px;box-shadow:0 3px 14px rgba(11,74,49,.14);overflow:hidden">
         <span style="padding:0 12px 0 16px;font-size:16px;color:#0FA968">✦</span>
-        <input id="aiBuilderInput" type="text" placeholder="Tell me what to change — add, delete, update, fix, replace anything…" style="flex:1;border:none;outline:none;padding:12px 4px;font-size:12.5px;font-family:inherit;color:#12233F;background:transparent">
+        <input id="aiBuilderInput" type="text" placeholder="Ask a question or tell me what to change — &quot;any grammar issues?&quot;, &quot;add skill: Kubernetes&quot;…" style="flex:1;border:none;outline:none;padding:12px 4px;font-size:12.5px;font-family:inherit;color:#12233F;background:transparent">
         <button id="aiBuilderBtn" style="background:linear-gradient(135deg,#0FA968,#0B8A55);color:#fff;border:none;padding:12px 22px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit" onclick="runAIBuilder()">Run</button>
       </div>
       <!-- Progress -->
@@ -2541,7 +2553,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260823h"></script>
+<script src="app.js?v=20260823i"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
