@@ -892,9 +892,36 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
     };
     const PRIMARY_FIELD = { certifications: 'name', courses: 'name', projects: 'name', education: 'degree', experience: 'title' };
 
+    // Typo-tolerant section detection. Plain substring matching missed common
+    // misspellings ("ceritification", "experiance"), which silently fell through
+    // to the fix flow and returned the generic no-fix-intent hint. Now each word
+    // in the command is compared to each keyword by prefix and by edit distance,
+    // so a one- or two-character slip still resolves to the right section.
+    function editDistance(a, b) {
+      if (Math.abs(a.length - b.length) > 2) return 99;
+      const prev = Array(b.length + 1).fill(0).map((_, i) => i);
+      for (let i = 1; i <= a.length; i++) {
+        let diag = prev[0]; prev[0] = i;
+        for (let j = 1; j <= b.length; j++) {
+          const tmp = prev[j];
+          prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+          diag = tmp;
+        }
+      }
+      return prev[b.length];
+    }
+    function fuzzyHas(words, kw) {
+      const tol = kw.length <= 4 ? 0 : kw.length <= 7 ? 1 : 2;
+      return words.some(w => {
+        if (w === kw || w.startsWith(kw)) return true;
+        if (Math.abs(w.length - kw.length) > tol) return false;
+        return editDistance(w, kw) <= tol;
+      });
+    }
     function detectListSection(text) {
+      const words = text.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
       for (const [sec, kws] of Object.entries(SECTION_KEYWORDS)) {
-        if (kws.some(k => text.includes(k))) return sec;
+        if (kws.some(k => text.includes(k) || fuzzyHas(words, k))) return sec;
       }
       return null;
     }
@@ -995,7 +1022,15 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
     const wantG  = all || /grammar|spell|punctuat|tense|full stop|typo/.test(cmd);
     const wantC  = all || /context|metric|number|measurab|impact/.test(cmd);
     if (!wantV && !wantG && !wantC) {
-      return res.json({ success: true, units: [], note: 'no-fix-intent' });
+      // Be specific about WHY nothing happened rather than always returning the
+      // same generic hint: the user needs to know which half of the instruction
+      // (the section, or the action) failed to land.
+      if (structSection) {
+        return res.json({ success: true, units: [], note: 'no-action-verb', section: structSection, command: rawCmd });
+      }
+      const anyVerb = isDelete || isAdd || isUpdate;
+      return res.json({ success: true, units: [],
+        note: anyVerb ? 'no-target-section' : 'no-fix-intent', command: rawCmd });
     }
 
     const secs = targetSections();
@@ -1014,8 +1049,17 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
       'Return ONLY the corrected text. No preamble, no commentary, no bullet characters that were not already there.'
     ];
 
-    const out = [];
-    for (const u of units) {
+    // Run units 3-at-a-time instead of strictly serially. Six sections used to
+    // mean six sequential Claude calls (~90s of a motionless progress bar);
+    // a small concurrency cap keeps that well under a browser's patience
+    // without hammering the rate limiter.
+    const out = new Array(units.length);
+    let cursor = 0;
+    async function worker() {
+      while (true) {
+        const myIdx = cursor++;
+        if (myIdx >= units.length) return;
+        const u = units[myIdx];
       const prompt =
         'You are correcting one section of a resume.\n\nDO THIS:\n' +
         asks.map(a => '- ' + a).join('\n') +
@@ -1027,7 +1071,7 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
         fixed = (await claudeText(prompt, 1200) || '').trim();
       } catch (e) {
         console.error('ai-builder unit failed:', u.section, e.message);
-        out.push({ ...u, fixed: u.text, unchanged: true, error: 'AI call failed' });
+        out[myIdx] = { ...u, fixed: u.text, unchanged: true, error: 'AI call failed' };
         continue;
       }
 
@@ -1036,11 +1080,13 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
       const inLines  = u.text.split('\n').filter(l => l.trim()).length;
       const outLines = fixed.split('\n').filter(l => l.trim()).length;
       if (!fixed || outLines < Math.ceil(inLines / 2)) {
-        out.push({ ...u, fixed: u.text, unchanged: true, error: 'rejected unsafe rewrite' });
+        out[myIdx] = { ...u, fixed: u.text, unchanged: true, error: 'rejected unsafe rewrite' };
       } else {
-        out.push({ ...u, fixed, unchanged: fixed === u.text });
+        out[myIdx] = { ...u, fixed, unchanged: fixed === u.text };
+      }
       }
     }
+    await Promise.all([worker(), worker(), worker()]);
 
     const placeholders = out.reduce((n, u) => n + ((u.fixed.match(/\[[A-Z]\]/g) || []).length), 0);
     res.json({ success: true, units: out, placeholders });
