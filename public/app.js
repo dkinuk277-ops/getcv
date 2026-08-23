@@ -1478,7 +1478,7 @@ function refreshQualityDashboard(){
     var tile=document.getElementById(tileId);
     if(tile){
       tile.classList.remove('qsub-good','qsub-warn','qsub-bad');
-      tile.classList.add(score>=85?'qsub-good':score>=55?'qsub-warn':'qsub-bad');
+      tile.classList.add(score>=100?'qsub-good':score>=50?'qsub-warn':'qsub-bad');
     }
   }
   setTile('qsub-vocab-tile','qdash-vocab',qs.vocabulary);
@@ -1633,7 +1633,7 @@ function buildEditor(){
   // a 100% is green whether it's Vocabulary or Completeness, a middling
   // score is amber, a poor one is red. Keeps the whole row visually honest
   // and consistent instead of some tiles being colored and others plain.
-  function qsevClass(score){ return score>=85 ? 'qsub-good' : score>=55 ? 'qsub-warn' : 'qsub-bad'; }
+  function qsevClass(score){ return score>=100 ? 'qsub-good' : score>=50 ? 'qsub-warn' : 'qsub-bad'; }
   const qCard = el('div', {class: 'card quality-card', id: 'sec-quality'});
   qCard.innerHTML = '<div class="qdash-row">'
     + '<div class="qdash-score-wrap">'
