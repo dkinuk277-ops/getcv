@@ -592,16 +592,22 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .qdash-score{font-size:20px;font-weight:900;line-height:1.1;transition:all .3s}
 .qdash-label{font-size:9px;font-weight:600;transition:color .3s}
 .qdash-subs{display:flex;gap:6px;flex:1;margin-left:auto}
-.qsub{flex:1;border-radius:6px;padding:5px 6px;text-align:center;border:1px solid}
-.qsub-label{font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:1px}
-.qsub-val{font-size:14px;font-weight:900;transition:all .3s}
-.qsub-detail{font-size:7.5px;margin-top:1px}
-.qsub-vocab{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
-.qsub-vocab .qsub-val{color:#10B981}
-.qsub-grammar{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
-.qsub-grammar .qsub-val{color:#F59E0B}
-.qsub-context{background:#EEF2FF;border-color:#C7D2FE;color:#3730A3}
-.qsub-context .qsub-val{color:#6366F1}
+.qsub{flex:1;border-radius:8px;padding:5px 6px;text-align:center;border:1px solid;position:relative;overflow:hidden;
+  cursor:pointer;transition:transform .18s ease,box-shadow .18s ease}
+.qsub::before{content:"";position:absolute;top:0;left:0;right:0;height:50%;
+  background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,0));pointer-events:none}
+.qsub-label{font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:1px;position:relative}
+.qsub-val{font-size:14px;font-weight:900;transition:all .3s;position:relative}
+.qsub-detail{font-size:7.5px;margin-top:1px;position:relative}
+.qsub-good{background:#F0FDF4;border-color:#BBF7D0;color:#166534}
+.qsub-good .qsub-val{color:#10B981}
+.qsub-good:hover{transform:translateY(-2px);box-shadow:0 5px 14px rgba(16,185,129,.28),0 0 0 1px rgba(16,185,129,.2)}
+.qsub-warn{background:#FFFBEB;border-color:#FDE68A;color:#92400E}
+.qsub-warn .qsub-val{color:#F59E0B}
+.qsub-warn:hover{transform:translateY(-2px);box-shadow:0 5px 14px rgba(245,158,11,.28),0 0 0 1px rgba(245,158,11,.2)}
+.qsub-bad{background:#FEF2F2;border-color:#FCA5A5;color:#991B1B}
+.qsub-bad .qsub-val{color:#EF4444}
+.qsub-bad:hover{transform:translateY(-2px);box-shadow:0 5px 14px rgba(239,68,68,.28),0 0 0 1px rgba(239,68,68,.2)}
 @media(max-width:700px){.qdash-row{flex-direction:column;align-items:stretch}
   .qdash-score-wrap{justify-content:center}.qdash-subs{flex-direction:column}}
 
@@ -2500,7 +2506,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260823b"></script>
+<script src="app.js?v=20260823c"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
