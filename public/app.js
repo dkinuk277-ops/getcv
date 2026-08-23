@@ -1473,11 +1473,19 @@ function refreshQualityDashboard(){
   var le=document.getElementById('qdash-label');if(le){le.textContent=sev.label;le.style.color=sev.color;}
   var re=document.getElementById('qdash-ring');if(re)re.style.background='conic-gradient('+sev.color+' 0deg,'+sev.color+' '+deg+'deg,#E5E7EB '+deg+'deg)';
   var ri=document.getElementById('qdash-ring-inner');if(ri){ri.textContent=qs.overall+'%';ri.style.color=sev.color;}
-  var ve=document.getElementById('qdash-vocab');if(ve)ve.textContent=qs.vocabulary+'%';
-  var ge=document.getElementById('qdash-grammar');if(ge)ge.textContent=qs.grammar+'%';
-  var ce=document.getElementById('qdash-texterror');if(ce)ce.textContent=qs.texterror+'%';
-  var ste=document.getElementById('qdash-structure');if(ste)ste.textContent=qs.structure+'%';
-  var coe=document.getElementById('qdash-completeness');if(coe)coe.textContent=qs.completeness+'%';
+  function setTile(tileId, valId, score){
+    var v=document.getElementById(valId); if(v) v.textContent=score+'%';
+    var tile=document.getElementById(tileId);
+    if(tile){
+      tile.classList.remove('qsub-good','qsub-warn','qsub-bad');
+      tile.classList.add(score>=85?'qsub-good':score>=55?'qsub-warn':'qsub-bad');
+    }
+  }
+  setTile('qsub-vocab-tile','qdash-vocab',qs.vocabulary);
+  setTile('qsub-grammar-tile','qdash-grammar',qs.grammar);
+  setTile('qsub-texterror-tile','qdash-texterror',qs.texterror);
+  setTile('qsub-structure-tile','qdash-structure',qs.structure);
+  setTile('qsub-completeness-tile','qdash-completeness',qs.completeness);
   var std=document.getElementById('qdash-structure-detail');
   if(std) std.textContent = qs.structureInfo.risky ? '1 layout issue' : 'Layout is safe';
   var cod=document.getElementById('qdash-completeness-detail');
@@ -1495,13 +1503,13 @@ function refreshQualityDashboard(){
 // that currently has an unfixed misspelling — fixing each one (by typing the
 // correction) removes it from this list and raises the tile's score
 // automatically via the same reward mechanism every other check already uses.
-function jumpToTextErrors(){
+function jumpToIssueType(type, niceLabel){
   var qs=R.quality_score; if(!qs) return;
   var secKeys=[]; var seen={};
-  qs.errors.filter(function(e){return e.type==='texterror' && !e.fixed;}).forEach(function(e){
+  qs.errors.filter(function(e){return e.type===type && !e.fixed;}).forEach(function(e){
     if(!seen[e.secKey]){ seen[e.secKey]=true; secKeys.push(e.secKey); }
   });
-  if(!secKeys.length) return;
+  if(!secKeys.length){ toast('No '+(niceLabel||type)+' issues left \u2014 nothing to jump to.', 3000); return; }
   var first=true;
   secKeys.forEach(function(secKey){
     var m=secKey.match(/^experience_(\d+)$/);
@@ -1621,6 +1629,11 @@ function buildEditor(){
   const tec = unfixed.filter(function(e){return e.type==='texterror';}).length;
   const structRisky = qs.structureInfo.risky;
   const missingCount = (qs.completenessInfo.missing||[]).length;
+  // Every tile is colored by its OWN score, not a fixed per-metric color —
+  // a 100% is green whether it's Vocabulary or Completeness, a middling
+  // score is amber, a poor one is red. Keeps the whole row visually honest
+  // and consistent instead of some tiles being colored and others plain.
+  function qsevClass(score){ return score>=85 ? 'qsub-good' : score>=55 ? 'qsub-warn' : 'qsub-bad'; }
   const qCard = el('div', {class: 'card quality-card', id: 'sec-quality'});
   qCard.innerHTML = '<div class="qdash-row">'
     + '<div class="qdash-score-wrap">'
@@ -1632,25 +1645,29 @@ function buildEditor(){
     + '<div class="qdash-label" id="qdash-label" style="color:'+severity.color+'">'+severity.label+'</div>'
     + '</div></div>'
     + '<div class="qdash-subs">'
-    + '<div class="qsub qsub-vocab" title="Flags weak or vague phrasing \u2014 e.g. &quot;responsible for&quot; instead of &quot;managed&quot;."><div class="qsub-label">Vocabulary</div>'
+    + '<div class="qsub '+qsevClass(qs.vocabulary)+'" id="qsub-vocab-tile" title="Flags weak or vague phrasing \u2014 e.g. &quot;responsible for&quot; instead of &quot;managed&quot;. Click to jump to it."><div class="qsub-label">Vocabulary</div>'
     + '<div class="qsub-val" id="qdash-vocab">'+qs.vocabulary+'%</div>'
     + '<div class="qsub-detail" id="qdash-vocab-detail">'+vc+' issue'+(vc!==1?'s':'')+' remaining</div></div>'
-    + '<div class="qsub qsub-grammar" title="Checks for double spaces, missing punctuation, and inconsistent tense."><div class="qsub-label">Grammar</div>'
+    + '<div class="qsub '+qsevClass(qs.grammar)+'" id="qsub-grammar-tile" title="Checks for double spaces, missing punctuation, and inconsistent tense. Click to jump to it."><div class="qsub-label">Grammar</div>'
     + '<div class="qsub-val" id="qdash-grammar">'+qs.grammar+'%</div>'
     + '<div class="qsub-detail" id="qdash-grammar-detail">'+gc+' issue'+(gc!==1?'s':'')+' remaining</div></div>'
-    + '<div class="qsub qsub-texterror" id="qsub-texterror-tile" style="cursor:pointer" title="Flags common misspellings against a curated list of frequently misspelled words. Click to jump to them."><div class="qsub-label">Text Errors</div>'
+    + '<div class="qsub '+qsevClass(qs.texterror)+'" id="qsub-texterror-tile" title="Flags common misspellings against a curated list of frequently misspelled words. Click to jump to them."><div class="qsub-label">Text Errors</div>'
     + '<div class="qsub-val" id="qdash-texterror">'+qs.texterror+'%</div>'
     + '<div class="qsub-detail" id="qdash-texterror-detail">'+tec+' issue'+(tec!==1?'s':'')+' remaining</div></div>'
-    + '<div class="qsub qsub-structure" id="qsub-structure-tile" style="cursor:pointer" title="Checks whether your chosen template\u2019s layout can be read correctly by ATS screening software \u2014 the shape of the file, not what it says. Click to review."><div class="qsub-label">Structure</div>'
-    + '<div class="qsub-val" id="qdash-structure" style="'+(structRisky?'color:#B45309':'')+'">'+qs.structure+'%</div>'
+    + '<div class="qsub '+qsevClass(qs.structure)+'" id="qsub-structure-tile" title="Checks whether your chosen template\u2019s layout can be read correctly by ATS screening software \u2014 the shape of the file, not what it says. Click to review."><div class="qsub-label">Structure</div>'
+    + '<div class="qsub-val" id="qdash-structure">'+qs.structure+'%</div>'
     + '<div class="qsub-detail" id="qdash-structure-detail">'+(structRisky?'1 layout issue':'Layout is safe')+'</div></div>'
-    + '<div class="qsub qsub-completeness" id="qsub-completeness-tile" style="cursor:pointer" title="Checks whether key fields \u2014 dates, titles, contact details \u2014 are filled in, since screening software looks for these directly. Click to see what\u2019s missing."><div class="qsub-label">Completeness</div>'
-    + '<div class="qsub-val" id="qdash-completeness" style="'+(missingCount>0?'color:#B45309':'')+'">'+qs.completeness+'%</div>'
+    + '<div class="qsub '+qsevClass(qs.completeness)+'" id="qsub-completeness-tile" title="Checks whether key fields \u2014 dates, titles, contact details \u2014 are filled in, since screening software looks for these directly. Click to see what\u2019s missing."><div class="qsub-label">Completeness</div>'
+    + '<div class="qsub-val" id="qdash-completeness">'+qs.completeness+'%</div>'
     + '<div class="qsub-detail" id="qdash-completeness-detail">'+missingCount+' field'+(missingCount!==1?'s':'')+' missing</div></div>'
     + '</div></div>';
   ed.appendChild(qCard);
+  var vocabTile = document.getElementById('qsub-vocab-tile');
+  if(vocabTile) vocabTile.addEventListener('click', function(){ jumpToIssueType('vocab','vocabulary'); });
+  var grammarTile = document.getElementById('qsub-grammar-tile');
+  if(grammarTile) grammarTile.addEventListener('click', function(){ jumpToIssueType('grammar','grammar'); });
   var terTile = document.getElementById('qsub-texterror-tile');
-  if(terTile) terTile.addEventListener('click', jumpToTextErrors);
+  if(terTile) terTile.addEventListener('click', function(){ jumpToIssueType('texterror','text'); });
   var structTile = document.getElementById('qsub-structure-tile');
   if(structTile) structTile.addEventListener('click', handleStructureClick);
   var compTile = document.getElementById('qsub-completeness-tile');
