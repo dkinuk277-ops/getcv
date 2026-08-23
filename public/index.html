@@ -1691,6 +1691,17 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 .ai-verify-head .title{font-size:16px;font-weight:800;margin-bottom:4px}
 .ai-verify-head .subtitle{font-size:11px;color:#D1FAE5;line-height:1.5}
 .ai-verify-body{padding:20px}
+.ic-tbl{border:1px solid #E5E7EB;border-radius:10px;overflow:hidden;margin-top:2px}
+.ic-row{display:flex;border-bottom:1px solid #F3F4F6}
+.ic-row:last-child{border-bottom:none}
+.ic-k{width:92px;flex-shrink:0;padding:9px 12px;font-size:10.5px;color:#6B7280;background:#FAFAF9}
+.ic-v{flex:1;padding:9px 12px;font-size:11.5px;color:#1A2028;word-break:break-word}
+.ic-v.blank{color:#9CA3AF;font-style:italic}
+.ic-v.was{color:#9CA3AF;text-decoration:line-through}
+.ic-list{margin:2px 0 0;padding-left:18px;font-size:11.5px;line-height:1.9;color:#1A2028}
+.ic-skip{font-size:10.5px;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px;margin-top:10px;line-height:1.55}
+.ic-jump{display:inline-block;margin-top:11px;font-size:11.5px;color:#0FA968;font-weight:800;text-decoration:underline;cursor:pointer}
+.ic-asked{font-size:10.5px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:8px 10px;margin-bottom:12px;line-height:1.55}
 .ai-verify-warn{background:#FEF2F2;border:1px solid #FEE2E2;border-radius:10px;padding:12px;margin-bottom:14px;display:flex;gap:10px}
 .ai-verify-warn-icon{font-size:18px;flex-shrink:0}
 .ai-verify-warn-text{font-size:11px;line-height:1.6;color:#7F1D1D}
@@ -2217,6 +2228,22 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 </div>
 
 <!-- ===== AI Verification Modal ===== -->
+<!-- ===== AI Builder: what-was-inserted confirmation (opens BEFORE the verify modal) ===== -->
+<div class="ai-verify-overlay" id="insertConfirmModal">
+  <div class="ai-verify-box" style="max-width:480px">
+    <div class="ai-verify-head" id="insertConfirmHead">
+      <div class="icon" id="insertConfirmIcon">&#10003;</div>
+      <div class="title" id="insertConfirmTitle"></div>
+      <div class="subtitle" id="insertConfirmWhere"></div>
+    </div>
+    <div class="ai-verify-body" id="insertConfirmBody"></div>
+    <div class="ai-verify-footer">
+      <button class="btn-review" type="button" onclick="undoStructuralChange()">&#8630; Undo</button>
+      <button class="btn-verify" type="button" onclick="closeInsertConfirm()">Continue</button>
+    </div>
+  </div>
+</div>
+
 <div class="ai-verify-overlay" id="aiVerifyModal">
   <div class="ai-verify-box">
     <div class="ai-verify-head">
@@ -2514,7 +2541,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260823g"></script>
+<script src="app.js?v=20260823h"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
