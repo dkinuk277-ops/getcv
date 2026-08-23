@@ -4976,12 +4976,190 @@ function guessAIUnitLabels(){
   return out.length?out:['your resume'];
 }
 
+// ============================================================
+// ASK-A-QUESTION MODE
+// The bar used to only accept commands, so "are there any grammar issues?"
+// fell through to the fix flow and returned a generic hint. But every one of
+// these questions is already answerable from analyzeQualityScore() — locally,
+// instantly, with exact counts and locations. So questions are intercepted
+// BEFORE the fetch and answered from R.quality_score: no API call, no spinner,
+// no verify modal, and no chance of the AI inventing a count.
+// ============================================================
+
+// A leading fix verb means the user wants action, not a report — those fall
+// straight through to the existing flow so "fix all issues" is unchanged.
+var FIX_VERB_RE = /^(fix|correct|rewrite|improve|clean\s*up|sort\s*out|tidy|polish|repair)\b/i;
+var QUESTION_LEAD_RE = /^(are|is|do|does|have|has|any|how\s+many|how\s+much|what|which|where|why|can\s+you\s+(check|tell|show|list|find)|check|show|list|find|tell\s+me|review|scan|look\s+for|see\s+if)\b/i;
+
+var QUESTION_TOPICS = [
+  { type:'grammar',      re:/\b(grammar|grammatical|punctuation|tense|comma|full\s*stop)\b/i },
+  { type:'vocab',        re:/\b(vocab\w*|wording|weak|phrasing|word\s*choice|buzzword|cliche|clich\u00e9)\b/i },
+  { type:'texterror',    re:/\b(spell\w*|misspell\w*|typo\w*|text\s*error\w*)\b/i },
+  { type:'structure',    re:/\b(structure|layout|format|template|ats|parse\w*|column)\b/i },
+  { type:'completeness', re:/\b(complete\w*|missing|blank|empty|gap|left\s*out|filled)\b/i }
+];
+// Generic words that mean "check everything" when no specific topic is named.
+var GENERIC_TOPIC_RE = /\b(error|errors|issue|issues|problem|problems|mistake|mistakes|wrong|quality|score|resume|cv|anything)\b/i;
+
+// Returns 'grammar' | 'vocab' | 'texterror' | 'structure' | 'completeness'
+// | 'all', or null when this isn't a question at all.
+function detectQuestion(cmd){
+  var t = String(cmd||'').trim();
+  if(!t) return null;
+  if(FIX_VERB_RE.test(t)) return null;
+  var looksLikeQuestion = /\?\s*$/.test(t) || QUESTION_LEAD_RE.test(t);
+  if(!looksLikeQuestion) return null;
+  for(var i=0;i<QUESTION_TOPICS.length;i++){
+    if(QUESTION_TOPICS[i].re.test(t)) return QUESTION_TOPICS[i].type;
+  }
+  if(GENERIC_TOPIC_RE.test(t)) return 'all';
+  return null;
+}
+
+var Q_LABEL = { grammar:'grammar', vocab:'vocabulary', texterror:'spelling' };
+var Q_NOUN  = { grammar:'grammar issue', vocab:'weak phrase', texterror:'misspelling' };
+
+// Render the answer into the progress card. No bar, no spinner — this is a
+// finished answer, not work in progress.
+function answerQualityQuestion(kind){
+  resetAIProgress();
+  var prog=document.getElementById('aiBuilderProgress');
+  if(prog){ prog.classList.remove('hidden'); prog.style.display='block'; }
+  var qs = R.quality_score = analyzeQualityScore();
+  var title=document.getElementById('aiProgTitle');
+  var log=document.getElementById('aiProgSections');
+  log.className=''; 
+
+  if(kind==='structure'){
+    var si=qs.structureInfo||{};
+    title.innerHTML = si.risky
+      ? '\u26A0 Your layout may not parse cleanly'
+      : '\u2713 Your layout is ATS-safe';
+    log.innerHTML = '<div class="q-ans">'
+      + (si.risky
+          ? 'The <b>'+esc(si.templateName||'current')+'</b> template uses '+esc(si.reason||'a risky layout')+'.'
+            + '<div class="q-acts"><span class="q-act" onclick="askAIFollowUp(\'structure\')">Choose a safer template</span></div>'
+          : 'The <b>'+esc(si.templateName||'current')+'</b> template is a single-column layout, which ATS parsers read reliably.')
+      + '</div>' + qCaveat();
+    return;
+  }
+
+  if(kind==='completeness'){
+    var missing=(qs.completenessInfo&&qs.completenessInfo.missing)||[];
+    title.innerHTML = missing.length
+      ? '\u26A0 '+missing.length+' field'+(missing.length>1?'s':'')+' still empty'
+      : '\u2713 Nothing important is missing';
+    log.innerHTML = '<div class="q-ans">'
+      + (missing.length
+          ? qGroupHtml(missing.map(function(m){ return {location:m.label.split(' \u2014 ')[1]||'Resume'}; }))
+            + '<div class="q-acts"><span class="q-act" onclick="openCompletenessModal()">See all '+missing.length+'</span></div>'
+          : 'Every field the checklist looks at is filled in.')
+      + '</div>' + qCaveat();
+    return;
+  }
+
+  if(kind!=='all'){
+    var list=(qs.errors||[]).filter(function(e){ return e.type===kind && !e.fixed; });
+    title.innerHTML = list.length
+      ? 'Yes \u2014 '+list.length+' '+esc(Q_LABEL[kind])+' issue'+(list.length>1?'s':'')
+      : '\u2713 No '+esc(Q_LABEL[kind])+' issues found';
+    log.innerHTML = '<div class="q-ans">'
+      + (list.length
+          ? qGroupHtml(list)
+            + '<div class="q-acts">'
+            + '<span class="q-act" onclick="openIssuesModal(\''+kind+'\',\''+Q_LABEL[kind]+'\')">See all '+list.length+'</span>'
+            + '<span class="q-act" onclick="askAIFollowUp(\''+kind+'\')">Fix them for me</span>'
+            + '</div>'
+          : 'Nothing flagged by the '+esc(Q_LABEL[kind])+' check.')
+      + '</div>' + qCaveat();
+    return;
+  }
+
+  // Full sweep across all five dimensions.
+  var rows=[], totalIssues=0;
+  ['grammar','vocab','texterror'].forEach(function(t){
+    var n=(qs.errors||[]).filter(function(e){ return e.type===t && !e.fixed; }).length;
+    totalIssues+=n;
+    rows.push({ ok:n===0, name:cap(Q_LABEL[t]),
+      detail: n ? n+' '+Q_NOUN[t]+(n>1?'s':'') : 'none found',
+      act: n ? 'openIssuesModal(\''+t+'\',\''+Q_LABEL[t]+'\')' : '' });
+  });
+  var si2=qs.structureInfo||{};
+  rows.push({ ok:!si2.risky, name:'Structure',
+    detail: si2.risky ? 'layout may not parse' : 'layout is safe', act:'' });
+  var miss=(qs.completenessInfo&&qs.completenessInfo.missing)||[];
+  totalIssues+=miss.length;
+  rows.push({ ok:miss.length===0, name:'Completeness',
+    detail: miss.length ? miss.length+' field'+(miss.length>1?'s':'')+' missing' : 'all filled in',
+    act: miss.length ? 'openCompletenessModal()' : '' });
+
+  title.innerHTML = totalIssues
+    ? totalIssues+' thing'+(totalIssues>1?'s':'')+' to look at \u2014 overall score '+qs.overall+'%'
+    : '\u2713 All checks pass \u2014 overall score '+qs.overall+'%';
+
+  log.innerHTML = '<div class="q-ans">'
+    + rows.map(function(r){
+        return '<div class="q-row">'
+          + '<span class="q-dot '+(r.ok?'ok':'bad')+'">'+(r.ok?'\u2713':'\u25CF')+'</span>'
+          + '<span class="q-name">'+esc(r.name)+'</span>'
+          + '<span class="q-detail">'+esc(r.detail)+'</span>'
+          + (r.act?'<span class="q-act" onclick="'+r.act+'">See all</span>':'<span class="q-act-sp"></span>')
+          + '</div>';
+      }).join('')
+    + (totalIssues ? '<div class="q-acts"><span class="q-act" onclick="askAIFollowUp(\'all\')">Fix all text issues</span></div>' : '')
+    + '</div>' + qCaveat();
+}
+
+// Group a list of issues by their section label and render counts.
+function qGroupHtml(list){
+  var order=[], by={};
+  list.forEach(function(e){
+    var k=e.location||'Resume';
+    if(!by[k]){ by[k]=0; order.push(k); }
+    by[k]++;
+  });
+  return order.map(function(k){
+    return '<div class="q-row"><span class="q-dot bad">\u25CF</span>'
+      + '<span class="q-name">'+esc(k)+'</span>'
+      + '<span class="q-detail">'+by[k]+'</span><span class="q-act-sp"></span></div>';
+  }).join('');
+}
+
+// These checks are deliberately narrow — a rule set and a fixed misspellings
+// dictionary, not a proofread. Saying so keeps a green tick from overclaiming.
+function qCaveat(){
+  return '<div class="q-caveat">Checked on your device against Reeve\u2019s built-in rules \u2014 '
+    + 'no AI call. It won\u2019t catch everything a human proofreader would.</div>';
+}
+
+function cap(s){ return String(s).charAt(0).toUpperCase()+String(s).slice(1); }
+
+// Turn an answer into an action: drop the equivalent command in the box and run it.
+function askAIFollowUp(kind){
+  if(kind==='structure'){
+    if(typeof openTemplatesModal==='function'){ openTemplatesModal(); }
+    return;
+  }
+  var cmd = kind==='all' ? 'fix all issues'
+    : kind==='grammar' ? 'fix grammar'
+    : kind==='vocab' ? 'fix vocabulary'
+    : 'fix spelling';
+  var inp=document.getElementById('aiBuilderInput');
+  if(inp) inp.value=cmd;
+  runAIBuilder();
+}
+
 var AI_BUILDER_TIMEOUT_MS = 120000;
 
 function runAIBuilder(){
   var inputEl=document.getElementById('aiBuilderInput');
   var input=(inputEl.value||'').trim();
   if(!input){ inputEl.focus(); return; }
+
+  // Questions are answered locally from the existing analysis — return before
+  // any network work happens.
+  var qKind = detectQuestion(input);
+  if(qKind){ answerQualityQuestion(qKind); return; }
 
   var btn=document.getElementById('aiBuilderBtn');
   btn.disabled=true; btn.textContent='\u23F3 Working\u2026';
