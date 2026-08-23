@@ -2423,6 +2423,17 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   </div>
 </div>
 
+<!-- ===== Editor: Vocabulary / Grammar / Text Errors issue list popup ===== -->
+<div class="modal" id="issuesModal" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:520px">
+    <button class="modal-close" data-close type="button">&times;</button>
+    <div id="issuesModalBody"></div>
+    <div style="text-align:right;margin-top:16px">
+      <button class="btn btn-primary" data-close type="button">Got it</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== Editor: Completeness missing-fields popup ===== -->
 <div class="modal" id="completenessModal" role="dialog" aria-modal="true">
   <div class="modal-box" style="max-width:520px">
@@ -2503,7 +2514,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260823e"></script>
+<script src="app.js?v=20260823f"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
