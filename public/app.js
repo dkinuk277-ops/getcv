@@ -1444,7 +1444,7 @@ function markErrorFixed(err,fieldEl){
   var remaining=qs.errors.filter(function(e){return !e.fixed && e.type===err.type;}).length;
   if(remaining===0) qs[scoreKey]=100;
   qs[scoreKey]=Math.round(qs[scoreKey]);
-  qs.overall=Math.round((qs.vocabulary+qs.grammar+qs.texterror)/3);
+  qs.overall=Math.round((qs.vocabulary+qs.grammar+qs.texterror+qs.structure+qs.completeness)/5);
   // Clean up highlight span if it still exists in DOM
   if(fieldEl){
     var span=fieldEl.querySelector('[data-errid="'+err.id+'"]');
@@ -1499,10 +1499,11 @@ function refreshQualityDashboard(){
   var cd=document.getElementById('qdash-texterror-detail');if(cd)cd.textContent=cc+' issue'+(cc!==1?'s':'')+' remaining';
 }
 
-// Clicking the Text Errors tile scrolls to and briefly flashes every field
-// that currently has an unfixed misspelling — fixing each one (by typing the
-// correction) removes it from this list and raises the tile's score
-// automatically via the same reward mechanism every other check already uses.
+// Clicking a dashboard tile scrolls through EVERY section that has an
+// unfixed issue of that type, one at a time — not just the first one, with
+// the rest silently flashing wherever they happen to be on the page (which
+// is invisible if they're off-screen). A short stagger between each stop
+// gives the user a guided tour of every flagged spot, not just the closest.
 function jumpToIssueType(type, niceLabel){
   var qs=R.quality_score; if(!qs) return;
   var secKeys=[]; var seen={};
@@ -1510,17 +1511,21 @@ function jumpToIssueType(type, niceLabel){
     if(!seen[e.secKey]){ seen[e.secKey]=true; secKeys.push(e.secKey); }
   });
   if(!secKeys.length){ toast('No '+(niceLabel||type)+' issues left \u2014 nothing to jump to.', 3000); return; }
-  var first=true;
-  secKeys.forEach(function(secKey){
-    var m=secKey.match(/^experience_(\d+)$/);
-    var target = m ? document.querySelector('#sec-experience .entry[data-ix="'+m[1]+'"]')
-                    : document.getElementById('sec-'+secKey);
-    if(!target) return;
-    if(first){ target.scrollIntoView({behavior:'smooth', block:'center'}); first=false; }
-    target.classList.remove('tl-row-flash');
-    void target.offsetWidth;
-    target.classList.add('tl-row-flash');
-    setTimeout(function(){ target.classList.remove('tl-row-flash'); }, 1400);
+  if(secKeys.length > 1){
+    toast('Showing '+secKeys.length+' section'+(secKeys.length===1?'':'s')+' with '+(niceLabel||type)+' issues\u2026', 2500);
+  }
+  secKeys.forEach(function(secKey, i){
+    setTimeout(function(){
+      var m=secKey.match(/^experience_(\d+)$/);
+      var target = m ? document.querySelector('#sec-experience .entry[data-ix="'+m[1]+'"]')
+                      : document.getElementById('sec-'+secKey);
+      if(!target) return;
+      target.scrollIntoView({behavior:'smooth', block:'center'});
+      target.classList.remove('tl-row-flash');
+      void target.offsetWidth;
+      target.classList.add('tl-row-flash');
+      setTimeout(function(){ target.classList.remove('tl-row-flash'); }, 1400);
+    }, i * 1600);
   });
 }
 
