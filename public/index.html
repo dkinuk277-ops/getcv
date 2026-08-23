@@ -109,29 +109,7 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 @media(max-width:860px){.container{grid-template-columns:1fr}}
 
 /* ---------- Section rail (signature) ---------- */
-.rail{align-self:start;position:sticky;top:128px;display:flex;flex-direction:column;
-  min-height:calc(100vh - 168px);max-height:calc(100vh - 128px)}
-.rail>[data-rail], .rail>.rail-group{flex-shrink:0}
-
-/* ---------- Rail-bottom account chip (replaces the old header user pill
-   inside the builder, so the account menu lives where the rest of the
-   builder's navigation does, and it opens a popover in place instead of
-   navigating away from whatever the user is mid-edit on) ---------- */
-.rail-user{margin-top:auto;flex-shrink:0;display:flex;align-items:center;gap:9px;
-  padding:9px 10px;border-radius:12px;background:var(--card);border:1.5px solid var(--line);
-  cursor:pointer;font-family:inherit;text-align:left;width:100%;box-shadow:0 1px 2px rgba(26,32,40,.05);
-  transition:border-color .15s,box-shadow .15s}
-.rail-user:hover{border-color:var(--accent);box-shadow:0 2px 6px rgba(26,32,40,.1)}
-.rail-user.open{border-color:var(--accent)}
-.rail-user-avatar{width:28px;height:28px;border-radius:50%;background:#F2B63C;color:#4A3403;
-  font-weight:800;font-size:12.5px;display:inline-flex;align-items:center;justify-content:center;
-  flex-shrink:0;text-transform:uppercase}
-.rail-user-text{flex:1;min-width:0}
-.rail-user-name{display:block;font-size:12.5px;font-weight:700;color:var(--ink);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rail-user-chev{font-size:10px;color:var(--ink-soft);flex-shrink:0;transition:transform .15s}
-.rail-user.open .rail-user-chev{transform:rotate(180deg)}
-@media(max-width:860px){.rail-user{display:none}}
+.rail{align-self:start}
 
 .user-menu{position:fixed;z-index:400;width:220px;background:#fff;border:1px solid var(--line);
   border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px;display:none;
@@ -381,6 +359,9 @@ body:not(:has(#view-landing.on)):not(:has(#view-pro.on)):not(:has(#view-fresher.
 .tl-savename{display:inline-block;background:var(--accent-soft);color:#0F5B7E;font-weight:700;font-size:13px;border-radius:8px;padding:8px 16px;margin-bottom:14px}
 
 /* ---------- Header: user pill turns into a button ---------- */
+.user-btn-avatar-only{padding:4px}
+.user-btn-avatar-only .user-avatar{width:30px;height:30px;font-size:13px}
+.user-btn-avatar-only.open .user-avatar{box-shadow:0 0 0 2px rgba(255,255,255,.6)}
 .user-btn{background:rgba(91,200,245,.08);border:1px solid rgba(91,200,245,.35);
   color:var(--dc-text);font-family:inherit;font-size:13px;font-weight:600;
   padding:5px 12px 5px 5px;border-radius:99px;cursor:pointer;
@@ -908,7 +889,6 @@ header{background-image:var(--rv-sheen),var(--rv-glossy);border-bottom:1px solid
 .user-btn{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.45);color:#fff}
 .user-btn:hover{background:rgba(255,255,255,.26)}
 .user-avatar{background:#fff;color:var(--rv-deep)}
-#btnLogout{background:#fff;color:var(--rv-deep);border:none;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 /* console bar: white with teal actions */
 .module-bar{background:#fff;border:none;border-bottom:1.5px solid var(--rv-cardline);
   box-shadow:0 6px 14px -8px rgba(6,122,75,.35)}
@@ -1298,8 +1278,6 @@ header .rv-mark .ph, header .rv-mark .b1, header .rv-mark .b2, header .rv-mark .
 header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 /* header controls: gold accents */
 .user-avatar{background:#F2B63C;color:#4A3403}
-#btnLogout{background:linear-gradient(180deg,#FFD070,#F2B63C);color:#4A3403;border:none;font-weight:800;
-  box-shadow:0 3px 10px rgba(0,0,0,.25)}
 /* ticker: glossy gold, forest diamonds */
 .ticker{background-image:var(--rv-sheen),linear-gradient(180deg,#BDEFD6 0%,#9FE3C0 55%,#83D3A9 100%);
   border-bottom:1px solid #7CC49C}
@@ -1786,11 +1764,9 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
     <div class="brand-sub">Powered by <a href="https://www.decompliance.uk" target="_blank" rel="noopener">DeCompliance</a> · AI GRC Intelligence</div>
   </div>
   <div class="hdr-right" id="hdrRight" style="display:none">
-    <button class="user user-btn" id="hdrUser" type="button" title="Your account">
+    <button class="user user-btn user-btn-avatar-only" id="hdrUser" type="button" title="Your account">
       <span class="user-avatar" id="hdrAvatar"></span>
-      <span id="hdrUserText"></span>
     </button>
-    <button class="btn-dline" id="btnLogout" type="button">Log out</button>
   </div>
 </header>
 <div class="ticker"><span><b>◆</b> Talk to your resume with AI &nbsp;<b>◆</b> 25 professional templates &nbsp;<b>◆</b> Career timeline &amp; tenure ranking &nbsp;<b>◆</b> Photo-ready templates &nbsp;<b>◆</b> 🎯 Tailor for any job with AI &nbsp;<b>◆</b> Export to PDF &amp; Word &nbsp;<b>◆</b> Talk to your resume with AI &nbsp;<b>◆</b> 25 professional templates &nbsp;<b>◆</b> Career timeline &amp; tenure ranking</span></div>
@@ -2136,11 +2112,6 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <div data-rail></div>
         <button class="rail-folder js-tplopen" type="button">Templates</button>
         <button class="rail-folder js-savedopen" type="button">Saved Resumes</button>
-        <button class="rail-user js-railuser" type="button" title="Your account">
-          <span class="rail-user-avatar" data-avatar></span>
-          <span class="rail-user-text"><span class="rail-user-name" data-username></span></span>
-          <span class="rail-user-chev">&#9662;</span>
-        </button>
       </nav>
       <div class="rail-split" title="Drag to resize · double-click to reset"><span class="pv-grip"><i></i><i></i><i></i></span></div>
       <main>
@@ -2207,11 +2178,6 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
       <div data-rail></div>
       <button class="rail-folder js-tplopen" type="button">Templates</button>
       <button class="rail-folder js-savedopen" type="button">Saved Resumes</button>
-      <button class="rail-user js-railuser" type="button" title="Your account">
-        <span class="rail-user-avatar" data-avatar></span>
-        <span class="rail-user-text"><span class="rail-user-name" data-username></span></span>
-        <span class="rail-user-chev">&#9662;</span>
-      </button>
     </nav>
     <div class="rail-split" title="Drag to resize · double-click to reset"><span class="pv-grip"><i></i><i></i><i></i></span></div>
     <main>
@@ -2623,7 +2589,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260823j"></script>
+<script src="app.js?v=20260823k"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
