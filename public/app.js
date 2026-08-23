@@ -3447,12 +3447,24 @@ $('#hdrUser').addEventListener('click', (e)=>{ e.stopPropagation(); toggleUserMe
 // from the resume the user is mid-edit on. Only one #userMenu exists in the
 // DOM; it's repositioned to whichever chip triggered it.
 // ============================================================
+var _userMenuCloseTimer = null;
+
 function closeUserMenu(){
   const m = $('#userMenu');
+  document.querySelectorAll('.open').forEach(el => {
+    if(el.id === 'hdrUser' || (el.matches && el.matches('.user-btn, .rail-user'))) el.classList.remove('open');
+  });
   if(!m) return;
   m.classList.remove('in');
-  setTimeout(()=> m.classList.remove('open'), 120);
-  document.querySelectorAll('.rail-user.open').forEach(b => b.classList.remove('open'));
+  // A pending removal from a PREVIOUS close was clobbering a re-open that
+  // happened within its 120ms window: closeUserMenu() always fires first
+  // inside toggleUserMenu() to reset state, but its delayed cleanup would
+  // still be in flight when the menu was immediately reopened, and would
+  // then strip 'open' off the freshly-shown menu a moment later — the
+  // popover appeared to open and then silently closed itself. Tracking
+  // and cancelling the previous timer fixes it.
+  if(_userMenuCloseTimer) clearTimeout(_userMenuCloseTimer);
+  _userMenuCloseTimer = setTimeout(()=>{ m.classList.remove('open'); _userMenuCloseTimer=null; }, 120);
 }
 
 function toggleUserMenu(chip){
@@ -3479,6 +3491,7 @@ function toggleUserMenu(chip){
     m.style.left = r.left + 'px';
     m.style.right = 'auto';
   }
+  if(_userMenuCloseTimer){ clearTimeout(_userMenuCloseTimer); _userMenuCloseTimer=null; }
   m.classList.add('open');
   chip.classList.add('open');
   requestAnimationFrame(()=> m.classList.add('in'));
