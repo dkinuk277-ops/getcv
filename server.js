@@ -434,6 +434,155 @@ app.delete('/api/resumes/:id', requireAuth, (req, res) => {
 });
 
 // ============================================================
+// SAVED COVER LETTERS — completely separate from saved resumes.
+// Own directory, own file per user, own routes. Nothing here reads or
+// writes data/resumes/*, so this feature cannot corrupt or collide with
+// resume storage no matter what goes wrong.
+// ============================================================
+const CL_DIR = path.join(DATA_DIR, 'cover-letters');
+if (!fsx.existsSync(CL_DIR)) fsx.mkdirSync(CL_DIR, { recursive: true });
+function coverLettersFile(email){
+  return path.join(CL_DIR, email.replace(/[^a-z0-9@._-]/gi, '_') + '.json');
+}
+function loadCoverLetters(email){ return loadJSON(coverLettersFile(email), []); }
+function saveCoverLetters(email, list){ saveJSON(coverLettersFile(email), list); }
+const MAX_SAVED_CL = 20;
+const CL_TONES = ['formal', 'confident', 'warm'];
+
+// List (lightweight)
+app.get('/api/cover-letters', requireAuth, (req, res) => {
+  const list = loadCoverLetters(req.user.email).map(c => ({
+    id: c.id, company: c.company, role: c.role, tone: c.tone,
+    resumeName: c.resumeName || '', updated: c.updated
+  }));
+  list.sort((a,b)=> (b.updated||'').localeCompare(a.updated||''));
+  res.json({ success: true, coverLetters: list });
+});
+
+// Save / update
+app.post('/api/cover-letters', requireAuth, (req, res) => {
+  const { id, company, role, tone, content, resumeId, resumeName } = req.body || {};
+  if (!company || !company.trim()) return res.status(400).json({ error: 'Company name is required' });
+  if (!role || !role.trim()) return res.status(400).json({ error: 'Job title is required' });
+  if (!content || !content.trim()) return res.status(400).json({ error: 'No letter content to save' });
+  const list = loadCoverLetters(req.user.email);
+  const now = new Date().toISOString();
+  const existing = id && list.find(c => c.id === id);
+  if (existing) {
+    existing.company = company.trim().slice(0, 120);
+    existing.role = role.trim().slice(0, 120);
+    existing.tone = CL_TONES.includes(tone) ? tone : existing.tone;
+    existing.content = content;
+    existing.resumeId = resumeId || existing.resumeId || null;
+    existing.resumeName = resumeName || existing.resumeName || '';
+    existing.updated = now;
+  } else {
+    if (list.length >= MAX_SAVED_CL) return res.status(400).json({ error: `Maximum ${MAX_SAVED_CL} saved cover letters — delete one first` });
+    list.push({ id: crypto.randomBytes(8).toString('hex'), company: company.trim().slice(0, 120),
+      role: role.trim().slice(0, 120), tone: CL_TONES.includes(tone) ? tone : 'confident',
+      content, resumeId: resumeId || null, resumeName: resumeName || '', created: now, updated: now });
+  }
+  saveCoverLetters(req.user.email, list);
+  const saved = existing || list[list.length - 1];
+  res.json({ success: true, id: saved.id });
+});
+
+// Load one (full content)
+app.get('/api/cover-letters/:id', requireAuth, (req, res) => {
+  const c = loadCoverLetters(req.user.email).find(x => x.id === req.params.id);
+  if (!c) return res.status(404).json({ error: 'Cover letter not found' });
+  res.json({ success: true, coverLetter: c });
+});
+
+// Delete
+app.delete('/api/cover-letters/:id', requireAuth, (req, res) => {
+  const list = loadCoverLetters(req.user.email);
+  const idx = list.findIndex(x => x.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Cover letter not found' });
+  list.splice(idx, 1);
+  saveCoverLetters(req.user.email, list);
+  res.json({ success: true });
+});
+
+// ============================================================
+// COVER LETTER GENERATION — few inputs (company, role, tone, one optional
+// note), drafted from the resume actually on file. Same anti-hallucination
+// rule as Tailor and the AI Builder: only real, verifiable content from the
+// resume goes in; nothing about employers, dates, numbers or skills is
+// invented to fill a gap.
+// ============================================================
+function summarizeResumeForLetter(data){
+  const p = (data && data.personal) || {};
+  const exp = Array.isArray(data && data.experience) ? data.experience.slice(0, 3) : [];
+  const skills = Array.isArray(data && data.skills) ? data.skills.slice(0, 12) : [];
+  const lines = [];
+  lines.push('Name: ' + (p.name || '(not given)'));
+  if (exp.length){
+    lines.push('Recent experience:');
+    exp.forEach(e => {
+      lines.push('- ' + (e.title || 'Role') + ' at ' + (e.company || 'Company')
+        + (e.start ? (' (' + e.start + (e.end ? '–' + e.end : '–present') + ')') : ''));
+      if (e.desc) lines.push('  ' + String(e.desc).slice(0, 500));
+    });
+  }
+  if (skills.length) lines.push('Skills: ' + skills.join(', '));
+  return lines.join('\n');
+}
+
+app.post('/api/cover-letter/generate', aiLimiter, requireAuth, async (req, res) => {
+  const { company, role, tone, note, resumeData } = req.body || {};
+  const companyName = (company || '').trim();
+  const roleName = (role || '').trim();
+  if (!companyName) return res.status(400).json({ error: 'Please enter the company name' });
+  if (!roleName) return res.status(400).json({ error: 'Please enter the job title you\'re applying for' });
+  if (!resumeData || typeof resumeData !== 'object') return res.status(400).json({ error: 'No resume loaded to write from' });
+  const toneWord = CL_TONES.includes(tone) ? tone : 'confident';
+  const toneInstruction = {
+    formal: 'formal and traditional — measured language, no contractions, conventional business-letter phrasing',
+    confident: 'confident and direct — clear, assured statements, active voice, no hedging',
+    warm: 'warm and personable — approachable and genuine while staying professional, first person throughout'
+  }[toneWord];
+
+  const resumeSummary = summarizeResumeForLetter(resumeData);
+  const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const prompt = `You are writing a cover letter for a job application. Use ONLY facts present in
+the resume summary below — never invent an employer, dates, numbers, skills, or achievements
+that are not there. If the resume doesn't give you enough to fill a paragraph naturally, write a
+shorter, honest paragraph instead of padding it with invented detail.
+
+COMPANY: ${companyName}
+ROLE: ${roleName}
+TONE: ${toneInstruction}
+${note && note.trim() ? 'ADDITIONAL CONTEXT FROM THE CANDIDATE: ' + note.trim().slice(0, 500) : ''}
+
+RESUME SUMMARY:
+${resumeSummary}
+
+Write a complete cover letter:
+- Open addressing the hiring manager by title (not a name, since none was given) and naming the role
+- 2-3 body paragraphs connecting real experience and skills from the resume to what the role likely needs
+- A closing paragraph with a brief call to action
+- Sign off "Kind regards," followed by the candidate's name on its own line
+- Do NOT include a letterhead, date, or address block — start directly with "Dear Hiring Manager,"
+- Plain paragraphs separated by a blank line — no markdown, no bullet points, no headers
+
+Return ONLY the letter text, nothing else.`;
+
+  try {
+    const letter = await claudeText(prompt, 900);
+    if (!letter || !letter.trim()){
+      return res.status(502).json({ error: 'The AI returned an empty draft \u2014 please try again.' });
+    }
+    res.json({ success: true, letter: letter.trim(), tone: toneWord, date: today });
+  } catch (err) {
+    console.error('cover-letter/generate error:', err.message);
+    if (err.status === 429) return res.status(429).json({ error: 'Too many requests \u2014 please wait a moment and try again.' });
+    res.status(502).json({ error: 'Could not generate the cover letter right now. Please try again.' });
+  }
+});
+
+// ============================================================
 // JOB-DESCRIPTION TAILORING — the flagship feature.
 // Analyses a pasted JD against the user's resume and returns
 // structured, individually-acceptable changes. NEVER fabricates:
