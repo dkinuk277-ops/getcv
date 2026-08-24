@@ -3912,6 +3912,7 @@ let pubFieldState = { email:false, phone:false, photo:false };
 let pubIndexable = false;
 let pubResumeId = null;
 let pubResumeData = null; // full data for the resume the modal was opened on — never R
+let pubTemplate = 'classic';
 let pubSlugCheckTimer = null;
 let pubCurrentSlug = null; // set once actually published, for Unpublish
 
@@ -3937,6 +3938,7 @@ async function openPublishModal(resumeId, resumeName){
   pubFieldState = { email:false, phone:false, photo:false };
   pubIndexable = false;
   pubCurrentSlug = null;
+  pubSetTemplate('classic');
   $('#pubErr').classList.remove('on');
   $('#pubResumeLabel').textContent = 'From "' + resumeName + '"';
   document.querySelectorAll('.pub-field:not(.locked) .pub-toggle').forEach(t => t.classList.remove('on'));
@@ -3961,6 +3963,7 @@ async function openPublishModal(resumeId, resumeName){
     if(existing){
       pubCurrentSlug = existing.slug;
       pubIndexable = existing.indexable;
+      pubSetTemplate(existing.template || 'classic');
       $('#pubLiveUrl').textContent = location.origin + '/cv/' + existing.slug;
       pubShowPane('pubPaneResult');
     } else {
@@ -3995,6 +3998,15 @@ $('#pubIndexToggle').addEventListener('click', function(){
   this.classList.toggle('on', pubIndexable);
 });
 
+// Seven fixed template ids, matching the server's own enum — the id is
+// all that's ever sent; the server owns every actual style rule, so there
+// is no client-controlled CSS or markup involved in this selection at all.
+function pubSetTemplate(id){
+  pubTemplate = id;
+  document.querySelectorAll('.pub-tpl').forEach(b => b.classList.toggle('on', b.dataset.tpl===id));
+}
+document.querySelectorAll('.pub-tpl').forEach(btn => btn.addEventListener('click', ()=> pubSetTemplate(btn.dataset.tpl)));
+
 $('#pubSlug').addEventListener('input', function(){
   const val = this.value.trim().toLowerCase();
   clearTimeout(pubSlugCheckTimer);
@@ -4018,7 +4030,7 @@ $('#pubPublish').addEventListener('click', async ()=>{
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         resumeId: pubResumeId, resumeData: pubResumeData, fields: pubFieldState,
-        indexable: pubIndexable, customSlug: $('#pubSlug').value.trim()
+        indexable: pubIndexable, customSlug: $('#pubSlug').value.trim(), template: pubTemplate
       })
     });
     pubCurrentSlug = out.slug;
