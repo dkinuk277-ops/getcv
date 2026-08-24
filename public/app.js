@@ -3684,6 +3684,222 @@ function tlError(paneId, msg){
   setTimeout(()=> e.classList.remove('on'), 8000);
 }
 
+// ============================================================
+// COVER LETTER — separate feature, separate storage (data/cover-letters/*
+// on the server, never data/resumes/*). Deliberately a single simple form
+// rather than a multi-step wizard: company, role, tone, one optional note —
+// the resume itself supplies everything else. Nothing here touches R,
+// currentResumeId, tailorResult, or any Tailor/AI-builder state.
+// ============================================================
+let clTone = 'confident';
+let clLastLetter = null;   // { content, company, role, tone, date }
+let clSavedId = null;      // id of this letter once saved, for re-save/update
+
+function clError(msg){
+  const e = $('#clErr'); e.textContent = msg; e.classList.add('on');
+  setTimeout(()=> e.classList.remove('on'), 8000);
+}
+function clSaveError(msg){
+  const e = $('#clSaveErr'); e.textContent = msg; e.classList.add('on');
+  setTimeout(()=> e.classList.remove('on'), 8000);
+}
+
+function clShowPane(pane){
+  ['clPaneForm','clPaneLoading','clPaneResult'].forEach(id=>{
+    const el2 = $('#'+id);
+    if(el2) el2.classList.toggle('hidden', id!==pane);
+  });
+}
+
+document.querySelectorAll('.js-coverletter').forEach(b => b.addEventListener('click', ()=>{
+  if(resumeIsEmpty()) return toast('Import or open a resume first — then write a cover letter for it.', 5000);
+  $('#clErr').classList.remove('on');
+  $('#clSaveErr').classList.remove('on');
+  $('#clCompany').value = '';
+  $('#clRole').value = '';
+  $('#clNote').value = '';
+  clTone = 'confident';
+  document.querySelectorAll('.cl-tone-btn').forEach(t => t.classList.toggle('on', t.dataset.tone==='confident'));
+  clLastLetter = null;
+  clSavedId = null;
+  clShowPane('clPaneForm');
+  $('#clModal').classList.add('open');
+  setTimeout(()=> $('#clCompany').focus(), 40);
+}));
+
+document.querySelectorAll('.cl-tone-btn').forEach(btn => btn.addEventListener('click', ()=>{
+  clTone = btn.dataset.tone;
+  document.querySelectorAll('.cl-tone-btn').forEach(t => t.classList.toggle('on', t===btn));
+}));
+
+async function clGenerateLetter(){
+  const company = $('#clCompany').value.trim();
+  const role = $('#clRole').value.trim();
+  if(!company) return clError('Please enter the company name.');
+  if(!role) return clError('Please enter the job title you\'re applying for.');
+
+  clShowPane('clPaneLoading');
+  try{
+    const out = await api('/api/cover-letter/generate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ company, role, tone: clTone, note: $('#clNote').value, resumeData: R })
+    });
+    clLastLetter = { content: out.letter, company, role, tone: out.tone || clTone, date: out.date };
+    clSavedId = null; // a fresh generation is not yet saved
+    $('#clLetterText').value = out.letter;
+    $('#clResultMeta').textContent = company + ' \u2014 ' + role + ' \u00b7 ' + (out.tone||clTone) + ' tone';
+    clShowPane('clPaneResult');
+  }catch(err){
+    clShowPane('clPaneForm');
+    clError(err.message || 'Could not generate the letter — please try again.');
+  }
+}
+$('#clGenerate').addEventListener('click', clGenerateLetter);
+$('#clRegenerate').addEventListener('click', ()=>{
+  if(!window.confirm('Regenerate this letter? Your current edits in the box will be replaced.')) return;
+  clGenerateLetter();
+});
+$('#clBackToForm').addEventListener('click', ()=> clShowPane('clPaneForm'));
+
+// Build a simple standalone HTML document for a cover letter — entirely
+// separate from resumeHTML(), which is the resume builder's export and must
+// not be touched by this feature.
+function coverLetterHTML(){
+  const name = esc(R.personal?.name || 'Your Name');
+  const meta = clLastLetter || {};
+  const bodyHtml = esc($('#clLetterText').value)
+    .split(/\n{2,}/).map(p => '<p style="margin:0 0 14px">'+p.replace(/\n/g,'<br>')+'</p>').join('');
+  return `<!doctype html><html><head><meta charset="utf-8">
+<title>${name} — Cover Letter — ${esc(meta.company||'')}</title>
+<style>
+  body{font-family:Georgia,serif;max-width:680px;margin:40px auto;padding:0 24px;color:#1A2028;line-height:1.6;font-size:14px}
+  .cl-date{color:#6B7280;font-size:12.5px;margin-bottom:24px}
+  @media print{ body{margin:0;padding:24mm} }
+</style></head><body>
+<div class="cl-date">${esc(meta.date || new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}))}</div>
+${bodyHtml}
+</body></html>`;
+}
+
+function clSafeFileName(){
+  const co = (clLastLetter?.company || 'Company').replace(/[^A-Za-z0-9]+/g,'-');
+  return ((R.personal?.name||'My').trim().replace(/[^A-Za-z0-9]+/g,'-') || 'My') + '-CoverLetter-' + co;
+}
+
+$('#clDownloadHtml').addEventListener('click', ()=>{
+  const blob = new Blob([coverLetterHTML()], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = el('a',{href:url,download:clSafeFileName()+'.html'});
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 800);
+});
+
+$('#clDownloadWord').addEventListener('click', ()=>{
+  const html = coverLetterHTML().replace('<html>',
+    `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">`)
+    .replace('<head>', `<head><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->`);
+  const blob = new Blob(['\ufeff', html], {type:'application/msword'});
+  const url = URL.createObjectURL(blob);
+  const a = el('a',{href:url,download:clSafeFileName()+'.doc'});
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 800);
+});
+
+$('#clDownloadPdf').addEventListener('click', ()=>{
+  const pw = window.open('', '_blank');
+  if(!pw) return toast('Please allow pop-ups for this site, then click PDF again', 5000);
+  const auto = `<script>window.onload=()=>setTimeout(()=>window.print(),350);window.onafterprint=()=>setTimeout(()=>window.close(),300);<\/script>`;
+  pw.document.write(coverLetterHTML().replace('</body>', auto+'</body>'));
+  pw.document.close();
+});
+
+$('#clSave').addEventListener('click', async ()=>{
+  const content = $('#clLetterText').value.trim();
+  if(!content) return clSaveError('Nothing to save yet.');
+  try{
+    const out = await api('/api/cover-letters', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        id: clSavedId,
+        company: clLastLetter?.company || $('#clCompany').value,
+        role: clLastLetter?.role || $('#clRole').value,
+        tone: clLastLetter?.tone || clTone,
+        content,
+        resumeId: currentResumeId || null,
+        resumeName: currentResumeName || ''
+      })
+    });
+    clSavedId = out.id;
+    toast('💾 Cover letter saved');
+    loadClSavedList();
+  }catch(err){ clSaveError('Save failed: ' + err.message); }
+});
+
+// ---- Saved modal: Cover Letters tab, alongside the existing Resumes tab ----
+async function loadClSavedList(){
+  let items = [];
+  try{
+    const out = await api('/api/cover-letters');
+    items = out.coverLetters || [];
+  }catch{ /* not signed in yet */ }
+  document.querySelectorAll('[data-clsavedlist]').forEach(listEl=>{
+    listEl.innerHTML = '';
+    if(!items.length){
+      listEl.appendChild(el('div',{class:'saved-empty'},
+        'No saved cover letters yet — generate one from the ✉️ Cover Letter button in the builder.'));
+      return;
+    }
+    items.forEach(item=>{
+      const row = el('div',{class:'saved-row'});
+      row.innerHTML = `<div>
+          <div class="sname">✉️ ${esc(item.company)} \u2014 ${esc(item.role)}</div>
+          <div class="smeta">${esc(item.tone||'')}${item.resumeName?' · from '+esc(item.resumeName):''} · updated ${new Date(item.updated).toLocaleDateString()}</div>
+        </div>
+        <div class="sbtns">
+          <button class="btn btn-ghost" data-open type="button">Open</button>
+          <button class="btn btn-danger" data-del type="button">Delete</button>
+        </div>`;
+      row.querySelector('[data-open]').addEventListener('click', async ()=>{
+        try{
+          const out = await api('/api/cover-letters/' + item.id);
+          const c = out.coverLetter;
+          clLastLetter = { content:c.content, company:c.company, role:c.role, tone:c.tone, date:null };
+          clSavedId = c.id;
+          $('#clLetterText').value = c.content;
+          $('#clResultMeta').textContent = c.company + ' \u2014 ' + c.role + ' \u00b7 ' + c.tone + ' tone';
+          $('#savedModal').classList.remove('open');
+          clShowPane('clPaneResult');
+          $('#clModal').classList.add('open');
+        }catch(err){ toast('Could not open: ' + err.message, 5000); }
+      });
+      row.querySelector('[data-del]').addEventListener('click', async ()=>{
+        if(!window.confirm('Delete the cover letter for "' + item.company + '"? This cannot be undone.')) return;
+        try{
+          await api('/api/cover-letters/' + item.id, {method:'DELETE'});
+          if(clSavedId === item.id) clSavedId = null;
+          toast('Deleted');
+          loadClSavedList();
+        }catch(err){ toast('Delete failed: ' + err.message, 5000); }
+      });
+      listEl.appendChild(row);
+    });
+  });
+}
+
+$('#savedTabResumes').addEventListener('click', ()=>{
+  $('#savedTabResumes').classList.add('on');
+  $('#savedTabCL').classList.remove('on');
+  $('#savedPaneResumes').classList.remove('hidden');
+  $('#savedPaneCL').classList.add('hidden');
+});
+$('#savedTabCL').addEventListener('click', ()=>{
+  $('#savedTabCL').classList.add('on');
+  $('#savedTabResumes').classList.remove('on');
+  $('#savedPaneCL').classList.remove('hidden');
+  $('#savedPaneResumes').classList.add('hidden');
+  loadClSavedList();
+});
+
 document.querySelectorAll('.js-tailor').forEach(b => b.addEventListener('click', ()=>{
   if(resumeIsEmpty()) return toast('Import or open a resume first — then tailor it for a job.', 5000);
   $('#tlErr').classList.remove('on');
