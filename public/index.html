@@ -549,6 +549,14 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .saved-row .sname{font-weight:600;font-size:13.5px;color:var(--ink)}
 .saved-row .smeta{font-size:11.5px;color:var(--ink-soft);margin-top:1px}
 .saved-row .sbtns{display:flex;gap:7px}
+.saved-tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.saved-tab{background:none;border:none;font-family:inherit;font-size:12.5px;font-weight:700;
+  color:var(--ink-soft);padding:8px 4px 10px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.saved-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.cl-tones{display:flex;gap:8px}
+.cl-tone-btn{flex:1;background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px;
+  font-family:inherit;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer}
+.cl-tone-btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
 .pv-tpl-applied{font-size:12px;color:var(--ink-soft);margin-bottom:9px}
 .pv-tpl-applied b{color:var(--accent)}
 
@@ -2099,6 +2107,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
     <span class="mbtns">
       <button class="btn-dline js-upload" type="button" title="Upload a new CV anytime — replaces the current one in the builder">Upload CV</button>
       <button class="btn-dline js-refresh" type="button" title="Clear the current resume data">Refresh</button>
+      <button class="btn-dline js-coverletter" type="button" title="Generate a cover letter for a specific job">✉️ Cover Letter</button>
       <button class="btn-gold js-tailor" type="button" title="Tailor your CV to job description">🎯 Tailor your CV to Job Description</button>
       <button class="btn-dline js-save" type="button">Save</button>
       <button class="btn-dline js-preview" type="button">Preview</button>
@@ -2166,6 +2175,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
     </span>
     <span class="mbtns">
       <button class="btn-dline js-refresh" type="button" title="Clear the current resume data">Refresh</button>
+      <button class="btn-dline js-coverletter" type="button" title="Generate a cover letter for a specific job">✉️ Cover Letter</button>
       <button class="btn-dline js-save" type="button">Save</button>
       <button class="btn-dline js-preview" type="button">Preview</button>
       <button class="btn-dline js-switch" data-to="pro" type="button">Switch to Professionals →</button>
@@ -2554,9 +2564,76 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 <div class="modal" id="savedModal" role="dialog" aria-modal="true">
   <div class="modal-box" style="max-width:640px">
     <button class="modal-close" data-close>&times;</button>
-    <h2 style="margin-bottom:4px">📁 Saved Resumes</h2>
-    <p style="font-size:13px;color:var(--ink-soft);margin-bottom:14px">Open one to continue editing, apply a new template and download again.</p>
-    <div class="saved-list" data-savedlist></div>
+    <h2 style="margin-bottom:4px">📁 Saved</h2>
+    <div class="saved-tabs" id="savedTabs">
+      <button class="saved-tab on" id="savedTabResumes" type="button">Resumes</button>
+      <button class="saved-tab" id="savedTabCL" type="button">Cover Letters</button>
+    </div>
+    <div id="savedPaneResumes">
+      <p style="font-size:13px;color:var(--ink-soft);margin-bottom:14px">Open one to continue editing, apply a new template and download again.</p>
+      <div class="saved-list" data-savedlist></div>
+    </div>
+    <div id="savedPaneCL" class="hidden">
+      <p style="font-size:13px;color:var(--ink-soft);margin-bottom:14px">Open one to keep editing, or download it again.</p>
+      <div class="saved-list" data-clsavedlist></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Cover Letter generator — company, role, tone, one optional note.
+     Deliberately a single simple form, not a multi-step wizard: the resume
+     already supplies the real content, so there's little else to ask. ===== -->
+<div class="modal" id="clModal" role="dialog" aria-modal="true">
+  <div class="modal-box tl-box" style="max-width:760px">
+    <button class="modal-close" data-close type="button">&times;</button>
+    <h2 style="margin-bottom:4px">✉️ Cover Letter <span class="pro-chip">★ PRO</span></h2>
+    <p style="font-size:12.5px;color:var(--ink-soft);margin-bottom:14px">Drafted from the resume you have open — nothing is invented that isn't already on it.</p>
+
+    <div id="clPaneForm">
+      <div class="tl-grid">
+        <div class="tl-f"><label for="clCompany">Company</label><input id="clCompany" placeholder="e.g. Barclays"></div>
+        <div class="tl-f"><label for="clRole">Job title</label><input id="clRole" placeholder="e.g. Senior GRC Manager"></div>
+      </div>
+      <div class="tl-f" style="margin-top:10px">
+        <label>Tone</label>
+        <div class="cl-tones" id="clTones">
+          <button class="cl-tone-btn" data-tone="formal" type="button">Formal</button>
+          <button class="cl-tone-btn on" data-tone="confident" type="button">Confident</button>
+          <button class="cl-tone-btn" data-tone="warm" type="button">Warm</button>
+        </div>
+      </div>
+      <div class="tl-f" style="margin-top:10px">
+        <label for="clNote">Anything specific to mention? <span style="font-weight:400;color:var(--ink-soft)">(optional)</span></label>
+        <textarea id="clNote" rows="2" placeholder="e.g. why this company, a relocation, a career change — leave blank to skip"></textarea>
+      </div>
+      <div class="tl-err" id="clErr"></div>
+      <div class="tl-actions">
+        <button class="btn btn-ghost" data-close type="button">Cancel</button>
+        <button class="btn btn-primary" id="clGenerate" type="button">Generate draft →</button>
+      </div>
+    </div>
+
+    <div id="clPaneLoading" class="hidden" style="text-align:center;padding:30px 0">
+      <span class="spin"></span> Writing your cover letter&hellip;
+    </div>
+
+    <div id="clPaneResult" class="hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+        <span style="font-size:12px;color:var(--ink-soft)" id="clResultMeta"></span>
+        <button class="tl-clear-btn" id="clRegenerate" type="button">↺ Regenerate</button>
+      </div>
+      <textarea id="clLetterText" rows="16" style="width:100%;font-family:inherit;font-size:13px;line-height:1.7;padding:14px;border:1px solid var(--line);border-radius:10px;box-sizing:border-box"></textarea>
+      <div class="tl-err" id="clSaveErr"></div>
+      <div class="tl-actions" style="justify-content:space-between">
+        <button class="btn btn-ghost" id="clBackToForm" type="button">← Edit details</button>
+        <span style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost" id="clDownloadHtml" type="button">HTML</button>
+          <button class="btn btn-ghost" id="clDownloadWord" type="button">Word</button>
+          <button class="btn btn-ghost" id="clDownloadPdf" type="button">PDF</button>
+          <button class="btn btn-primary" id="clSave" type="button">💾 Save</button>
+        </span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2589,7 +2666,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260823k"></script>
+<script src="app.js?v=20260823l"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
