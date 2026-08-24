@@ -558,6 +558,16 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .cl-tone-btn{flex:1;background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px;
   font-family:inherit;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer}
 .cl-tone-btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.pub-fields{display:flex;flex-direction:column;gap:7px}
+.pub-field{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);
+  border-radius:9px;padding:9px 12px;font-size:12.5px;color:var(--ink);cursor:pointer}
+.pub-field.locked{opacity:.6;cursor:default}
+.pub-toggle{width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;
+  display:inline-block;flex-shrink:0}
+.pub-toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;
+  background:#fff;border-radius:50%;transition:left .15s}
+.pub-toggle.on{background:#0FA968}
+.pub-toggle.on::after{left:16px}
 .pv-tpl-applied{font-size:12px;color:var(--ink-soft);margin-bottom:9px}
 .pv-tpl-applied b{color:var(--accent)}
 
@@ -2638,6 +2648,64 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   </div>
 </div>
 
+<!-- ===== Publish as a personal page — company-name link a recruiter can click
+     with no download involved. Deliberately shows the full public-field
+     review every time: nothing here is on by default except what a resume
+     is fundamentally for (experience/summary/skills). ===== -->
+<div class="modal" id="pubModal" role="dialog" aria-modal="true">
+  <div class="modal-box tl-box" style="max-width:640px">
+    <button class="modal-close" data-close type="button">&times;</button>
+    <h2 style="margin-bottom:4px">🔗 Publish as a page</h2>
+    <p style="font-size:12.5px;color:var(--ink-soft);margin-bottom:14px" id="pubResumeLabel"></p>
+
+    <div id="pubPaneForm">
+      <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:8px">What's on the page</div>
+      <div class="pub-fields" id="pubFields">
+        <div class="pub-field on locked"><span>Experience &amp; summary</span><span class="pub-toggle on"></span></div>
+        <div class="pub-field on locked"><span>Skills</span><span class="pub-toggle on"></span></div>
+        <div class="pub-field" data-field="email"><span>Email address</span><span class="pub-toggle"></span></div>
+        <div class="pub-field" data-field="phone"><span>Phone number</span><span class="pub-toggle"></span></div>
+        <div class="pub-field" data-field="photo"><span>Photo</span><span class="pub-toggle"></span></div>
+      </div>
+
+      <div class="tl-f" style="margin-top:14px">
+        <label for="pubSlug">Link</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:12.5px;color:var(--ink-soft)">reeve.app/cv/</span>
+          <input id="pubSlug" style="flex:1" placeholder="your-name">
+        </div>
+        <div id="pubSlugStatus" style="font-size:11px;margin-top:4px"></div>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);margin-top:12px;cursor:pointer">
+        <span class="pub-toggle" id="pubIndexToggle"></span>
+        Allow search engines to index this page
+      </label>
+
+      <div class="tl-err" id="pubErr"></div>
+      <div class="tl-actions">
+        <button class="btn btn-ghost" data-close type="button">Cancel</button>
+        <button class="btn btn-primary" id="pubPublish" type="button">Publish →</button>
+      </div>
+    </div>
+
+    <div id="pubPaneResult" class="hidden">
+      <div style="background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
+        <span id="pubLiveUrl" style="font-size:12.5px;font-weight:700;color:var(--accent);word-break:break-all"></span>
+        <button class="btn btn-ghost" id="pubCopy" type="button">Copy</button>
+      </div>
+      <p style="font-size:11.5px;color:var(--ink-soft);margin-bottom:16px">Share this link directly — it won't show up as a downloadable file, and it updates only when you republish.</p>
+      <div class="tl-actions" style="justify-content:space-between">
+        <button class="btn btn-danger" id="pubUnpublish" type="button">Unpublish</button>
+        <span style="display:flex;gap:8px">
+          <button class="btn btn-ghost" id="pubViewLive" type="button">View live page ↗</button>
+          <button class="btn btn-primary" data-close type="button">Done</button>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== Preview + Download modal ===== -->
 <div class="modal" id="previewModal" role="dialog" aria-modal="true">
   <div class="modal-box" style="max-width:900px">
@@ -2667,7 +2735,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260823l"></script>
+<script src="app.js?v=20260823m"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
