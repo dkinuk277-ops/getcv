@@ -568,6 +568,20 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
   background:#fff;border-radius:50%;transition:left .15s}
 .pub-toggle.on{background:#0FA968}
 .pub-toggle.on::after{left:16px}
+.pub-tpl-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.pub-tpl{display:flex;flex-direction:column;align-items:center;gap:6px;background:#fff;
+  border:1.5px solid var(--line);border-radius:9px;padding:9px 4px;font-family:inherit;
+  font-size:11px;font-weight:700;color:var(--ink-soft);cursor:pointer}
+.pub-tpl.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.pub-tpl-sw{width:100%;height:28px;border-radius:5px;display:block}
+.pub-tpl-sw-classic{background:linear-gradient(180deg,#fff 55%,#E5E7EB 55%)}
+.pub-tpl-sw-modern{background:linear-gradient(180deg,#0FA968 40%,#fff 40%)}
+.pub-tpl-sw-minimal{background:#fff;border:1px solid #E5E7EB}
+.pub-tpl-sw-framed{background:#fff;border:2.5px solid #1E3A8A}
+.pub-tpl-sw-banner{background:linear-gradient(180deg,#D85A30 45%,#fff 45%)}
+.pub-tpl-sw-sidebar{background:linear-gradient(90deg,#F5F3FF 38%,#fff 38%)}
+.pub-tpl-sw-timeline{background:#fff;border-left:3px solid #F2B63C}
+@media(max-width:520px){.pub-tpl-grid{grid-template-columns:repeat(3,1fr)}}
 .pv-tpl-applied{font-size:12px;color:var(--ink-soft);margin-bottom:9px}
 .pv-tpl-applied b{color:var(--accent)}
 
@@ -2677,6 +2691,17 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
         <div id="pubSlugStatus" style="font-size:11px;margin-top:4px"></div>
       </div>
 
+      <div style="font-size:12px;font-weight:700;color:var(--ink);margin:16px 0 8px">Look</div>
+      <div class="pub-tpl-grid" id="pubTplGrid">
+        <button class="pub-tpl on" data-tpl="classic" type="button"><span class="pub-tpl-sw pub-tpl-sw-classic"></span>Classic</button>
+        <button class="pub-tpl" data-tpl="modern" type="button"><span class="pub-tpl-sw pub-tpl-sw-modern"></span>Modern</button>
+        <button class="pub-tpl" data-tpl="minimal" type="button"><span class="pub-tpl-sw pub-tpl-sw-minimal"></span>Minimal</button>
+        <button class="pub-tpl" data-tpl="framed" type="button"><span class="pub-tpl-sw pub-tpl-sw-framed"></span>Framed</button>
+        <button class="pub-tpl" data-tpl="banner" type="button"><span class="pub-tpl-sw pub-tpl-sw-banner"></span>Banner</button>
+        <button class="pub-tpl" data-tpl="sidebar" type="button"><span class="pub-tpl-sw pub-tpl-sw-sidebar"></span>Sidebar</button>
+        <button class="pub-tpl" data-tpl="timeline" type="button"><span class="pub-tpl-sw pub-tpl-sw-timeline"></span>Timeline</button>
+      </div>
+
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);margin-top:12px;cursor:pointer">
         <span class="pub-toggle" id="pubIndexToggle"></span>
         Allow search engines to index this page
@@ -2735,7 +2760,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20260823n"></script>
+<script src="app.js?v=20260823o"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>
