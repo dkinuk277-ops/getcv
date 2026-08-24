@@ -3327,10 +3327,12 @@ async function loadSavedList(){
           <div class="smeta">${esc(item.who||'')}${item.title?' · '+esc(item.title):''} · ${tplName} · updated ${new Date(item.updated).toLocaleDateString()}</div>
         </div>
         <div class="sbtns">
+          <button class="btn btn-ghost" data-publish type="button">Publish</button>
           <button class="btn btn-ghost" data-open type="button">Open</button>
           <button class="btn btn-danger" data-del type="button">Delete</button>
         </div>`;
       row.querySelector('[data-open]').addEventListener('click', ()=> openSavedResume(item.id));
+      row.querySelector('[data-publish]').addEventListener('click', ()=> openPublishModal(item.id, item.name));
       row.querySelector('[data-del]').addEventListener('click', async ()=>{
         if(!window.confirm('Delete "' + item.name + '"? This cannot be undone.')) return;
         try{
@@ -3898,6 +3900,133 @@ $('#savedTabCL').addEventListener('click', ()=>{
   $('#savedPaneCL').classList.remove('hidden');
   $('#savedPaneResumes').classList.add('hidden');
   loadClSavedList();
+});
+
+// ============================================================
+// PUBLISH — a shareable link version of a saved resume. The client's job
+// is only to collect what the user wants public and send it; every actual
+// leak-prevention decision (the allowlist, the slug rules) lives on the
+// server, not here — this code never assumes anything about what's safe.
+// ============================================================
+let pubFieldState = { email:false, phone:false, photo:false };
+let pubIndexable = false;
+let pubResumeId = null;
+let pubSlugCheckTimer = null;
+let pubCurrentSlug = null; // set once actually published, for Unpublish
+
+function pubShowPane(pane){
+  ['pubPaneForm','pubPaneResult'].forEach(id=>{
+    const el2 = $('#'+id);
+    if(el2) el2.classList.toggle('hidden', id!==pane);
+  });
+}
+function pubError(msg){
+  const e = $('#pubErr'); e.textContent = msg; e.classList.add('on');
+  setTimeout(()=> e.classList.remove('on'), 8000);
+}
+
+async function openPublishModal(resumeId, resumeName){
+  pubResumeId = resumeId;
+  pubFieldState = { email:false, phone:false, photo:false };
+  pubIndexable = false;
+  pubCurrentSlug = null;
+  $('#pubErr').classList.remove('on');
+  $('#pubResumeLabel').textContent = 'From "' + resumeName + '"';
+  document.querySelectorAll('.pub-field:not(.locked) .pub-toggle').forEach(t => t.classList.remove('on'));
+  $('#pubIndexToggle').classList.remove('on');
+  $('#pubSlugStatus').textContent = '';
+  pubShowPane('pubPaneForm');
+  $('#pubModal').classList.add('open');
+
+  // Check whether this resume already has a live page, so re-opening
+  // Publish on it shows the existing link instead of offering a duplicate.
+  try{
+    const out = await api('/api/publish');
+    const existing = (out.sites || []).find(s => s.resumeId === resumeId);
+    if(existing){
+      pubCurrentSlug = existing.slug;
+      pubIndexable = existing.indexable;
+      $('#pubLiveUrl').textContent = location.origin + '/cv/' + existing.slug;
+      pubShowPane('pubPaneResult');
+    } else {
+      const suggested = slugifyClient((R.personal && R.personal.name) || resumeName || '');
+      $('#pubSlug').value = suggested;
+    }
+  }catch{ /* not signed in yet, or listing failed — form still usable */ }
+}
+
+// Client-side mirror of the server's slugify, used only to PRE-FILL the
+// field — the server is the one that actually validates and resolves it,
+// so a mismatch here is cosmetic, never a security decision.
+function slugifyClient(str){
+  return String(str||'').toLowerCase()
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60);
+}
+
+document.querySelectorAll('.pub-field:not(.locked)').forEach(field => {
+  field.addEventListener('click', ()=>{
+    const key = field.dataset.field;
+    pubFieldState[key] = !pubFieldState[key];
+    field.querySelector('.pub-toggle').classList.toggle('on', pubFieldState[key]);
+  });
+});
+$('#pubIndexToggle').addEventListener('click', function(){
+  pubIndexable = !pubIndexable;
+  this.classList.toggle('on', pubIndexable);
+});
+
+$('#pubSlug').addEventListener('input', function(){
+  const val = this.value.trim().toLowerCase();
+  clearTimeout(pubSlugCheckTimer);
+  const statusEl = $('#pubSlugStatus');
+  if(!val){ statusEl.textContent=''; return; }
+  statusEl.textContent = 'Checking…';
+  statusEl.style.color = 'var(--ink-soft)';
+  pubSlugCheckTimer = setTimeout(async ()=>{
+    try{
+      const out = await api('/api/publish/check-slug?slug=' + encodeURIComponent(val));
+      if(out.available){ statusEl.textContent = '✓ Available'; statusEl.style.color = '#0FA968'; }
+      else { statusEl.textContent = out.reason || 'Already taken — try another'; statusEl.style.color = '#B91C1C'; }
+    }catch(err){ statusEl.textContent = ''; }
+  }, 400);
+});
+
+$('#pubPublish').addEventListener('click', async ()=>{
+  try{
+    const out = await api('/api/publish', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        resumeId: pubResumeId, resumeData: R, fields: pubFieldState,
+        indexable: pubIndexable, customSlug: $('#pubSlug').value.trim()
+      })
+    });
+    pubCurrentSlug = out.slug;
+    $('#pubLiveUrl').textContent = location.origin + '/cv/' + out.slug;
+    pubShowPane('pubPaneResult');
+  }catch(err){ pubError(err.message || 'Could not publish — please try again.'); }
+});
+
+$('#pubCopy').addEventListener('click', async ()=>{
+  const url = $('#pubLiveUrl').textContent;
+  try{
+    await navigator.clipboard.writeText(url);
+    toast('Link copied');
+  }catch{ toast('Could not copy automatically — select the link text to copy it', 5000); }
+});
+
+$('#pubViewLive').addEventListener('click', ()=>{
+  window.open($('#pubLiveUrl').textContent, '_blank');
+});
+
+$('#pubUnpublish').addEventListener('click', async ()=>{
+  if(!pubCurrentSlug) return;
+  if(!window.confirm('Unpublish this page? The link will stop working immediately.')) return;
+  try{
+    await api('/api/publish/' + pubCurrentSlug, {method:'DELETE'});
+    toast('Unpublished');
+    $('#pubModal').classList.remove('open');
+  }catch(err){ toast('Could not unpublish: ' + err.message, 5000); }
 });
 
 document.querySelectorAll('.js-tailor').forEach(b => b.addEventListener('click', ()=>{
