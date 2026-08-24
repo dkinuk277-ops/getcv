@@ -680,21 +680,42 @@ function validateCustomSlug(slug){
 // when the caller explicitly asked for each one. There is no default
 // branch that copies "anything else" through — any field not named below
 // simply never reaches a published page, current or future.
+const PUB_SECTION_ORDER_DEFAULT = ['skills','summary','projects','experience','certifications','languages','accomplishments','courses','education'];
+const PUB_KNOWN_SECTIONS = new Set(PUB_SECTION_ORDER_DEFAULT);
+const PUB_TEMPLATES = new Set(['classic','modern','minimal','framed','banner','sidebar','timeline']);
+
+// STRICT ALLOWLIST. This is the single control that makes the whole
+// feature safe: it reads from the user's resume data but can only ever
+// carry forward the exact fields listed here, and email/phone/photo only
+// when the caller explicitly asked for each one. There is no default
+// branch that copies "anything else" through — any field not named below
+// simply never reaches a published page, current or future.
 function buildPublicProjection(resumeData, fields){
   const d = resumeData || {};
   const p = d.personal || {};
+  const sp = d.section_prefs || {};
   const wantEmail = !!(fields && fields.email);
   const wantPhone = !!(fields && fields.phone);
   const wantPhoto = !!(fields && fields.photo);
+  const on = k => sp[k] !== false;
+
+  // Honors the resume's own section order and on/off toggles — the same
+  // ones the PDF/Word export already respects — rather than a hardcoded
+  // sequence, so a published page never drops or misorders a section the
+  // user actually has enabled.
+  const rawOrder = Array.isArray(d.section_order) && d.section_order.length
+    ? d.section_order : PUB_SECTION_ORDER_DEFAULT;
+  const sectionOrder = rawOrder.filter(k => PUB_KNOWN_SECTIONS.has(k) && k !== 'summary' && on(k));
 
   const projection = {
     name: String(p.name || '').slice(0, 120),
     headline: String((d.experience && d.experience[0] && d.experience[0].title) || '').slice(0, 160),
-    summary: String(d.summary || '').slice(0, 2000),
+    summary: (on('summary') !== false && String(d.summary || '').trim()) ? String(d.summary).slice(0, 2000) : '',
     email: wantEmail ? String(p.email || '').slice(0, 200) : '',
     phone: wantPhone ? String(p.phone || '').slice(0, 60) : '',
     photo: wantPhoto ? String(p.photo || '').slice(0, 2_000_000) : '',
     linkedin: String(p.linkedin || '').slice(0, 300),
+    sectionOrder,
     experience: Array.isArray(d.experience) ? d.experience.slice(0, 15).map(e => ({
       title: String(e.title || '').slice(0, 160),
       company: String(e.company || '').slice(0, 160),
@@ -707,7 +728,20 @@ function buildPublicProjection(resumeData, fields){
       institution: String(e.institution || '').slice(0, 160),
       year: String(e.year || '').slice(0, 40)
     })) : [],
-    skills: Array.isArray(d.skills) ? d.skills.slice(0, 40).map(s => String(s).slice(0, 80)) : []
+    skills: Array.isArray(d.skills) ? d.skills.slice(0, 40).map(s => String(s).slice(0, 80)) : [],
+    certifications: Array.isArray(d.certifications) ? d.certifications.slice(0, 20).map(c => ({
+      name: String(c.name || '').slice(0, 160), issuer: String(c.issuer || '').slice(0, 160),
+      year: String(c.year || '').slice(0, 40)
+    })) : [],
+    languages: Array.isArray(d.languages) ? d.languages.slice(0, 20).map(s => String(s).slice(0, 60)) : [],
+    projects: Array.isArray(d.projects) ? d.projects.slice(0, 20).map(pr => ({
+      name: String(pr.name || '').slice(0, 160), desc: String(pr.desc || '').slice(0, 1500)
+    })) : [],
+    accomplishments: Array.isArray(d.accomplishments) ? d.accomplishments.slice(0, 20).map(s => String(s).slice(0, 300)) : [],
+    courses: Array.isArray(d.courses) ? d.courses.slice(0, 20).map(c => ({
+      name: String(c.name || '').slice(0, 160), provider: String(c.provider || '').slice(0, 160),
+      year: String(c.year || '').slice(0, 40)
+    })) : []
   };
   return projection;
 }
@@ -734,15 +768,19 @@ app.get('/api/publish', requireAuth, (req, res) => {
   const idx = loadPublishedIndex();
   const mine = Object.entries(idx)
     .filter(([, rec]) => rec.ownerEmail === req.user.email)
-    .map(([slug, rec]) => ({ slug, resumeId: rec.resumeId, indexable: !!rec.indexable, updated: rec.updated }));
+    .map(([slug, rec]) => ({ slug, resumeId: rec.resumeId, indexable: !!rec.indexable, template: rec.template || 'classic', updated: rec.updated }));
   res.json({ success: true, sites: mine });
 });
 
 app.post('/api/publish', requireAuth, (req, res) => {
-  const { resumeId, resumeData, fields, indexable, customSlug } = req.body || {};
+  const { resumeId, resumeData, fields, indexable, customSlug, template } = req.body || {};
   if (!resumeData || typeof resumeData !== 'object') return res.status(400).json({ error: 'No resume data to publish' });
   const name = (resumeData.personal && resumeData.personal.name || '').trim();
   if (!name) return res.status(400).json({ error: 'Add your name to the resume before publishing' });
+  // Template is a fixed enum the server itself defines — never a client-sent
+  // string used directly, so there is no way to smuggle arbitrary CSS or
+  // markup through this field.
+  const tpl = PUB_TEMPLATES.has(template) ? template : 'classic';
 
   const projection = buildPublicProjection(resumeData, fields);
 
@@ -762,7 +800,7 @@ app.post('/api/publish', requireAuth, (req, res) => {
     if (!idx[slug] && mineCount >= MAX_PUBLISHED_PER_USER) throw Object.assign(new Error(`Maximum ${MAX_PUBLISHED_PER_USER} published pages — unpublish one first`), { statusCode: 400 });
     const now = new Date().toISOString();
     idx[slug] = {
-      ownerEmail: req.user.email, resumeId: resumeId || null, projection,
+      ownerEmail: req.user.email, resumeId: resumeId || null, projection, template: tpl,
       indexable: !!indexable, created: (idx[slug] && idx[slug].created) || now, updated: now
     };
     return slug;
@@ -785,45 +823,151 @@ app.delete('/api/publish/:slug', requireAuth, (req, res) => {
 
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"\']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-function publicSiteHTML(projection, indexable){
+// Shared neutral markup for every section type. Templates never duplicate
+// this — they only ever re-skin the .pg-* classes via CSS, so the content
+// and the allowlist logic that produced it stay in exactly one place
+// regardless of how many visual templates exist.
+function pubSectionBlock(key, projection){
   const p = projection;
-  const expHtml = (p.experience || []).map(e => `
-    <div style="margin-bottom:18px">
-      <div style="font-weight:700;font-size:14px;color:#1A2028">${esc(e.title)}${e.company ? ' — ' + esc(e.company) : ''}</div>
-      <div style="font-size:11.5px;color:#6B7280;margin-bottom:5px">${esc(e.start)}${e.end ? '\u2013' + esc(e.end) : ''}</div>
-      <div style="font-size:12.5px;color:#374151;white-space:pre-wrap;line-height:1.6">${esc(e.desc)}</div>
-    </div>`).join('');
-  const eduHtml = (p.education || []).map(e => `
-    <div style="margin-bottom:8px;font-size:12.5px;color:#374151">
-      <b>${esc(e.degree)}</b>${e.institution ? ' — ' + esc(e.institution) : ''}${e.year ? ' (' + esc(e.year) + ')' : ''}
-    </div>`).join('');
-  const skillsHtml = (p.skills || []).map(s => `<span style="display:inline-block;background:#F3F4F6;border-radius:6px;padding:4px 10px;font-size:11.5px;color:#374151;margin:0 6px 6px 0">${esc(s)}</span>`).join('');
+  if (key === 'experience' && p.experience.length){
+    return `<div class="pg-sec pg-sec-experience"><h2 class="pg-h2">Experience</h2>` +
+      p.experience.map(e => `
+      <div class="pg-job">
+        <div class="pg-job-title">${esc(e.title)}${e.company ? ' — ' + esc(e.company) : ''}</div>
+        <div class="pg-job-dates">${esc(e.start)}${e.end ? '\u2013' + esc(e.end) : ''}</div>
+        <div class="pg-job-desc">${esc(e.desc)}</div>
+      </div>`).join('') + `</div>`;
+  }
+  if (key === 'education' && p.education.length){
+    return `<div class="pg-sec pg-sec-education"><h2 class="pg-h2">Education</h2>` +
+      p.education.map(e => `<div class="pg-line"><b>${esc(e.degree)}</b>${e.institution ? ' — ' + esc(e.institution) : ''}${e.year ? ' (' + esc(e.year) + ')' : ''}</div>`).join('') +
+      `</div>`;
+  }
+  if (key === 'skills' && p.skills.length){
+    return `<div class="pg-sec pg-sec-skills"><h2 class="pg-h2">Skills</h2><div class="pg-tags">` +
+      p.skills.map(s => `<span class="pg-tag">${esc(s)}</span>`).join('') + `</div></div>`;
+  }
+  if (key === 'certifications' && p.certifications.length){
+    return `<div class="pg-sec pg-sec-certifications"><h2 class="pg-h2">Certifications</h2>` +
+      p.certifications.map(c => `<div class="pg-line">${esc(c.name)}${c.issuer ? ' — ' + esc(c.issuer) : ''}${c.year ? ' (' + esc(c.year) + ')' : ''}</div>`).join('') +
+      `</div>`;
+  }
+  if (key === 'languages' && p.languages.length){
+    return `<div class="pg-sec pg-sec-languages"><h2 class="pg-h2">Languages</h2><div class="pg-tags">` +
+      p.languages.map(s => `<span class="pg-tag">${esc(s)}</span>`).join('') + `</div></div>`;
+  }
+  if (key === 'projects' && p.projects.length){
+    return `<div class="pg-sec pg-sec-projects"><h2 class="pg-h2">Projects</h2>` +
+      p.projects.map(pr => `<div class="pg-line"><b>${esc(pr.name)}</b>${pr.desc ? '<div class="pg-job-desc">' + esc(pr.desc) + '</div>' : ''}</div>`).join('') +
+      `</div>`;
+  }
+  if (key === 'accomplishments' && p.accomplishments.length){
+    return `<div class="pg-sec pg-sec-accomplishments"><h2 class="pg-h2">Accomplishments</h2><ul class="pg-list">` +
+      p.accomplishments.map(a => `<li>${esc(a)}</li>`).join('') + `</ul></div>`;
+  }
+  if (key === 'courses' && p.courses.length){
+    return `<div class="pg-sec pg-sec-courses"><h2 class="pg-h2">Courses</h2>` +
+      p.courses.map(c => `<div class="pg-line">${esc(c.name)}${c.provider ? ' — ' + esc(c.provider) : ''}${c.year ? ' (' + esc(c.year) + ')' : ''}</div>`).join('') +
+      `</div>`;
+  }
+  return '';
+}
+
+// Seven visual templates, each pairing a layout with an accent color —
+// they all reuse the exact same .pg-* markup contract, so every template
+// automatically supports every section type with no per-template content
+// logic to keep in sync.
+function pubTemplateCSS(tpl){
+  const base = `
+  body{font-family:'Inter',system-ui,sans-serif;margin:0;padding:0;color:#1A2028;line-height:1.6;background:#fff}
+  .pg-wrap{max-width:760px;margin:0 auto;padding:48px 24px;box-sizing:border-box}
+  .pg-name{font-size:26px;margin:0 0 4px;font-weight:700}
+  .pg-headline{font-size:14px;color:#6B7280;margin-bottom:12px}
+  .pg-contact{font-size:12px;color:#6B7280;margin-bottom:20px}
+  .pg-summary{font-size:13px;color:#374151;margin-bottom:8px}
+  .pg-h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#6B7280;border-bottom:1px solid #E5E7EB;padding-bottom:6px;margin:28px 0 14px}
+  .pg-job{margin-bottom:18px}
+  .pg-job-title{font-weight:700;font-size:14px;color:#1A2028}
+  .pg-job-dates{font-size:11.5px;color:#6B7280;margin-bottom:5px}
+  .pg-job-desc{font-size:12.5px;color:#374151;white-space:pre-wrap;line-height:1.6}
+  .pg-line{margin-bottom:8px;font-size:12.5px;color:#374151}
+  .pg-tags{display:flex;flex-wrap:wrap;gap:6px}
+  .pg-tag{display:inline-block;background:#F3F4F6;border-radius:6px;padding:4px 10px;font-size:11.5px;color:#374151}
+  .pg-list{margin:0;padding-left:18px;font-size:12.5px;color:#374151}
+  .pg-photo img{width:88px;height:88px;border-radius:50%;object-fit:cover;margin-bottom:14px}
+  `;
+  const byId = {
+    classic: `body{font-family:Georgia,serif} .pg-h2{font-family:Georgia,serif}`,
+    modern: `
+      .pg-banner{background:#0FA968;color:#fff;padding:28px 24px;margin:-48px -24px 28px}
+      .pg-banner .pg-name{color:#fff} .pg-banner .pg-headline{color:rgba(255,255,255,.85)}
+      .pg-h2{color:#0FA968;border-bottom-color:#0FA968}`,
+    minimal: `
+      .pg-name{font-weight:500} .pg-headline,.pg-h2{color:#9CA3AF}
+      .pg-h2{border-bottom:none;letter-spacing:.1em;font-size:10.5px}
+      .pg-job-desc{font-weight:300}`,
+    framed: `
+      body{background:#F3F4F6} .pg-wrap{border:4px solid #1E3A8A;border-radius:12px;background:#fff;margin:24px auto;box-shadow:none}
+      .pg-name{color:#1E3A8A} .pg-h2{color:#1E3A8A;border:none;border-left:3px solid #1E3A8A;padding-left:10px}`,
+    banner: `
+      .pg-banner{background:#D85A30;color:#fff;padding:36px 24px;margin:-48px -24px 28px;text-align:center}
+      .pg-banner .pg-name{color:#fff} .pg-banner .pg-headline{color:rgba(255,255,255,.85)}
+      .pg-photo img{margin:0 auto 14px;display:block;border:3px solid rgba(255,255,255,.5)}
+      .pg-h2{color:#D85A30;border:none;border-bottom:2px solid #D85A30;display:inline-block}`,
+    sidebar: `
+      .pg-wrap{display:grid;grid-template-columns:220px 1fr;gap:32px;max-width:820px;align-items:start}
+      .pg-aside{background:#F5F3FF;padding:20px;border-radius:10px}
+      .pg-aside .pg-name{color:#534AB7} .pg-h2{color:#534AB7}
+      @media(max-width:600px){.pg-wrap{display:block}}`,
+    timeline: `
+      .pg-h2{color:#B45309}
+      .pg-sec-experience{border-left:2px solid #F2B63C;padding-left:16px;margin-left:4px}
+      .pg-sec-experience .pg-job{position:relative}
+      .pg-sec-experience .pg-job::before{content:'';position:absolute;left:-21px;top:5px;width:8px;height:8px;border-radius:50%;background:#F2B63C}`
+  };
+  return base + (byId[tpl] || byId.classic);
+}
+
+function publicSiteHTML(projection, indexable, template){
+  const p = projection;
+  const tpl = PUB_TEMPLATES.has(template) ? template : 'classic';
+  const usesBanner = tpl === 'modern' || tpl === 'banner';
+  const usesSidebar = tpl === 'sidebar';
+
   const contactBits = [];
   if (p.email) contactBits.push(esc(p.email));
   if (p.phone) contactBits.push(esc(p.phone));
-  if (p.linkedin) contactBits.push(`<a href="${esc(p.linkedin)}" style="color:#0FA968">LinkedIn</a>`);
-  const photoHtml = p.photo ? `<img src="${esc(p.photo)}" alt="" style="width:88px;height:88px;border-radius:50%;object-fit:cover;margin-bottom:14px">` : '';
+  if (p.linkedin) contactBits.push(`<a href="${esc(p.linkedin)}" style="color:inherit">LinkedIn</a>`);
+  const photoHtml = p.photo ? `<div class="pg-photo"><img src="${esc(p.photo)}" alt=""></div>` : '';
+
+  const identityHtml = `
+    ${photoHtml}
+    <h1 class="pg-name">${esc(p.name)}</h1>
+    ${p.headline ? `<div class="pg-headline">${esc(p.headline)}</div>` : ''}
+    ${contactBits.length ? `<div class="pg-contact">${contactBits.join(' \u00b7 ')}</div>` : ''}`;
+
+  // sectionOrder was already filtered down to enabled, known sections at
+  // publish time — this just renders each one that has content, in that
+  // stored order. Summary is handled separately since it sits above the
+  // ordered sections, matching how the resume export treats it.
+  const order = (p.sectionOrder && p.sectionOrder.length) ? p.sectionOrder : PUB_SECTION_ORDER_DEFAULT;
+  const sectionsHtml = order.map(k => pubSectionBlock(k, p)).join('');
+  const summaryHtml = p.summary ? `<div class="pg-summary">${esc(p.summary)}</div>` : '';
+
+  let bodyHtml;
+  if (usesSidebar){
+    bodyHtml = `<div class="pg-wrap"><aside class="pg-aside">${identityHtml}</aside><main class="pg-main">${summaryHtml}${sectionsHtml}</main></div>`;
+  } else if (usesBanner){
+    bodyHtml = `<div class="pg-wrap"><div class="pg-banner">${identityHtml}</div>${summaryHtml}${sectionsHtml}</div>`;
+  } else {
+    bodyHtml = `<div class="pg-wrap">${identityHtml}${summaryHtml}${sectionsHtml}</div>`;
+  }
 
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 ${indexable ? '' : '<meta name="robots" content="noindex, nofollow">'}
 <title>${esc(p.name)}${p.headline ? ' — ' + esc(p.headline) : ''}</title>
-<style>
-  body{font-family:'Inter',system-ui,sans-serif;max-width:720px;margin:48px auto;padding:0 24px;color:#1A2028;line-height:1.6}
-  h1{font-size:26px;margin:0 0 4px}
-  .headline{font-size:14px;color:#6B7280;margin-bottom:12px}
-  .contact{font-size:12px;color:#6B7280;margin-bottom:28px}
-  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#6B7280;border-bottom:1px solid #E5E7EB;padding-bottom:6px;margin:28px 0 14px}
-</style></head><body>
-${photoHtml}
-<h1>${esc(p.name)}</h1>
-${p.headline ? `<div class="headline">${esc(p.headline)}</div>` : ''}
-${contactBits.length ? `<div class="contact">${contactBits.join(' \u00b7 ')}</div>` : ''}
-${p.summary ? `<div style="font-size:13px;color:#374151;margin-bottom:8px">${esc(p.summary)}</div>` : ''}
-${expHtml ? `<h2>Experience</h2>${expHtml}` : ''}
-${eduHtml ? `<h2>Education</h2>${eduHtml}` : ''}
-${skillsHtml ? `<h2>Skills</h2><div>${skillsHtml}</div>` : ''}
-</body></html>`;
+<style>${pubTemplateCSS(tpl)}</style></head><body>${bodyHtml}</body></html>`;
 }
 
 // PUBLIC — no requireAuth. Reads exclusively from the published-sites
@@ -841,10 +985,11 @@ app.get('/cv/:slug', publicSiteLimiter, (req, res) => {
   if (!rec){
     return res.status(404).send('<!doctype html><title>Not found</title><body style="font-family:sans-serif;text-align:center;padding:80px 20px;color:#6B7280"><h2>This page isn\'t available.</h2><p>It may have been unpublished.</p></body>');
   }
-  res.send(publicSiteHTML(rec.projection, rec.indexable));
+  res.send(publicSiteHTML(rec.projection, rec.indexable, rec.template));
 });
 
 // ============================================================
+// JOB-DESCRIPTION TAILORING — the flagship feature.// ============================================================
 // JOB-DESCRIPTION TAILORING — the flagship feature.
 // Analyses a pasted JD against the user's resume and returns
 // structured, individually-acceptable changes. NEVER fabricates:
