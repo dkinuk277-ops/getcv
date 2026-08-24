@@ -264,6 +264,13 @@ const tailorLimiter = rateLimit({
   standardHeaders: true, legacyHeaders: false,
   message: { error: 'Tailoring limit reached (10 per hour) — please wait a while and try again' }
 });
+// Published personal-site pages: cheap to serve (no AI call) but still public
+// and unauthenticated, so still rate-limited against scraping/enumeration.
+const publicSiteLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 60,
+  standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Too many requests — please slow down.' }
+});
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const SESS_FILE = path.join(DATA_DIR, 'sessions.json');
@@ -580,6 +587,261 @@ Return ONLY the letter text, nothing else.`;
     if (err.status === 429) return res.status(429).json({ error: 'Too many requests \u2014 please wait a moment and try again.' });
     res.status(502).json({ error: 'Could not generate the cover letter right now. Please try again.' });
   }
+});
+
+// ============================================================
+// PUBLISHED PERSONAL SITES — publicly shareable resume pages.
+//
+// This is the ONE feature in Reeve where an unauthenticated visitor reads
+// data back. Every other route requires requireAuth and is scoped to
+// req.user.email. That difference is treated as load-bearing throughout
+// this section:
+//
+// 1. STORAGE IS GLOBAL, NOT PER-USER. A public visitor has no session
+//    telling the server whose file to open, so lookups are by slug across
+//    all users — a single shared index, not the per-user JSON file pattern
+//    used for resumes and cover letters. Because many users can publish
+//    concurrently, writes to that shared file are serialized through an
+//    in-process queue (publishWriteQueue below) so two publishes landing
+//    at the same instant can never race and corrupt each other's write.
+//    This is safe for a single Node process; if this app is ever run as
+//    multiple instances behind a load balancer, this in-memory queue would
+//    need to move to a real datastore with row-level locking (Postgres,
+//    etc.) — noted here rather than silently assumed away.
+//
+// 2. THE PUBLIC ROUTE NEVER TOUCHES data/resumes/*. It reads exclusively
+//    from data/published-sites/index.json, and that file only ever
+//    contains what buildPublicProjection() explicitly allowlists — never
+//    the raw resume object. A bug in the public route can therefore never
+//    expose more than what a user deliberately published, no matter what
+//    else changes elsewhere in the app.
+// ============================================================
+const PUB_DIR = path.join(DATA_DIR, 'published-sites');
+if (!fsx.existsSync(PUB_DIR)) fsx.mkdirSync(PUB_DIR, { recursive: true });
+const PUB_INDEX_FILE = path.join(PUB_DIR, 'index.json');
+function loadPublishedIndex(){ return loadJSON(PUB_INDEX_FILE, {}); }
+function savePublishedIndex(idx){ saveJSON(PUB_INDEX_FILE, idx); }
+
+// Serializes every write to the shared index file through one promise
+// chain, so concurrent publish/unpublish requests from different users
+// never interleave a read-modify-write and silently drop one of them.
+let publishWriteQueue = Promise.resolve();
+function withPublishedIndex(mutator){
+  const run = publishWriteQueue.then(() => {
+    const idx = loadPublishedIndex();
+    const result = mutator(idx);
+    savePublishedIndex(idx);
+    return result;
+  });
+  publishWriteQueue = run.catch(() => {});
+  return run;
+}
+
+const MAX_PUBLISHED_PER_USER = 10;
+const RESERVED_SLUGS = new Set(['api','admin','login','signup','static','assets','cv','www',
+  'app','account','privacy-policy','terms-of-use','health','favicon.ico','robots.txt']);
+
+function slugify(str){
+  return String(str || '')
+    .toLowerCase()
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+function randomSuffix(){ return crypto.randomBytes(3).toString('hex'); }
+
+// Turns a base slug into an available one: tries it plain first, then
+// appends a short random suffix (a handful of times, to survive the rare
+// case where even the suffixed version collides) rather than falling back
+// to a fully random token — a name-based link only stays legible if the
+// suffix logic actually keeps trying before giving up.
+function resolveAvailableSlug(idx, base){
+  const clean = slugify(base) || 'resume';
+  if (!RESERVED_SLUGS.has(clean) && !idx[clean]) return clean;
+  for (let i = 0; i < 6; i++){
+    const candidate = clean + '-' + randomSuffix();
+    if (!RESERVED_SLUGS.has(candidate) && !idx[candidate]) return candidate;
+  }
+  return clean + '-' + crypto.randomBytes(5).toString('hex');
+}
+
+const SLUG_RE = /^[a-z0-9]([a-z0-9-]{0,58}[a-z0-9])?$/;
+function validateCustomSlug(slug){
+  if (!slug) return 'Enter a link.';
+  if (!SLUG_RE.test(slug)) return 'Use only lowercase letters, numbers, and hyphens.';
+  if (RESERVED_SLUGS.has(slug)) return 'That link is reserved — please choose another.';
+  return null;
+}
+
+// STRICT ALLOWLIST. This is the single control that makes the whole
+// feature safe: it reads from the user's resume data but can only ever
+// carry forward the exact fields listed here, and email/phone/photo only
+// when the caller explicitly asked for each one. There is no default
+// branch that copies "anything else" through — any field not named below
+// simply never reaches a published page, current or future.
+function buildPublicProjection(resumeData, fields){
+  const d = resumeData || {};
+  const p = d.personal || {};
+  const wantEmail = !!(fields && fields.email);
+  const wantPhone = !!(fields && fields.phone);
+  const wantPhoto = !!(fields && fields.photo);
+
+  const projection = {
+    name: String(p.name || '').slice(0, 120),
+    headline: String((d.experience && d.experience[0] && d.experience[0].title) || '').slice(0, 160),
+    summary: String(d.summary || '').slice(0, 2000),
+    email: wantEmail ? String(p.email || '').slice(0, 200) : '',
+    phone: wantPhone ? String(p.phone || '').slice(0, 60) : '',
+    photo: wantPhoto ? String(p.photo || '').slice(0, 2_000_000) : '',
+    linkedin: String(p.linkedin || '').slice(0, 300),
+    experience: Array.isArray(d.experience) ? d.experience.slice(0, 15).map(e => ({
+      title: String(e.title || '').slice(0, 160),
+      company: String(e.company || '').slice(0, 160),
+      start: String(e.start || '').slice(0, 40),
+      end: String(e.end || '').slice(0, 40),
+      desc: String(e.desc || '').slice(0, 3000)
+    })) : [],
+    education: Array.isArray(d.education) ? d.education.slice(0, 10).map(e => ({
+      degree: String(e.degree || '').slice(0, 160),
+      institution: String(e.institution || '').slice(0, 160),
+      year: String(e.year || '').slice(0, 40)
+    })) : [],
+    skills: Array.isArray(d.skills) ? d.skills.slice(0, 40).map(s => String(s).slice(0, 80)) : []
+  };
+  return projection;
+}
+
+app.get('/api/publish/check-slug', requireAuth, (req, res) => {
+  // Uses "reason", not "error" — the shared client api() helper treats any
+  // response body containing an "error" key as a failed request and throws,
+  // but an unavailable slug is a normal, expected outcome here, not a
+  // request failure. Reusing "error" for it would make the client silently
+  // swallow the "taken" result into its catch block.
+  const raw = String(req.query.slug || '').toLowerCase().trim();
+  const invalidReason = validateCustomSlug(raw);
+  if (invalidReason) return res.json({ available: false, reason: invalidReason });
+  const idx = loadPublishedIndex();
+  const taken = idx[raw] && idx[raw].ownerEmail !== req.user.email;
+  res.json({ available: !taken, reason: taken ? 'Already taken — try another' : undefined });
+});
+
+// List this user's published pages (for the badge/status shown against
+// each saved resume). The index is a flat object keyed by slug; at the
+// scale this app operates at, filtering it in memory per request is fine —
+// this is not a hot path.
+app.get('/api/publish', requireAuth, (req, res) => {
+  const idx = loadPublishedIndex();
+  const mine = Object.entries(idx)
+    .filter(([, rec]) => rec.ownerEmail === req.user.email)
+    .map(([slug, rec]) => ({ slug, resumeId: rec.resumeId, indexable: !!rec.indexable, updated: rec.updated }));
+  res.json({ success: true, sites: mine });
+});
+
+app.post('/api/publish', requireAuth, (req, res) => {
+  const { resumeId, resumeData, fields, indexable, customSlug } = req.body || {};
+  if (!resumeData || typeof resumeData !== 'object') return res.status(400).json({ error: 'No resume data to publish' });
+  const name = (resumeData.personal && resumeData.personal.name || '').trim();
+  if (!name) return res.status(400).json({ error: 'Add your name to the resume before publishing' });
+
+  const projection = buildPublicProjection(resumeData, fields);
+
+  withPublishedIndex(idx => {
+    const mineCount = Object.values(idx).filter(r => r.ownerEmail === req.user.email).length;
+    let slug;
+    if (customSlug && String(customSlug).trim()){
+      const clean = String(customSlug).trim().toLowerCase();
+      const err = validateCustomSlug(clean);
+      if (err) throw Object.assign(new Error(err), { statusCode: 400 });
+      if (idx[clean] && idx[clean].ownerEmail !== req.user.email) throw Object.assign(new Error('That link is already taken.'), { statusCode: 400 });
+      slug = clean;
+    } else {
+      if (mineCount >= MAX_PUBLISHED_PER_USER) throw Object.assign(new Error(`Maximum ${MAX_PUBLISHED_PER_USER} published pages — unpublish one first`), { statusCode: 400 });
+      slug = resolveAvailableSlug(idx, name);
+    }
+    if (!idx[slug] && mineCount >= MAX_PUBLISHED_PER_USER) throw Object.assign(new Error(`Maximum ${MAX_PUBLISHED_PER_USER} published pages — unpublish one first`), { statusCode: 400 });
+    const now = new Date().toISOString();
+    idx[slug] = {
+      ownerEmail: req.user.email, resumeId: resumeId || null, projection,
+      indexable: !!indexable, created: (idx[slug] && idx[slug].created) || now, updated: now
+    };
+    return slug;
+  }).then(slug => {
+    res.json({ success: true, slug });
+  }).catch(err => {
+    res.status(err.statusCode || 500).json({ error: err.message || 'Could not publish right now.' });
+  });
+});
+
+app.delete('/api/publish/:slug', requireAuth, (req, res) => {
+  const slug = String(req.params.slug || '').toLowerCase();
+  withPublishedIndex(idx => {
+    if (!idx[slug] || idx[slug].ownerEmail !== req.user.email) throw Object.assign(new Error('Published page not found'), { statusCode: 404 });
+    delete idx[slug]; // hard delete — unpublish removes the record, not a visibility flag
+    return true;
+  }).then(() => res.json({ success: true }))
+    .catch(err => res.status(err.statusCode || 500).json({ error: err.message }));
+});
+
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"\']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function publicSiteHTML(projection, indexable){
+  const p = projection;
+  const expHtml = (p.experience || []).map(e => `
+    <div style="margin-bottom:18px">
+      <div style="font-weight:700;font-size:14px;color:#1A2028">${esc(e.title)}${e.company ? ' — ' + esc(e.company) : ''}</div>
+      <div style="font-size:11.5px;color:#6B7280;margin-bottom:5px">${esc(e.start)}${e.end ? '\u2013' + esc(e.end) : ''}</div>
+      <div style="font-size:12.5px;color:#374151;white-space:pre-wrap;line-height:1.6">${esc(e.desc)}</div>
+    </div>`).join('');
+  const eduHtml = (p.education || []).map(e => `
+    <div style="margin-bottom:8px;font-size:12.5px;color:#374151">
+      <b>${esc(e.degree)}</b>${e.institution ? ' — ' + esc(e.institution) : ''}${e.year ? ' (' + esc(e.year) + ')' : ''}
+    </div>`).join('');
+  const skillsHtml = (p.skills || []).map(s => `<span style="display:inline-block;background:#F3F4F6;border-radius:6px;padding:4px 10px;font-size:11.5px;color:#374151;margin:0 6px 6px 0">${esc(s)}</span>`).join('');
+  const contactBits = [];
+  if (p.email) contactBits.push(esc(p.email));
+  if (p.phone) contactBits.push(esc(p.phone));
+  if (p.linkedin) contactBits.push(`<a href="${esc(p.linkedin)}" style="color:#0FA968">LinkedIn</a>`);
+  const photoHtml = p.photo ? `<img src="${esc(p.photo)}" alt="" style="width:88px;height:88px;border-radius:50%;object-fit:cover;margin-bottom:14px">` : '';
+
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+${indexable ? '' : '<meta name="robots" content="noindex, nofollow">'}
+<title>${esc(p.name)}${p.headline ? ' — ' + esc(p.headline) : ''}</title>
+<style>
+  body{font-family:'Inter',system-ui,sans-serif;max-width:720px;margin:48px auto;padding:0 24px;color:#1A2028;line-height:1.6}
+  h1{font-size:26px;margin:0 0 4px}
+  .headline{font-size:14px;color:#6B7280;margin-bottom:12px}
+  .contact{font-size:12px;color:#6B7280;margin-bottom:28px}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#6B7280;border-bottom:1px solid #E5E7EB;padding-bottom:6px;margin:28px 0 14px}
+</style></head><body>
+${photoHtml}
+<h1>${esc(p.name)}</h1>
+${p.headline ? `<div class="headline">${esc(p.headline)}</div>` : ''}
+${contactBits.length ? `<div class="contact">${contactBits.join(' \u00b7 ')}</div>` : ''}
+${p.summary ? `<div style="font-size:13px;color:#374151;margin-bottom:8px">${esc(p.summary)}</div>` : ''}
+${expHtml ? `<h2>Experience</h2>${expHtml}` : ''}
+${eduHtml ? `<h2>Education</h2>${eduHtml}` : ''}
+${skillsHtml ? `<h2>Skills</h2><div>${skillsHtml}</div>` : ''}
+</body></html>`;
+}
+
+// PUBLIC — no requireAuth. Reads exclusively from the published-sites
+// index; never touches data/resumes/*, so a bug here has no path to
+// leaking private resume data — only what buildPublicProjection() already
+// wrote at publish time.
+app.get('/cv/:slug', publicSiteLimiter, (req, res) => {
+  const slug = String(req.params.slug || '').toLowerCase();
+  const idx = loadPublishedIndex();
+  const rec = idx[slug];
+  // no-store: an unpublish must take effect immediately, not be served
+  // stale from a browser or intermediary cache for however long a normal
+  // cache lifetime would otherwise allow.
+  res.set('Cache-Control', 'no-store');
+  if (!rec){
+    return res.status(404).send('<!doctype html><title>Not found</title><body style="font-family:sans-serif;text-align:center;padding:80px 20px;color:#6B7280"><h2>This page isn\'t available.</h2><p>It may have been unpublished.</p></body>');
+  }
+  res.send(publicSiteHTML(rec.projection, rec.indexable));
 });
 
 // ============================================================
