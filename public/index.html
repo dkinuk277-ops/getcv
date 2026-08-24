@@ -549,10 +549,11 @@ body:has(#view-pro.on) .ticker, body:has(#view-fresher.on) .ticker{ flex-shrink:
 .saved-row .sname{font-weight:600;font-size:13.5px;color:var(--ink)}
 .saved-row .smeta{font-size:11.5px;color:var(--ink-soft);margin-top:1px}
 .saved-row .sbtns{display:flex;gap:7px}
-.saved-tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--line)}
-.saved-tab{background:none;border:none;font-family:inherit;font-size:12.5px;font-weight:700;
-  color:var(--ink-soft);padding:8px 4px 10px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
-.saved-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.saved-tabs{display:flex;gap:8px;margin-bottom:16px}
+.saved-tab{background:#fff;border:1.5px solid var(--line);border-radius:999px;font-family:inherit;
+  font-size:12.5px;font-weight:700;color:var(--ink-soft);padding:8px 18px;cursor:pointer}
+.saved-tab:hover{border-color:var(--accent);color:var(--accent)}
+.saved-tab.on{color:#fff;background:var(--accent);border-color:var(--accent)}
 .cl-tones{display:flex;gap:8px}
 .cl-tone-btn{flex:1;background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px;
   font-family:inherit;font-size:12.5px;font-weight:700;color:var(--ink-soft);cursor:pointer}
