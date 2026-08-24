@@ -3911,6 +3911,7 @@ $('#savedTabCL').addEventListener('click', ()=>{
 let pubFieldState = { email:false, phone:false, photo:false };
 let pubIndexable = false;
 let pubResumeId = null;
+let pubResumeData = null; // full data for the resume the modal was opened on — never R
 let pubSlugCheckTimer = null;
 let pubCurrentSlug = null; // set once actually published, for Unpublish
 
@@ -3927,6 +3928,12 @@ function pubError(msg){
 
 async function openPublishModal(resumeId, resumeName){
   pubResumeId = resumeId;
+  // Fetched here rather than reused from R, which is only the resume
+  // currently open in the editor — not necessarily the one this row
+  // belongs to. Publishing must always use THIS row's saved data, whatever
+  // else happens to be loaded on screen; publish is disabled until this
+  // load succeeds so it can never fall back to the wrong resume silently.
+  pubResumeData = null;
   pubFieldState = { email:false, phone:false, photo:false };
   pubIndexable = false;
   pubCurrentSlug = null;
@@ -3934,25 +3941,37 @@ async function openPublishModal(resumeId, resumeName){
   $('#pubResumeLabel').textContent = 'From "' + resumeName + '"';
   document.querySelectorAll('.pub-field:not(.locked) .pub-toggle').forEach(t => t.classList.remove('on'));
   $('#pubIndexToggle').classList.remove('on');
+  $('#pubSlug').value = '';
   $('#pubSlugStatus').textContent = '';
   pubShowPane('pubPaneForm');
+  $('#pubPublish').disabled = true;
+  $('#pubPublish').textContent = 'Loading…';
   $('#pubModal').classList.add('open');
 
-  // Check whether this resume already has a live page, so re-opening
-  // Publish on it shows the existing link instead of offering a duplicate.
   try{
-    const out = await api('/api/publish');
-    const existing = (out.sites || []).find(s => s.resumeId === resumeId);
+    const [resumeOut, publishOut] = await Promise.all([
+      api('/api/resumes/' + resumeId),
+      api('/api/publish').catch(()=>({sites:[]}))
+    ]);
+    pubResumeData = resumeOut.resume && resumeOut.resume.data;
+    $('#pubPublish').disabled = false;
+    $('#pubPublish').textContent = 'Publish →';
+
+    const existing = (publishOut.sites || []).find(s => s.resumeId === resumeId);
     if(existing){
       pubCurrentSlug = existing.slug;
       pubIndexable = existing.indexable;
       $('#pubLiveUrl').textContent = location.origin + '/cv/' + existing.slug;
       pubShowPane('pubPaneResult');
     } else {
-      const suggested = slugifyClient((R.personal && R.personal.name) || resumeName || '');
+      const suggested = slugifyClient((pubResumeData && pubResumeData.personal && pubResumeData.personal.name) || resumeName || '');
       $('#pubSlug').value = suggested;
     }
-  }catch{ /* not signed in yet, or listing failed — form still usable */ }
+  }catch(err){
+    pubError('Could not load this resume — please try again.');
+    $('#pubPublish').disabled = false;
+    $('#pubPublish').textContent = 'Publish →';
+  }
 }
 
 // Client-side mirror of the server's slugify, used only to PRE-FILL the
@@ -3993,11 +4012,12 @@ $('#pubSlug').addEventListener('input', function(){
 });
 
 $('#pubPublish').addEventListener('click', async ()=>{
+  if(!pubResumeData){ pubError('Still loading this resume — try again in a moment.'); return; }
   try{
     const out = await api('/api/publish', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        resumeId: pubResumeId, resumeData: R, fields: pubFieldState,
+        resumeId: pubResumeId, resumeData: pubResumeData, fields: pubFieldState,
         indexable: pubIndexable, customSlug: $('#pubSlug').value.trim()
       })
     });
