@@ -928,8 +928,29 @@ function pubTemplateCSS(tpl){
   return base + (byId[tpl] || byId.classic);
 }
 
+// Records published before a given deploy can lack fields a later version
+// of this code added (certifications/languages/projects/accomplishments/
+// courses/sectionOrder didn't exist until the 7-template rewrite). Without
+// this, an old stored record crashes the public route with a 500 the
+// instant any pubSectionBlock() reads .length on a field that was never
+// written for it. Every array/string this file reads is defaulted here,
+// once, so old data is always rendered as "that section is empty" rather
+// than taking the page down.
+function normalizeProjection(projection){
+  const p = projection || {};
+  const arr = v => Array.isArray(v) ? v : [];
+  return {
+    name: p.name || '', headline: p.headline || '', summary: p.summary || '',
+    email: p.email || '', phone: p.phone || '', photo: p.photo || '', linkedin: p.linkedin || '',
+    sectionOrder: arr(p.sectionOrder),
+    experience: arr(p.experience), education: arr(p.education), skills: arr(p.skills),
+    certifications: arr(p.certifications), languages: arr(p.languages),
+    projects: arr(p.projects), accomplishments: arr(p.accomplishments), courses: arr(p.courses)
+  };
+}
+
 function publicSiteHTML(projection, indexable, template){
-  const p = projection;
+  const p = normalizeProjection(projection);
   const tpl = PUB_TEMPLATES.has(template) ? template : 'classic';
   const usesBanner = tpl === 'modern' || tpl === 'banner';
   const usesSidebar = tpl === 'sidebar';
