@@ -1234,6 +1234,13 @@ SCORING LINKAGE — this drives a live "projected score" as the candidate select
 });
 
 // Legal pages: clean URLs
+// Help guide: signed-in users only (served from private/, not public/)
+app.get(['/help', '/help.html'], (req, res) => {
+  const t = getToken(req);
+  if (!(t && sessions[t])) return res.redirect('/');
+  res.setHeader('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'private', 'help.html'));
+});
 app.get('/privacy-policy', (req, res) => res.sendFile(path.join(__dirname, 'public', 'legal', 'privacy-policy.html')));
 app.get('/terms-of-use',   (req, res) => res.sendFile(path.join(__dirname, 'public', 'legal', 'terms-of-use.html')));
 
