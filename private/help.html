@@ -121,6 +121,22 @@ header{background-image:linear-gradient(180deg,rgba(255,255,255,.28) 0%,rgba(255
 .faqq .n{color:var(--rv-deep)}
 .shared{border-top-color:var(--rv-cardline)}
 .intro h2{color:#0B3B2A}
+
+/* glossy light-green question bars (signal "click to expand") */
+.faqitem{background:linear-gradient(180deg,#F4FCF8 0%,#DDF4E8 48%,#C9EDDA 52%,#D6F1E3 100%);
+  border:1px solid #8FD3B1;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 6px rgba(6,122,75,.12)}
+.faqitem:hover{border-color:var(--rv-main);box-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 3px 10px rgba(6,122,75,.2)}
+.faqq .chev{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(180deg,#34C98A,#067A4B);color:#fff;font-weight:700;font-size:15px;line-height:1}
+.faqitem[open]{background:linear-gradient(180deg,#34C98A 0%,#0FA968 50%,#067A4B 100%);border-color:#067A4B}
+.faqitem[open] .faqq,.faqitem[open] .faqq .n{color:#fff}
+.faqitem[open] .faqq .chev{background:rgba(255,255,255,.25)}
+.faqitem[open] .faqa{background:#fff;color:var(--ink-soft);padding-top:14px;margin-top:2px}
+.faqitem[open] .faqa b{color:var(--fg)}
+.pro .block,.fresh .block{--accent-mod:var(--pro)}
+.fresh .block{--accent-mod:var(--fresh)}
+.faqitem[open] .faqa{max-width:none;border-radius:0 0 11px 11px}
+.faqitem[open]{padding-bottom:0}
 </style>
 
 <header id="hhdr">
