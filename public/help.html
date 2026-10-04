@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reeve Help Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: dark app-chrome header (matches Reeve's own header) sits above
+   a light working surface; a two-way Professionals/Freshers toggle switches which
+   guide is shown, each built from Getting Started -> Ask AI guide -> FAQ accordion,
+   with a shared reference section underneath for things common to both modules. */
+:root{
+  --dc-ink:#0A1220; --dc-panel:#101B2E; --dc-line:#1E2D45;
+  --dc-blue:#5BC8F5; --dc-text:#E8EEF6; --dc-muted:#8FA3BD; --dc-gold:#E3B341;
+  --paper:#F6F7F4; --card:#FFFFFF; --ink:#1A2028; --ink-soft:#4B5563;
+  --line:#E3E6E0; --pro:#2196C9; --pro-soft:#E1F3FB;
+  --fresh:#0FA968; --fresh-soft:#E3F6ED;
+  --bg:var(--paper); --fg:var(--ink);
+  --radius:12px; --shadow:0 1px 3px rgba(26,32,40,.08),0 6px 18px rgba(26,32,40,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#0D1420; --fg:#E8EEF6; --card:#141E30; --line:#223047; --ink-soft:#9AAAC2; color-scheme:dark; }
+}
+:root[data-theme="dark"]{ --bg:#0D1420; --fg:#E8EEF6; --card:#141E30; --line:#223047; --ink-soft:#9AAAC2; color-scheme:dark; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--fg);line-height:1.6}
+h1,h2,h3{font-family:'Fraunces',serif}
+img{max-width:100%}
+
+/* ---- header, matches Reeve's own dark chrome ---- */
+header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px solid var(--dc-line);
+  padding:16px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(160deg,#34C98A,#0FA968 45%,#067A4B);
+  display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:700;color:#fff;font-size:15px;flex:none}
+.brand h1{font-size:19px;font-weight:700;color:#fff;letter-spacing:.01em}
+.brand-sub{font-size:11px;color:var(--dc-muted);margin-top:1px}
+.hdr-back{font-size:13px;color:var(--dc-blue);text-decoration:none;font-weight:600;border:1.5px solid var(--dc-blue);
+  border-radius:8px;padding:7px 14px;white-space:nowrap}
+
+.wrap{max-width:900px;margin:0 auto;padding:40px 20px 80px}
+.intro{margin-bottom:34px}
+.intro h2{font-size:30px;font-weight:600;margin-bottom:10px;text-wrap:balance}
+.intro p{color:var(--ink-soft);font-size:15px;max-width:60ch}
+
+/* ---- module toggle ---- */
+.toggle{display:flex;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;
+  padding:5px;margin-bottom:36px;max-width:480px;box-shadow:var(--shadow)}
+.toggle button{flex:1;border-radius:999px;padding:11px 18px;font-size:14px;font-weight:600;
+  color:var(--ink-soft);background:transparent;transition:background .15s,color .15s}
+.toggle button.on.pro{background:var(--pro);color:#fff}
+.toggle button.on.fresh{background:var(--fresh);color:#fff}
+
+.mod{display:none}
+.mod.on{display:block}
+
+/* ---- section blocks ---- */
+.block{margin-bottom:40px}
+.block > h3{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--accent-mod);margin-bottom:14px}
+.pro .block > h3{--accent-mod:var(--pro)}
+.fresh .block > h3{--accent-mod:var(--fresh)}
+
+/* getting started steps */
+.steps{list-style:none;counter-reset:step;display:flex;flex-direction:column;gap:2px}
+.steps li{counter-increment:step;display:flex;gap:14px;padding:14px 4px;border-bottom:1px solid var(--line)}
+.steps li:last-child{border-bottom:none}
+.steps li::before{content:counter(step);flex:none;width:26px;height:26px;border-radius:50%;
+  background:var(--accent-mod);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.steps b{display:block;font-size:14.5px;margin-bottom:2px}
+.steps span{font-size:13.5px;color:var(--ink-soft)}
+
+/* ask-ai guide cards */
+.aiguide{display:flex;flex-direction:column;gap:10px}
+.aicard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.aicard b{font-size:14px;display:block;margin-bottom:6px}
+.aicard .ex{font-size:13px;color:var(--ink-soft);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 11px;margin-top:6px;display:inline-block}
+.aicard .exrow{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+
+/* faq accordion */
+.faq{display:flex;flex-direction:column;gap:8px}
+.faqitem{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.faqq{width:100%;text-align:left;padding:15px 18px;font-size:14px;font-weight:600;
+  display:flex;align-items:center;justify-content:space-between;gap:12px}
+.faqq .n{color:var(--ink-soft);font-weight:700;margin-right:10px}
+.faqq .chev{flex:none;transition:transform .18s;color:var(--ink-soft)}
+.faqitem[open] .chev{transform:rotate(45deg)}
+.faqa{padding:0 18px 16px 44px;font-size:13.5px;color:var(--ink-soft);max-width:68ch}
+summary{list-style:none;cursor:pointer}
+summary::-webkit-details-marker{display:none}
+
+/* shared section */
+.shared{border-top:1px solid var(--line);padding-top:36px;margin-top:8px}
+.shared h2{font-size:20px;margin-bottom:18px}
+.sharedgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+@media (max-width:620px){.sharedgrid{grid-template-columns:1fr}}
+.sharedcard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.sharedcard b{font-size:14px;display:block;margin-bottom:5px}
+.sharedcard span{font-size:13px;color:var(--ink-soft)}
+
+.faqa ol{margin:6px 0 4px 18px;display:flex;flex-direction:column;gap:7px}
+.faqa ol li{padding-left:4px}
+.faqa b{color:var(--fg)}
+.faqa .note{margin-top:10px;padding:9px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--line);font-size:12.5px}
+.gtitle{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-soft);margin:26px 0 12px}
+.faqa{max-width:72ch}
+</style>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">R</div>
+    <div>
+      <h1>Reeve Help Center</h1>
+      <div class="brand-sub">AI Resume Builder · by DeCompliance</div>
+    </div>
+  </div>
+  <a class="hdr-back" href="/">&larr; Back to Reeve</a>
+</header>
+
+<div class="wrap">
+  <div class="intro">
+    <h2>Everything you need to build a resume that actually gets read.</h2>
+    <p>Pick the guide that matches where you are. Professionals import and tailor an existing CV against a job description; Freshers build one from scratch with guided prompts. Both share the same Ask AI bar, templates, cover letters and publishing tools.</p>
+  </div>
+
+  <div class="toggle">
+    <button class="on pro" data-mod="pro" onclick="showMod('pro')">For Professionals</button>
+    <button class="fresh" data-mod="fresh" onclick="showMod('fresh')">For Freshers / Graduates</button>
+  </div>
+
+  <!-- ================= PROFESSIONALS ================= -->
+  <div class="mod pro on" id="mod-pro">
+    <div class="block">
+      <h3>Getting Started</h3>
+      <ol class="steps">
+        <li><div><b>Import your existing CV</b><span>Upload a PDF, Word doc, or paste your text — Reeve extracts your experience, skills and education into an editable structure.</span></div></li>
+        <li><div><b>Paste the job description</b><span>Drop in the JD for the role you're applying to so the tailoring and ATS scoring both work against the right target.</span></div></li>
+        <li><div><b>Review the Quality Score</b><span>Check Vocabulary, Grammar, Text Errors, Structure and Completeness — each is clickable and jumps you straight to the issue.</span></div></li>
+        <li><div><b>Tailor with the Ask AI bar</b><span>Ask it to add, rewrite or tighten anything in plain English — see the examples below.</span></div></li>
+        <li><div><b>Export or publish</b><span>Download as PDF or Word, or publish a shareable link to send recruiters instead of an attachment.</span></div></li>
+      </ol>
+    </div>
+
+    <div class="block">
+      <h3>Using the Ask AI Bar</h3>
+      <div class="aiguide">
+        <div class="aicard"><b>Add content — in your own words</b>
+          <div class="exrow">
+            <span class="ex">add certification: ISO 42001 Lead Auditor, BSI, 2025</span>
+            <span class="ex">add 3 bullet points about the ISO 27001 audit under work experience</span>
+          </div>
+        </div>
+        <div class="aicard"><b>Delete something</b>
+          <div class="exrow"><span class="ex">delete my last job</span><span class="ex">remove the AIMS certification</span></div>
+        </div>
+        <div class="aicard"><b>Update a field</b>
+          <div class="exrow"><span class="ex">change my job title to Senior GRC Analyst</span><span class="ex">update the year on my ISO 27001 cert to 2024</span></div>
+        </div>
+        <div class="aicard"><b>Expand existing content</b>
+          <div class="exrow"><span class="ex">write more about my AI governance work under summary</span></div>
+        </div>
+        <div class="aicard"><b>Fix grammar, wording or impact</b>
+          <div class="exrow"><span class="ex">fix all issues</span><span class="ex">add metrics to my accomplishments</span></div>
+        </div>
+        <div class="aicard"><b>Ask a question — it answers, doesn't change anything</b>
+          <div class="exrow"><span class="ex">any grammar issues?</span><span class="ex">what's missing?</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>FAQ</h3>
+      <div class="faq">
+        <details class="faqitem"><summary class="faqq"><span><span class="n">01</span>How is the Professional module different from Fresher?</span><span class="chev">+</span></summary>
+          <div class="faqa">Professional starts from a CV you already have and tailors it to a job description. Fresher starts from a blank profile and builds one up from courses, projects and skills with no work history assumed.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">02</span>How do I import my existing CV?</span><span class="chev">+</span></summary>
+          <div class="faqa">Upload a PDF or Word file, or paste the text directly, when you start a new resume. Reeve parses it into sections automatically — review the result, since parsing an unusual layout can occasionally misplace a line.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">03</span>How does ATS scoring work, and what's a "good" score?</span><span class="chev">+</span></summary>
+          <div class="faqa">The Structure sub-score checks whether your template's layout (columns, tables, text boxes) can be parsed correctly by screening software. 100% means the layout is safe; anything lower flags a specific risk and how to fix it.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">04</span>How do I tailor my resume to a specific job description?</span><span class="chev">+</span></summary>
+          <div class="faqa">Paste the JD where prompted when you import or open a resume. Reeve highlights matching and missing keywords and skills so you can decide what to add — it won't invent experience you didn't have.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">05</span>What does the AI Builder change vs. what do I edit myself?</span><span class="chev">+</span></summary>
+          <div class="faqa">The AI Builder only acts on what you ask it to, and only uses facts you've stated — it never invents numbers, employers or outcomes. Anything left blank after an AI add is shown clearly as blank, for you to fill in yourself.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">06</span>How do I ask the AI to add, update or delete something?</span><span class="chev">+</span></summary>
+          <div class="faqa">Plain English works — you don't need a magic phrase. "Add skill: Kubernetes", "remove my second certification" or "explain my AI research work in a few lines under projects" are all understood, the same way you'd ask a person to update a document.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">07</span>Why didn't my change show up in the preview?</span><span class="chev">+</span></summary>
+          <div class="faqa">The right-hand preview updates automatically a moment after any change. If it looks stale, try a hard refresh (Cmd/Ctrl+Shift+R) — your browser may be holding an older cached version of the page.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">08</span>Can I undo an AI change?</span><span class="chev">+</span></summary>
+          <div class="faqa">Yes — every AI edit shows a confirmation of exactly what landed and where, with an undo option right there before you move on.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">09</span>How do I generate a cover letter from my resume?</span><span class="chev">+</span></summary>
+          <div class="faqa">Open the Cover Letter tab, answer a few short prompts (company, role, tone) and it drafts a letter using your actual resume content — downloadable and saved separately under Cover Letters.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">10</span>How do I switch templates without losing my content?</span><span class="chev">+</span></summary>
+          <div class="faqa">Templates only change layout and styling — your content stays exactly as it is. Click Templates in the left panel and pick any of the 25 templates at any time.</div></details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FRESHERS ================= -->
+  <div class="mod fresh" id="mod-fresh">
+    <div class="block">
+      <h3>Getting Started</h3>
+      <ol class="steps">
+        <li><div><b>Start a fresh profile</b><span>No CV to import yet — you'll build this one from your education, projects and courses instead of a job history.</span></div></li>
+        <li><div><b>Fill in Education first</b><span>Your degree, institution and graduation year anchor the rest of the resume when there's no work history yet.</span></div></li>
+        <li><div><b>Add Projects, Courses and Skills</b><span>Coursework, dissertations, hackathons, internships and certifications all count — use the Ask AI bar to turn a rough description into proper resume lines.</span></div></li>
+        <li><div><b>Write your Summary last</b><span>Once the rest is filled in, ask the AI to draft a summary — it's easier to summarise content that already exists.</span></div></li>
+        <li><div><b>Check Completeness, then export or publish</b><span>The Completeness score flags anything recruiters expect to see that's still missing.</span></div></li>
+      </ol>
+    </div>
+
+    <div class="block">
+      <h3>Using the Ask AI Bar</h3>
+      <div class="aiguide">
+        <div class="aicard"><b>Add content — in your own words</b>
+          <div class="exrow">
+            <span class="ex">add a course on AI governance under courses</span>
+            <span class="ex">explain my final-year project on fraud detection in a few lines under projects</span>
+          </div>
+        </div>
+        <div class="aicard"><b>Add skills or languages</b>
+          <div class="exrow"><span class="ex">I know Python, SQL and Power BI</span></div>
+        </div>
+        <div class="aicard"><b>Write your Summary</b>
+          <div class="exrow"><span class="ex">write a couple of lines about my interest in data analytics for my summary</span></div>
+        </div>
+        <div class="aicard"><b>Fix or improve wording</b>
+          <div class="exrow"><span class="ex">make my project description sound more confident</span></div>
+        </div>
+        <div class="aicard"><b>Ask a question</b>
+          <div class="exrow"><span class="ex">what fields are blank?</span><span class="ex">is my layout ATS-safe?</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>FAQ</h3>
+      <div class="faq">
+        <details class="faqitem"><summary class="faqq"><span><span class="n">01</span>I have no work experience — what goes in my resume?</span><span class="chev">+</span></summary>
+          <div class="faqa">Lead with Education, Projects, Courses and Skills. Internships, part-time work, volunteering and significant coursework all belong in Experience or Projects — recruiters reading graduate resumes expect this shape.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">02</span>How do I turn coursework or a project into resume content?</span><span class="chev">+</span></summary>
+          <div class="faqa">Describe it to the Ask AI bar in plain language — what you built, studied or achieved — and tell it which section. It turns a rough description into proper resume-style lines without inventing details you didn't give it.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">03</span>How do I ask the AI to add a course, certification or skill?</span><span class="chev">+</span></summary>
+          <div class="faqa">Just say it naturally — "add a certification for AIMS, Coursera, 2024" or "I completed a cybersecurity course with Google" both work, with or without the word "add".</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">04</span>What's a good way to write my Summary with no job history?</span><span class="chev">+</span></summary>
+          <div class="faqa">Fill in Education, Projects and Skills first, then ask the AI to write the summary — it draws on what's already there instead of generic filler, so fill in real content first.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">05</span>How does the Quality Score work for a fresher profile?</span><span class="chev">+</span></summary>
+          <div class="faqa">The same five checks apply — Vocabulary, Grammar, Text Errors, Structure, Completeness — but Completeness is scored against what a graduate resume needs, not a 10-year career history.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">06</span>Can I add internships, volunteering or college projects as "experience"?</span><span class="chev">+</span></summary>
+          <div class="faqa">Yes — anything with a role, a timeframe and real responsibilities belongs under Experience, whether or not it was a paid, full-time job.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">07</span>How do I add bullet points under a specific project or course?</span><span class="chev">+</span></summary>
+          <div class="faqa">Name the project or course and what you want added — "add 2 bullet points about the results under my fraud detection project" — and it appends to that specific entry rather than creating a new one.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">08</span>Why does the AI sometimes put something under the wrong section?</span><span class="chev">+</span></summary>
+          <div class="faqa">Name the section explicitly when a request could read more than one way — "...under projects" or "...in my summary" — and that explicit target always wins over a guess.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">09</span>How do I know if my resume will pass ATS screening with no work history?</span><span class="chev">+</span></summary>
+          <div class="faqa">Check the Structure score — it evaluates your template's layout, not your experience level, so a graduate resume in a safe template scores exactly as well as a senior one.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">10</span>How do I publish a shareable link to my resume for recruiters?</span><span class="chev">+</span></summary>
+          <div class="faqa">Open Publish from the preview panel, pick one of 7 visual templates, and get a clean, shareable link — no CV attachment needed.</div></details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SHARED ================= -->
+  <div class="shared">
+    <h2>Step-by-step guides</h2>
+    <p style="color:var(--ink-soft);font-size:14px;margin-bottom:6px;max-width:62ch">These work the same for Professionals and Freshers.</p>
+    <div class="gtitle">Saved Documents &amp; published links</div>
+    <div class="faq">
+        <details class="faqitem"><summary class="faqq"><span><span class="n">S1</span>Where do I find my saved resumes?</span><span class="chev">+</span></summary>
+          <div class="faqa"><ol><li>Click <b>Saved Documents</b> in the left panel (or open your account menu, the round avatar top right, and choose <b>Saved Documents</b>).</li><li>A window titled <b>Saved</b> opens with two tabs: <b>Resumes</b> and <b>Cover Letters</b>.</li><li>Under <b>Resumes</b>, each saved resume is a row showing its name, template and last-updated date. Click <b>Open</b> to keep editing it.</li></ol></div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">S2</span>Where exactly do I find my published link?</span><span class="chev">+</span></summary>
+          <div class="faqa"><ol><li>Open <b>Saved Documents</b> and stay on the <b>Resumes</b> tab.</li><li>Find the resume you published and click <b>Publish</b> on its row.</li><li>If that resume is already live, the window opens straight on your link (for example <i>yoursite/cv/your-name</i>) with <b>Copy</b>, <b>View live</b> and <b>Unpublish</b> buttons.</li><li>If it isn't live yet, you'll see the publish form instead. Choose what to show, pick a template, then click <b>Publish</b>.</li></ol><div class="note">Each resume has its own link. You can have up to 10 published pages at a time.</div></div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">S3</span>How do I publish a resume step by step?</span><span class="chev">+</span></summary>
+          <div class="faqa"><ol><li>Save the resume first (the <b>Save</b> button in the toolbar). Only saved resumes can be published.</li><li>Open <b>Saved Documents</b> &rarr; <b>Resumes</b> and click <b>Publish</b> on that resume's row.</li><li>Under <b>What's on the page</b>, switch on any extras you want public: email, phone, photo. Experience, summary and skills are always shown.</li><li>Type the ending of your link in the <b>Link</b> box. A green &ldquo;Available&rdquo; tick means it's yours.</li><li>Choose one of the 7 looks, then click <b>Publish</b>.</li><li>Copy the link and share it with recruiters. Use <b>Unpublish</b> any time and the link stops working immediately.</li></ol></div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">S4</span>How many resumes can I save, and how do I keep one per job?</span><span class="chev">+</span></summary>
+          <div class="faqa"><p>You can save up to <b>20 resumes</b> and <b>20 cover letters</b>. There are no folders yet, so the practical way to keep one resume per job description is to give each a clear name:</p><ol><li>Tailor your base resume to the job (see the guide below).</li><li>When asked <b>Name this tailored resume</b>, use a pattern such as <i>Barclays - Senior GRC Manager - Oct 2026</i>.</li><li>Repeat for every job. Your original is never overwritten; each tailored version is saved as a new resume.</li><li>Find any of them later in <b>Saved Documents</b> &rarr; <b>Resumes</b> and click <b>Open</b>.</li></ol><div class="note">Reached 20? Delete a resume you no longer need (the red <b>Delete</b> button on its row) to free a slot.</div></div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">S5</span>Can I delete a saved resume or a published page?</span><span class="chev">+</span></summary>
+          <div class="faqa">Yes. In <b>Saved Documents</b> click <b>Delete</b> on a row and confirm. Deleting is permanent. To take a published page offline without deleting the resume, open its <b>Publish</b> window and click <b>Unpublish</b>.</div></details>
+    </div>
+    <div class="gtitle">Tailor to a job description &amp; ATS check</div>
+    <div class="faq">
+        <details class="faqitem"><summary class="faqq"><span><span class="n">T1</span>How do I tailor my resume to a job step by step?</span><span class="chev">+</span></summary>
+          <div class="faqa"><ol><li>Open or import the resume you want to start from.</li><li>Click the gold <b>Tailor your CV to Job Description</b> button in the toolbar.</li><li><b>Step 1 - Paste job:</b> enter the job title, optionally the company, and paste the <i>whole</i> job listing. More text gives better results. Click <b>Analyse &amp; tailor</b>.</li><li><b>Step 2 - Review &amp; apply:</b> read your match score and the table of requirements. Tick the changes you want, edit any wording, or use <b>Apply all verified</b>.</li><li>Click <b>Apply changes</b>, then <b>Preview</b> to see exactly where each change landed (amber highlights show what changed).</li><li><b>Step 4 - Saved:</b> give the tailored resume a name and click <b>Save resume</b>. It opens in the builder, ready to download.</li></ol></div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">T2</span>How do I read the ATS match score?</span><span class="chev">+</span></summary>
+          <div class="faqa"><ol><li>The big ring is your <b>Match Score</b>: how many skills the job asks for are already evidenced in your resume.</li><li><b>Matched</b>: clearly present, nothing to do.</li><li><b>Partial</b>: you've done it but worded it differently from the job description, so reword it.</li><li><b>Missing</b>: related experience exists but this exact requirement isn't stated.</li><li><b>Not found</b>: nothing in your CV relates to it. This is a real gap, not a wording problem.</li><li>Click the Matched, Partial or Missing tiles to jump to those rows.</li></ol><div class="note">The score estimates how you'd fare with screening software. It is not a promise of an interview.</div></div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">T3</span>Will tailoring invent experience I don't have?</span><span class="chev">+</span></summary>
+          <div class="faqa">No. Reeve only reframes and reorders what is already true on your resume. Anything it can't verify is flagged and left for you to decide, and each suggested change is yours to accept or reject before anything is applied.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">T4</span>Why isn't my score 100%?</span><span class="chev">+</span></summary>
+          <div class="faqa">Click <b>Apply changes</b> and a short summary explains what is still holding the score back, usually genuine gaps such as a tool or qualification you don't list. Those are not fixed by rewording. Add them only if they are true for you.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">T5</span>Can I tailor the same resume for many jobs?</span><span class="chev">+</span></summary>
+          <div class="faqa">Yes. Each run saves a <i>new</i> resume under the name you choose, and your base resume stays untouched. Start the next job from the same base. Use <b>Clear &amp; Start New Job</b> at the top of the Tailor window to wipe the previous job description first.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">T6</span>I closed the window by mistake. Is my pasted job lost?</span><span class="chev">+</span></summary>
+          <div class="faqa">No. When you reopen Tailor you'll see &ldquo;Welcome back - we restored your last pasted job and results&rdquo;. Click <b>Clear &amp; Start New Job</b> when you want a clean slate.</div></details>
+    </div>
+    <div class="gtitle">Cover letters</div>
+    <div class="faq">
+        <details class="faqitem"><summary class="faqq"><span><span class="n">C1</span>How do I create a cover letter step by step?</span><span class="chev">+</span></summary>
+          <div class="faqa"><ol><li>Open the resume you want the letter based on (the letter is drafted from the resume on screen).</li><li>Click <b>Cover Letter</b> in the toolbar.</li><li>Enter the <b>Company</b> and <b>Job title</b>.</li><li>Pick a <b>Tone</b>: Formal, Confident (default) or Warm.</li><li>Optionally add a note, such as why this company or a career change.</li><li>Click <b>Generate draft</b>. The letter appears in an editable box.</li><li>Edit any line, or click <b>Regenerate</b> for a fresh version.</li></ol></div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">C2</span>How do I save or download a cover letter?</span><span class="chev">+</span></summary>
+          <div class="faqa"><ol><li>Click <b>Save</b> to keep it. It is stored under <b>Saved Documents</b> &rarr; <b>Cover Letters</b>.</li><li>Use <b>Word</b>, <b>PDF</b> or <b>HTML</b> to download a copy.</li><li>To come back later, open <b>Saved Documents</b>, switch to the <b>Cover Letters</b> tab and click <b>Open</b>.</li></ol><div class="note">You can keep up to 20 saved cover letters.</div></div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">C3</span>Will the cover letter make things up?</span><span class="chev">+</span></summary>
+          <div class="faqa">No. It is drafted from the resume you have open, and nothing is added that isn't already on it. Use the optional note box if you want to mention something specific, and review the text before sending.</div></details>
+        <details class="faqitem"><summary class="faqq"><span><span class="n">C4</span>Can I write a different letter for each job?</span><span class="chev">+</span></summary>
+          <div class="faqa">Yes. Change the company and job title, regenerate, and save. Give each saved letter a name that matches the job so you can tell them apart in the Cover Letters tab.</div></details>
+    </div>
+
+    <h2 style="margin-top:44px">Quick reference</h2>
+    <div class="sharedgrid">
+      <div class="sharedcard"><b>Cover Letters</b><span>Drafted from your resume with company, role and tone. Saved separately.</span></div>
+      <div class="sharedcard"><b>Saved Documents</b><span>Two tabs: Resumes and Cover Letters. Open, publish or delete from each row.</span></div>
+      <div class="sharedcard"><b>Publishing a personal page</b><span>A shareable link per resume, 7 looks, you choose what is public.</span></div>
+      <div class="sharedcard"><b>Downloading PDF / Word</b><span>Export matches your live preview, in any of the 25 templates.</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showMod(which){
+  document.querySelectorAll('.toggle button').forEach(function(b){ b.classList.toggle('on', b.dataset.mod===which); });
+  document.querySelectorAll('.mod').forEach(function(m){ m.classList.toggle('on', m.id==='mod-'+which); });
+  try{ localStorage.setItem('reeveHelpMod', which); }catch(e){}
+}
+try{
+  var saved = localStorage.getItem('reeveHelpMod');
+  if(saved==='fresh') showMod('fresh');
+}catch(e){}
+</script>
+
+</html>

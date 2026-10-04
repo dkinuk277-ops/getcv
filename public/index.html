@@ -40,6 +40,8 @@ header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px soli
 .brand-sub{font-size:11px;color:var(--dc-muted);margin-top:1px}
 .brand-sub a{color:var(--dc-blue);text-decoration:none;font-weight:600}
 .hdr-right{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--dc-muted)}
+.hdr-help{color:var(--dc-text);text-decoration:none;font-weight:600;font-size:13px;padding:6px 12px;border:1px solid var(--dc-line);border-radius:999px;background:rgba(91,200,245,.08)}
+.hdr-help:hover{border-color:var(--dc-blue);color:var(--dc-blue)}
 .hdr-right .user{color:var(--dc-text);font-weight:600}
 .btn-dline{background:transparent;color:var(--dc-blue);border:1.5px solid var(--dc-blue);
   font-size:13px;font-weight:600;border-radius:8px;padding:7px 14px;cursor:pointer;font-family:inherit}
@@ -1797,6 +1799,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
     <div class="brand-sub">Powered by <a href="https://www.decompliance.uk" target="_blank" rel="noopener">DeCompliance</a> · AI GRC Intelligence</div>
   </div>
   <div class="hdr-right" id="hdrRight" style="display:none">
+    <a class="hdr-help" href="/help.html" target="_blank" rel="noopener" title="Help &amp; FAQs (opens in a new tab)">? Help</a>
     <button class="user user-btn user-btn-avatar-only" id="hdrUser" type="button" title="Your account">
       <span class="user-avatar" id="hdrAvatar"></span>
     </button>
