@@ -388,13 +388,13 @@ function resumesFile(email){
 }
 function loadResumes(email){ return loadJSON(resumesFile(email), []); }
 function saveResumes(email, list){ saveJSON(resumesFile(email), list); }
-const MAX_SAVED = 20;
+const MAX_SAVED = 100;
 
 // List (lightweight - no full data)
 app.get('/api/resumes', requireAuth, (req, res) => {
   const list = loadResumes(req.user.email).map(r => ({
     id: r.id, name: r.name, template: r.template, updated: r.updated,
-    who: r.data?.personal?.name || '', title: r.data?.experience?.[0]?.title || ''
+    folder: r.folder || '', who: r.data?.personal?.name || '', title: r.data?.experience?.[0]?.title || ''
   }));
   list.sort((a,b)=> (b.updated||'').localeCompare(a.updated||''));
   res.json({ success: true, resumes: list });
@@ -403,6 +403,8 @@ app.get('/api/resumes', requireAuth, (req, res) => {
 // Save / update
 app.post('/api/resumes', requireAuth, (req, res) => {
   const { id, name, template, data } = req.body || {};
+  const hasFolder = typeof (req.body||{}).folder === 'string';
+  const folder = hasFolder ? req.body.folder.trim().slice(0, 60) : '';
   if (!name || !name.trim()) return res.status(400).json({ error: 'Please give this resume a name' });
   if (!data || typeof data !== 'object') return res.status(400).json({ error: 'No resume data to save' });
   const list = loadResumes(req.user.email);
@@ -412,15 +414,26 @@ app.post('/api/resumes', requireAuth, (req, res) => {
     existing.name = name.trim().slice(0, 80);
     existing.template = template || existing.template;
     existing.data = data;
+    if (hasFolder) existing.folder = folder;
     existing.updated = now;
   } else {
     if (list.length >= MAX_SAVED) return res.status(400).json({ error: `Maximum ${MAX_SAVED} saved resumes — delete one first` });
     list.push({ id: crypto.randomBytes(8).toString('hex'), name: name.trim().slice(0, 80),
-      template: template || 'exec-navy', data, created: now, updated: now });
+      template: template || 'exec-navy', folder, data, created: now, updated: now });
   }
   saveResumes(req.user.email, list);
   const saved = existing || list[list.length - 1];
   res.json({ success: true, id: saved.id });
+});
+
+// Move a resume into a folder (empty string = no folder)
+app.patch('/api/resumes/:id/folder', requireAuth, (req, res) => {
+  const list = loadResumes(req.user.email);
+  const r = list.find(x => x.id === req.params.id);
+  if (!r) return res.status(404).json({ error: 'Resume not found' });
+  r.folder = String((req.body||{}).folder || '').trim().slice(0, 60);
+  saveResumes(req.user.email, list);
+  res.json({ success: true, folder: r.folder });
 });
 
 // Load one (full data)

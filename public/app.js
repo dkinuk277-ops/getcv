@@ -3329,17 +3329,21 @@ async function saveCurrentResume(){
   const suggested = (R.personal.name ? R.personal.name + ' — ' : '') + 'CV ' + new Date().toLocaleDateString();
   const name = window.prompt('Name this resume:', currentResumeName || suggested);
   if(name === null) return; // cancelled
+  const folderIn = window.prompt('Folder (optional) — e.g. a company or job, to keep resumes for different job descriptions together. Leave blank for none:', currentResumeFolder || '');
+  if(folderIn === null) return;
   try{
     const out = await api('/api/resumes', {method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ id: currentResumeId, name, template: selectedTemplate, data: R })});
+      body: JSON.stringify({ id: currentResumeId, name, folder: folderIn.trim(), template: selectedTemplate, data: R })});
     currentResumeId = out.id;
     currentResumeName = name;
+    currentResumeFolder = folderIn.trim();
     toast('💾 Saved "' + name + '"');
     loadSavedList();
   }catch(err){ toast('Save failed: ' + err.message, 5000); }
 }
 let currentResumeName = '';
+let currentResumeFolder = '';
 
 async function loadSavedList(){
   let items = [];
@@ -3354,7 +3358,16 @@ async function loadSavedList(){
         'No saved resumes yet — build one and click 💾 Save in the toolbar above.'));
       return;
     }
-    items.forEach(item=>{
+    const folderNames = [...new Set(items.map(i=>i.folder).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    const ordered = [];
+    folderNames.forEach(f=> ordered.push({head:f}, ...items.filter(i=>i.folder===f)));
+    const loose = items.filter(i=>!i.folder);
+    if(loose.length){ if(folderNames.length) ordered.push({head:''}); ordered.push(...loose); }
+    ordered.forEach(item=>{
+      if(item.head !== undefined){
+        listEl.appendChild(el('div',{class:'saved-folder'}, item.head ? '📁 ' + item.head : '📄 No folder'));
+        return;
+      }
       const tplName = (TEMPLATES.find(t=>t.id===item.template)||{}).name || item.template;
       const row = el('div',{class:'saved-row'});
       row.innerHTML = `<div>
@@ -3362,11 +3375,21 @@ async function loadSavedList(){
           <div class="smeta">${esc(item.who||'')}${item.title?' · '+esc(item.title):''} · ${tplName} · updated ${new Date(item.updated).toLocaleDateString()}</div>
         </div>
         <div class="sbtns">
+          <button class="btn btn-ghost" data-move type="button">Move</button>
           <button class="btn btn-ghost" data-publish type="button">Publish</button>
           <button class="btn btn-ghost" data-open type="button">Open</button>
           <button class="btn btn-danger" data-del type="button">Delete</button>
         </div>`;
       row.querySelector('[data-open]').addEventListener('click', ()=> openSavedResume(item.id));
+      row.querySelector('[data-move]').addEventListener('click', async ()=>{
+        const f = window.prompt('Move "' + item.name + '" to folder (leave blank for no folder):', item.folder || '');
+        if(f === null) return;
+        try{
+          await api('/api/resumes/' + item.id + '/folder', {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({folder:f})});
+          if(currentResumeId === item.id) currentResumeFolder = f.trim();
+          loadSavedList();
+        }catch(err){ toast('Move failed: ' + err.message, 5000); }
+      });
       row.querySelector('[data-publish]').addEventListener('click', ()=> openPublishModal(item.id, item.name));
       row.querySelector('[data-del]').addEventListener('click', async ()=>{
         if(!window.confirm('Delete "' + item.name + '"? This cannot be undone.')) return;
@@ -3390,6 +3413,7 @@ async function openSavedResume(id){
     if(TEMPLATES.some(t=>t.id===r.template)) selectedTemplate = r.template;
     currentResumeId = r.id;
     currentResumeName = r.name;
+    currentResumeFolder = r.folder || '';
     moveEditorTo(currentModule);
     buildEditor();
     $('#savedModal').classList.remove('open');
@@ -3408,7 +3432,7 @@ document.querySelectorAll('.js-upload').forEach(b => b.addEventListener('click',
 // Refresh: clear current resume data and start clean (with save prompt)
 function clearBuilder(){
   R = emptyResume();
-  currentResumeId = null; currentResumeName = '';
+  currentResumeId = null; currentResumeName = ''; currentResumeFolder = '';
   builtForModule = null;
   $('#editorWrap').classList.add('hidden');
   hideAIBuilder();
@@ -5050,11 +5074,12 @@ $('#tlSaveNameConfirm').addEventListener('click', async ()=>{
     const tailored = applyTailorChanges(R, tailorResult.changes, accepted);
     const out = await api('/api/resumes', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ name, template: selectedTemplate, data: tailored })
+      body: JSON.stringify({ name, folder: ($('#tlCompany').value.trim() || $('#tlTitle').value.trim()), template: selectedTemplate, data: tailored })
     });
     R = normalize(tailored);
     currentResumeId = out.id;
     currentResumeName = name;
+    currentResumeFolder = ($('#tlCompany').value.trim() || $('#tlTitle').value.trim());
     buildEditor();
     renderLivePreview();
     loadSavedList();
