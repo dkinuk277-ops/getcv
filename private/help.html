@@ -17,10 +17,6 @@
   --bg:var(--paper); --fg:var(--ink);
   --radius:12px; --shadow:0 1px 3px rgba(26,32,40,.08),0 6px 18px rgba(26,32,40,.06);
 }
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){ --bg:#0D1420; --fg:#E8EEF6; --card:#141E30; --line:#223047; --ink-soft:#9AAAC2; color-scheme:dark; }
-}
-:root[data-theme="dark"]{ --bg:#0D1420; --fg:#E8EEF6; --card:#141E30; --line:#223047; --ink-soft:#9AAAC2; color-scheme:dark; }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--fg);line-height:1.6}
 h1,h2,h3{font-family:'Fraunces',serif}
@@ -104,6 +100,27 @@ summary::-webkit-details-marker{display:none}
 .faqa .note{margin-top:10px;padding:9px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--line);font-size:12.5px}
 .gtitle{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-soft);margin:26px 0 12px}
 .faqa{max-width:72ch}
+
+/* ---- Reeve green theme (matches the app) ---- */
+:root{
+  --rv-bright:#34C98A; --rv-main:#0FA968; --rv-deep:#067A4B; --rv-tint:#D9F2E4; --rv-cardline:#9BD8B9;
+  --rv-ink:#12233F; --rv-ink-soft:#4A5B76;
+  --bg:#C6EBD8; --fg:#12233F; --card:#FFFFFF; --line:#9BD8B9; --ink-soft:#4A5B76;
+  --pro:#067A4B; --pro-soft:#D9F2E4; --fresh:#B97800; --fresh-soft:#FFF1CF;
+  --shadow:0 1px 3px rgba(6,122,75,.12),0 6px 18px rgba(6,122,75,.10);
+  color-scheme:light;
+}
+body{background:linear-gradient(180deg,#C6EBD8,#A9DFC3) fixed;min-height:100vh}
+header{background-image:linear-gradient(180deg,rgba(255,255,255,.28) 0%,rgba(255,255,255,.08) 48%,rgba(255,255,255,0) 52%),linear-gradient(180deg,#34C98A 0%,#0FA968 45%,#067A4B 100%);
+  background-color:#0FA968;border-bottom:1px solid rgba(255,255,255,.25)}
+.brand-sub{color:#D9F5E8}
+.hdr-back{color:#fff;border-color:rgba(255,255,255,.7);background:rgba(255,255,255,.14)}
+.brand-mark{background:#fff;color:#067A4B}
+.aicard .ex,.faqa .note{background:#F2FBF6}
+.faqitem[open]{border-color:var(--rv-main)}
+.faqq .n{color:var(--rv-deep)}
+.shared{border-top-color:var(--rv-cardline)}
+.intro h2{color:#0B3B2A}
 </style>
 
 <header id="hhdr">
