@@ -1674,9 +1674,102 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
     const wantG  = all || /grammar|spell|punctuat|tense|full stop|typo/.test(cmd);
     const wantC  = all || /context|metric|number|measurab|impact/.test(cmd);
     if (!wantV && !wantG && !wantC) {
-      // Be specific about WHY nothing happened rather than always returning the
-      // same generic hint: the user needs to know which half of the instruction
-      // (the section, or the action) failed to land.
+      // Nothing above matched: no add/delete/update verb, no fix-type word.
+      // Rather than give up, ask Claude directly whether this reads as a
+      // request to add new content somewhere on the resume — this is the
+      // general natural-language fallback for phrasing that never uses a
+      // "magic word" like "add", e.g. "explain my AI research work and bot
+      // implementation in a few lines under projects". The user should be
+      // able to ask this bar anything, the same way they'd ask an AI chat
+      // to update a document — not be limited to a fixed verb list.
+      const ADDABLE_SECTIONS = ['summary', 'skills', 'certifications', 'languages',
+        'projects', 'accomplishments', 'courses', 'experience', 'education'];
+      let classified = null;
+      try {
+        const classifyPrompt = 'A user is typing into an AI bar that edits their resume. Decide whether their ' +
+          'message is asking to ADD new content to a specific section — even if they never say the word ' +
+          '"add" (e.g. "explain my AI research work and bot implementation in a few lines under projects" IS ' +
+          'an add request, for the "projects" section).\n\n' +
+          'VALID SECTIONS: ' + ADDABLE_SECTIONS.join(', ') + '\n\n' +
+          'USER MESSAGE: "' + rawCmd + '"\n\n' +
+          'Respond ONLY with JSON: {"isAdd": true|false, "section": "<one of the valid sections, or null>"}. ' +
+          'Set isAdd to true only if the user wants something NEW written and added — a new entry, new bullet ' +
+          'points, or new summary text. Set isAdd to false if they want EXISTING content fixed, rewritten, ' +
+          'shortened or polished, if it is a question, general chat, or does not name or clearly imply a ' +
+          'target section.';
+        classified = await claudeJSON(classifyPrompt, 150);
+      } catch (e) { classified = null; }
+
+      if (classified && classified.isAdd && ADDABLE_SECTIONS.includes(classified.section)) {
+        const sec = classified.section;
+
+        if (sec === 'summary') {
+          const prompt = 'Write 1-2 sentences to ADD to a resume summary, based on this instruction:\n"' + rawCmd + '"\n\n' +
+            'EXISTING SUMMARY:\n' + (resume.summary || '(empty)') + '\n\n' +
+            'Respond ONLY with JSON: {"addition": "..."} — the new sentence(s) only, written to read naturally ' +
+            'after the existing summary. Only use facts stated in the instruction — never invent anything. ' +
+            'Do not repeat what the existing summary already says.';
+          let addition = '';
+          try {
+            const resolved = await claudeJSON(prompt, 300);
+            addition = String(resolved.addition || '').trim();
+          } catch (e) { /* leave empty */ }
+          if (addition) {
+            const beforeSummary = String(resume.summary || '').trim();
+            const newSummary = beforeSummary ? beforeSummary + ' ' + addition : addition;
+            return res.json({ success: true, mode: 'update', section: 'summary', field: 'value', value: newSummary, label: 'Summary' });
+          }
+        } else if (sec === 'experience') {
+          const list = Array.isArray(resume.experience) ? resume.experience : [];
+          if (list.length) {
+            const idx = 0;
+            const target = list[idx];
+            const prompt = 'Write resume bullet points to ADD to an existing job entry, based on this instruction:\n"' + rawCmd + '"\n\n' +
+              'CURRENT JOB: ' + (target.title || 'Role') + (target.company ? ' at ' + target.company : '') + '\n' +
+              'EXISTING DESCRIPTION:\n' + (target.desc || '(empty)') + '\n\n' +
+              'Respond ONLY with JSON: {"bullets": ["...", "...", "..."]} — one short, specific line per bullet, ' +
+              'in the candidate\'s own voice. Only use facts stated in the instruction — never invent numbers, ' +
+              'tools, or outcomes not mentioned. Do not repeat anything already in EXISTING DESCRIPTION.';
+            let bullets = [];
+            try {
+              const resolved = await claudeJSON(prompt, 500);
+              bullets = Array.isArray(resolved.bullets) ? resolved.bullets.map(String).map(s => s.trim().replace(/^[•\-\*]\s*/, '')).filter(Boolean) : [];
+            } catch (e) { /* leave empty */ }
+            if (bullets.length) {
+              const before = String(target.desc || '').trim();
+              const newDesc = (before ? before + '\n' : '') + bullets.map(b => '• ' + b).join('\n');
+              return res.json({ success: true, mode: 'update', section: 'experience', index: idx,
+                field: 'desc', value: newDesc, label: labelOf('experience', target) });
+            }
+          }
+        } else if (FLAT_SECTIONS.has(sec)) {
+          const prompt = 'Extract the new ' + sec + ' item(s) to add, from this instruction:\n"' + rawCmd + '"\n\n' +
+            'Respond ONLY with JSON: {"items": ["...", "..."]} — one short string per item. Do not invent items that were not mentioned.';
+          let items = [];
+          try {
+            const resolved = await claudeJSON(prompt, 300);
+            items = Array.isArray(resolved.items) ? resolved.items.map(String).map(s => s.trim()).filter(Boolean) : [];
+          } catch (e) { /* leave empty */ }
+          if (items.length) return res.json({ success: true, mode: 'add', section: sec, items });
+        } else if (ITEM_SHAPES[sec]) {
+          const shape = ITEM_SHAPES[sec];
+          const prompt = 'Extract the details for one new ' + sec + ' entry from this instruction:\n"' + rawCmd + '"\n\n' +
+            'Respond ONLY with JSON matching exactly this shape (empty string for anything not mentioned — ' +
+            'never invent facts — but DO use the full substance of the instruction for any long-text field ' +
+            'such as "desc", written as 1-3 concise sentences or bullet-style lines):\n' + JSON.stringify(shape);
+          let item;
+          try { item = await claudeJSON(prompt, 400); } catch (e) { item = null; }
+          if (item) {
+            const clean = {};
+            Object.keys(shape).forEach(k => { clean[k] = (item[k] != null) ? String(item[k]) : ''; });
+            if (Object.values(clean).some(v => v.trim())) {
+              return res.json({ success: true, mode: 'add', section: sec, item: clean });
+            }
+          }
+        }
+      }
+
+      // Still nothing — explain specifically why.
       if (structSection) {
         return res.json({ success: true, units: [], note: 'no-action-verb', section: structSection, command: rawCmd });
       }
