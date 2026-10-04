@@ -1912,7 +1912,7 @@ function reorderSection(fromKey, toKey, before){
 
 // gold flash on the moved section inside the live preview
 const PREVIEW_HEADINGS = {skills:'Key Skills', summary:'Areas of Practice', accomplishments:'Accomplishments',
-  courses:'Courses', projects:'Projects', experience:'Work Experience'};
+  courses:'Courses', projects:'Projects', experience:'Work Experience', languages:'Languages'};
 function flashPreviewSection(key){
   const head = PREVIEW_HEADINGS[key]; if(!head) return;
   const pane = document.querySelector('.view.on [data-livepane]') || document.querySelector('[data-livepane]');
@@ -2102,7 +2102,14 @@ function personalCard(){
     const wrap = el('div',{class:'field'});
     wrap.appendChild(fieldHead(lab, null));
     const inp = el('input',{'data-p':f,value:R.personal[f]||''});
-    inp.addEventListener('input',()=> { R.personal[f]=inp.value; if(f==='name') renderPreview(); });
+    // renderPreview() here refers to the photo-thumbnail redraw defined above,
+    // which only exists when this template has a photo slot (getTemplate().photo) —
+    // calling it unconditionally on every keystroke in the Name field threw a
+    // ReferenceError on non-photo templates. The error didn't block the live
+    // resume preview on the right (event bubbling still reaches the #editor
+    // listener below), but it was a real, console-visible crash on every
+    // keystroke — guard it so it only runs where it's actually defined.
+    inp.addEventListener('input',()=> { R.personal[f]=inp.value; if(f==='name' && typeof renderPreview==='function') renderPreview(); });
     wrap.appendChild(inp);
     grid.appendChild(wrap);
   });
@@ -2274,14 +2281,18 @@ function listCard(key){
       }
 
       head.querySelector('.btn-danger').addEventListener('click', ()=>{
-        R[key].splice(i,1); renderEntries();
+        R[key].splice(i,1); renderEntries(); renderRail();
+        if(typeof renderLivePreview === 'function') renderLivePreview();
+        flashPreviewSection(key);
       });
       wrap.appendChild(en);
     });
   };
   renderEntries();
   h2.querySelector('.btn-ghost').addEventListener('click', ()=>{
-    R[key].push(def.blank()); renderEntries();
+    R[key].push(def.blank()); renderEntries(); renderRail();
+    if(typeof renderLivePreview === 'function') renderLivePreview();
+    flashPreviewSection(key);
   });
   return c;
 }
@@ -2302,12 +2313,20 @@ function skillsCard(){
         t.style.borderBottom = '2px solid #10B981';
         t.title = hasErr.desc;
       }
-      t.querySelector('button').addEventListener('click', ()=>{ R.skills.splice(i,1); render(); });
+      t.querySelector('button').addEventListener('click', ()=>{
+        R.skills.splice(i,1); render(); renderRail();
+        if(typeof renderLivePreview === 'function') renderLivePreview();
+        flashPreviewSection('skills');
+      });
       tags.appendChild(t);
     });
   };
   inp.addEventListener('keydown', e=>{
-    if(e.key==='Enter' && inp.value.trim()){ R.skills.push(inp.value.trim()); inp.value=''; render(); }
+    if(e.key==='Enter' && inp.value.trim()){
+      R.skills.push(inp.value.trim()); inp.value=''; render(); renderRail();
+      if(typeof renderLivePreview === 'function') renderLivePreview();
+      flashPreviewSection('skills');
+    }
   });
   render();
   return c;
@@ -2322,12 +2341,20 @@ function simpleListCard(key, title){
     tags.innerHTML='';
     R[key].forEach((s,i)=>{
       const t = el('span',{class:'tag'}, `${esc(typeof s==='string'?s:JSON.stringify(s))} <button type="button">&times;</button>`);
-      t.querySelector('button').addEventListener('click', ()=>{ R[key].splice(i,1); render(); });
+      t.querySelector('button').addEventListener('click', ()=>{
+        R[key].splice(i,1); render(); renderRail();
+        if(typeof renderLivePreview === 'function') renderLivePreview();
+        flashPreviewSection(key);
+      });
       tags.appendChild(t);
     });
   };
   inp.addEventListener('keydown', e=>{
-    if(e.key==='Enter' && inp.value.trim()){ R[key].push(inp.value.trim()); inp.value=''; render(); }
+    if(e.key==='Enter' && inp.value.trim()){
+      R[key].push(inp.value.trim()); inp.value=''; render(); renderRail();
+      if(typeof renderLivePreview === 'function') renderLivePreview();
+      flashPreviewSection(key);
+    }
   });
   render();
   return c;
@@ -2762,6 +2789,13 @@ function resumeHTML(forExport=false){
   const coursesBlock = (on('courses') && R.courses.length)
     ? `<h2>Courses</h2><ul>${R.courses.map(c=>`<li>${esc(c.name)}${c.provider?' — '+esc(c.provider):''}${c.year?' ('+esc(c.year)+')':''}</li>`).join('')}</ul>` : '';
 
+  // Languages has an editor card (simpleListCard) and is in every section_order/
+  // section_prefs default, but had no render block here at all — anything added
+  // there could never appear in the preview or export no matter what. Rendered
+  // the same way as Skills (chip list) since both are flat string arrays.
+  const languagesBlock = (on('languages') && R.languages.length)
+    ? `<h2>Languages</h2><div class="gcv-chips">${R.languages.map(l=>`<span class="gcv-chip">${esc(l)}</span>`).join('')}</div>` : '';
+
   const expBlock = (on('experience') && R.experience.length) ? `<h2>Work Experience / History</h2>` +
     R.experience.map((j,i)=>`
     <div class="gcv-job">
@@ -2792,7 +2826,8 @@ function resumeHTML(forExport=false){
 
   // ---- LAYOUT COMPOSER: user-arranged section order feeds every layout
   const blockMap = {summary:aopBlock, skills:skillsBlock, accomplishments:accomplishmentsBlock,
-    courses:coursesBlock, projects:projectsBlock, experience: layout==='timeline' ? expBlockTimeline : expBlock};
+    courses:coursesBlock, projects:projectsBlock, languages:languagesBlock,
+    experience: layout==='timeline' ? expBlockTimeline : expBlock};
   const orderKeys = (Array.isArray(R.section_order) && R.section_order.length ? R.section_order : DEFAULT_SECTION_ORDER)
     .filter(k => blockMap[k] !== undefined);
   const orderedAll = orderKeys.map(k=>blockMap[k]).join('');
