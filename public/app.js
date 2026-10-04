@@ -3423,6 +3423,20 @@ async function openSavedResume(id){
 
 document.querySelectorAll('.js-save').forEach(b => b.addEventListener('click', saveCurrentResume));
 
+// Help: opens inside the app (signed-in only); the guide itself is served
+// from the login-gated /help route.
+let helpReturnView = 'home';
+$('#hdrHelp').addEventListener('click', ()=>{
+  if(!currentUser){ showView('login'); return; }
+  const cur = document.querySelector('.view.on');
+  if(cur && cur.id !== 'view-help') helpReturnView = cur.id.replace('view-','');
+  const fr = $('#helpFrame');
+  if(!fr.getAttribute('src')) fr.setAttribute('src', '/help');
+  showView('help');
+  window.scrollTo(0,0);
+});
+$('#helpBack').addEventListener('click', ()=> showView(helpReturnView || 'home'));
+
 // Upload CV anytime — replaces current resume with the new import
 document.querySelectorAll('.js-upload').forEach(b => b.addEventListener('click', ()=>{
   $('#fileInput').value = '';
