@@ -1495,8 +1495,22 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
         return editDistance(w, kw) <= tol;
       });
     }
+    // An explicit "under/in/to/for <section>" phrase names the target directly
+    // and must win over any OTHER keyword mentioned incidentally elsewhere in
+    // the same command. Without this, "add 3 bullets about my AIMS course
+    // under work experience" matched on the word "course" — appearing earlier
+    // in SECTION_KEYWORDS' iteration order — and silently ignored the explicit
+    // "under work experience" the user actually gave as the target.
+    const TARGET_PHRASE_RE = /\b(?:under|in|to|for|within)\s+(?:my\s+|the\s+)?([a-z][a-z\s]{2,30}?)(?:\s+section)?(?=[.,:;]|\s*$)/i;
     function detectListSection(text) {
       const words = text.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+      const targetMatch = text.match(TARGET_PHRASE_RE);
+      if (targetMatch) {
+        const targetWords = targetMatch[1].replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+        for (const [sec, kws] of Object.entries(SECTION_KEYWORDS)) {
+          if (kws.some(k => targetMatch[1].includes(k) || fuzzyHas(targetWords, k))) return sec;
+        }
+      }
       for (const [sec, kws] of Object.entries(SECTION_KEYWORDS)) {
         if (kws.some(k => text.includes(k) || fuzzyHas(words, k))) return sec;
       }
@@ -1510,6 +1524,36 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
 
     const structSection = detectListSection(cmd);
     const isDelete = DELETE_RE.test(cmd), isAdd = ADD_RE.test(cmd), isUpdate = UPDATE_RE.test(cmd);
+
+    // Summary is a free-text field, not a list section, so it's handled
+    // separately from the list add/delete/update machinery below — and only
+    // on an EXPLICIT "under/in/to my summary" target, same precedence rule
+    // as Fix 1 above, so "add a line about my AIMS course to my summary"
+    // correctly goes to the summary even though "course" also appears in
+    // the sentence and would otherwise win via SECTION_KEYWORDS.
+    const SUMMARY_WORDS = ['summary', 'profile', 'overview', 'about me'];
+    function mentionsSummary(t) {
+      const words = t.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+      return SUMMARY_WORDS.some(k => t.includes(k) || fuzzyHas(words, k));
+    }
+    const targetPhraseMatch = cmd.match(TARGET_PHRASE_RE);
+    const explicitSummaryTarget = targetPhraseMatch && mentionsSummary(targetPhraseMatch[1]);
+
+    if (explicitSummaryTarget && isAdd) {
+      const prompt = 'Write 1-2 sentences to ADD to a resume summary, based on this instruction:\n"' + rawCmd + '"\n\n' +
+        'EXISTING SUMMARY:\n' + (resume.summary || '(empty)') + '\n\n' +
+        'Respond ONLY with JSON: {"addition": "..."} — the new sentence(s) only, written to read naturally after the existing summary. ' +
+        'Only use facts stated in the instruction — never invent anything. Do not repeat what the existing summary already says.';
+      let addition = '';
+      try {
+        const resolved = await claudeJSON(prompt, 300);
+        addition = String(resolved.addition || '').trim();
+      } catch (e) { /* leave empty */ }
+      if (!addition) return res.json({ success: true, units: [], note: 'no-item-detected' });
+      const beforeSummary = String(resume.summary || '').trim();
+      const newSummary = beforeSummary ? beforeSummary + ' ' + addition : addition;
+      return res.json({ success: true, mode: 'update', section: 'summary', field: 'value', value: newSummary, label: 'Summary' });
+    }
 
     // Only intercept when a concrete list-type section was named — otherwise
     // fall through to the fix flow below (e.g. "correct the grammar in my summary").
@@ -1543,6 +1587,37 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
       }
 
       if (isAdd) {
+        // "Add N bullets/lines/points about X [under work experience]" means
+        // append achievement bullets to an EXISTING job, not create a brand
+        // new job entry with a blank title and company. Without this,
+        // "add 3 bullet lines about my AIMS course" against the experience
+        // section built a new, mostly-empty experience item — which is what
+        // was reported as "adding under courses, but they're not courses".
+        const ADD_BULLETS_RE = /\b(bullet|bullets|line|lines|point|points)\b/i;
+        if (structSection === 'experience' && ADD_BULLETS_RE.test(cmd) && list.length) {
+          const wantFirst = /\b(first|oldest|earliest)\b/i.test(cmd);
+          // index 0 is this app's convention for the most recent / current
+          // role (used the same way elsewhere, e.g. the published-page
+          // headline reads experience[0]), so that's the sensible default
+          // target when the user doesn't name a specific job.
+          const idx = wantFirst ? list.length - 1 : 0;
+          const target = list[idx];
+          const prompt = 'Write resume bullet points to ADD to an existing job entry, based on this instruction:\n"' + rawCmd + '"\n\n' +
+            'CURRENT JOB: ' + (target.title || 'Role') + (target.company ? ' at ' + target.company : '') + '\n' +
+            'EXISTING DESCRIPTION:\n' + (target.desc || '(empty)') + '\n\n' +
+            'Respond ONLY with JSON: {"bullets": ["...", "...", "..."]} — one short, specific line per bullet, in the candidate\'s own voice. ' +
+            'Only use facts stated in the instruction — never invent numbers, tools, or outcomes not mentioned. Do not repeat anything already in EXISTING DESCRIPTION.';
+          let bullets = [];
+          try {
+            const resolved = await claudeJSON(prompt, 500);
+            bullets = Array.isArray(resolved.bullets) ? resolved.bullets.map(String).map(s => s.trim().replace(/^[•\-\*]\s*/, '')).filter(Boolean) : [];
+          } catch (e) { /* leave empty */ }
+          if (!bullets.length) return res.json({ success: true, units: [], note: 'no-item-detected' });
+          const before = String(target.desc || '').trim();
+          const newDesc = (before ? before + '\n' : '') + bullets.map(b => '• ' + b).join('\n');
+          return res.json({ success: true, mode: 'update', section: 'experience', index: idx,
+            field: 'desc', value: newDesc, label: labelOf('experience', target) });
+        }
         if (FLAT_SECTIONS.has(structSection)) {
           const prompt = 'Extract the new ' + structSection + ' item(s) to add, from this instruction:\n"' + rawCmd + '"\n\n' +
             'Respond ONLY with JSON: {"items": ["...", "..."]} \u2014 one short string per item. Do not invent items that were not mentioned.';

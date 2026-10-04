@@ -5869,12 +5869,13 @@ var _lastStructural = null;
 var SECTION_LABEL = {
   skills:'Skills', certifications:'Certifications', languages:'Languages',
   projects:'Projects', accomplishments:'Accomplishments', courses:'Courses',
-  experience:'Experience', education:'Education'
+  experience:'Experience', education:'Education', summary:'Summary'
 };
 var FIELD_LABEL = {
   name:'Name', issuer:'Issuer', year:'Year', provider:'Provider', desc:'Description',
   degree:'Degree', institution:'Institution', grade:'Grade', title:'Job title',
-  company:'Company', location:'Location', start:'Start date', end:'End date', value:'Value'
+  company:'Company', location:'Location', start:'Start date', end:'End date', value:'Value',
+  summary:'Summary'
 };
 
 function applyStructuralChange(data){
@@ -5896,6 +5897,21 @@ function applyStructuralChange(data){
 
   setTimeout(function(){
     var sec = data.section;
+
+    // Summary is a plain string, not a list — it needs its own path rather
+    // than the array machinery below, which would otherwise overwrite it
+    // with an empty array on the very next line.
+    if(sec === 'summary'){
+      var beforeSummary = R.summary || '';
+      R.summary = data.value;
+      var summaryResult = { mode:'update', section:'summary', snapshot:beforeSummary,
+        command:(document.getElementById('aiBuilderInput')||{}).value||'',
+        ok:true, indexes:[], skipped:[], fields:[{key:'summary', was:beforeSummary, value:data.value}],
+        label:'Summary' };
+      applyStructuralResult(summaryResult, 'update', 'summary', fill, title, log, logLine);
+      return;
+    }
+
     if(!Array.isArray(R[sec])) R[sec] = [];
 
     // Snapshot before touching anything, so Undo can restore exactly.
@@ -5958,36 +5974,44 @@ function applyStructuralChange(data){
       }
     }
 
-    fill.style.width='100%';
-    document.getElementById('aiProgSpinner').style.display='none';
-    if(window._aiTicker){ clearInterval(window._aiTicker); window._aiTicker=null; }
-
-    logLine(result.ok
-      ? (VERB_PAST[data.mode]||'Changed')+' <b>'+esc(result.label||'entry')+'</b> in '+esc(SECTION_LABEL[sec]||sec)
-      : 'Could not apply that change \u2014 try again with more detail');
-    title.innerHTML = result.ok ? '\u2713 Complete' : '\u2717 Nothing changed';
-
-    var noteEl=document.getElementById('aiPlaceholderNote');
-    if(noteEl) noteEl.innerHTML = 'Only the fields you actually stated were filled in. Anything shown as blank was not invented \u2014 add it yourself.';
-
-    var btn=document.getElementById('aiBuilderBtn');
-    btn.disabled=false; btn.textContent='Run';
-
-    if(!result.ok){ _lastStructural=null; return; }
-
-    _lastStructural = result;
-    var scrollY=window.scrollY;
-    R.quality_score = analyzeQualityScore();
-    buildEditor();
-    window.scrollTo(0,scrollY);
-    renderRail();
-    if(typeof schedulePreview==='function') schedulePreview();
-
-    // Show WHAT landed and WHERE first; the hallucination check follows once
-    // this closes, so the user reads the facts before being asked to vouch
-    // for them.
-    setTimeout(function(){ openInsertConfirm(result); }, 350);
+    applyStructuralResult(result, data.mode, sec, fill, title, log, logLine);
   }, 400);
+}
+
+// Shared by every mode (add/delete/update) across every section type,
+// including the summary text field \u2014 finishes the progress UI, applies the
+// quality-score/editor/rail refresh, and opens the what-landed-where popup.
+// Pulled out so the summary path above doesn't have to duplicate it.
+function applyStructuralResult(result, mode, sec, fill, title, log, logLine){
+  fill.style.width='100%';
+  document.getElementById('aiProgSpinner').style.display='none';
+  if(window._aiTicker){ clearInterval(window._aiTicker); window._aiTicker=null; }
+
+  logLine(result.ok
+    ? (VERB_PAST[mode]||'Changed')+' <b>'+esc(result.label||'entry')+'</b> in '+esc(SECTION_LABEL[sec]||sec)
+    : 'Could not apply that change \u2014 try again with more detail');
+  title.innerHTML = result.ok ? '\u2713 Complete' : '\u2717 Nothing changed';
+
+  var noteEl=document.getElementById('aiPlaceholderNote');
+  if(noteEl) noteEl.innerHTML = 'Only the fields you actually stated were filled in. Anything shown as blank was not invented \u2014 add it yourself.';
+
+  var btn=document.getElementById('aiBuilderBtn');
+  btn.disabled=false; btn.textContent='Run';
+
+  if(!result.ok){ _lastStructural=null; return; }
+
+  _lastStructural = result;
+  var scrollY=window.scrollY;
+  R.quality_score = analyzeQualityScore();
+  buildEditor();
+  window.scrollTo(0,scrollY);
+  renderRail();
+  if(typeof schedulePreview==='function') schedulePreview();
+
+  // Show WHAT landed and WHERE first; the hallucination check follows once
+  // this closes, so the user reads the facts before being asked to vouch
+  // for them.
+  setTimeout(function(){ openInsertConfirm(result); }, 350);
 }
 
 var FLAT_SECTION_SET = new Set(['skills','languages','accomplishments']);
@@ -5995,7 +6019,7 @@ var VERB_PAST = { add:'Added', delete:'Deleted', update:'Updated' };
 
 function openInsertConfirm(res){
   var sec = res.section, secLabel = SECTION_LABEL[sec] || sec;
-  var total = (R[sec]||[]).length;
+  var total = Array.isArray(R[sec]) ? R[sec].length : 1;
   var head = document.getElementById('insertConfirmHead');
   var body = document.getElementById('insertConfirmBody');
   if(!body) return;
@@ -6014,6 +6038,8 @@ function openInsertConfirm(res){
     where = 'Entry '+(res.indexes[0]+1)+' of '+total+' under '+secLabel;
   } else if(res.indexes.length>1){
     where = res.indexes.length+' entries added \u2014 now '+total+' under '+secLabel;
+  } else if(sec==='summary'){
+    where = 'Updated your '+secLabel+' section';
   }
   document.getElementById('insertConfirmWhere').textContent = where;
   if(head) head.style.background = res.mode==='delete'
