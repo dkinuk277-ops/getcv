@@ -27,6 +27,16 @@ if (!process.env.ANTHROPIC_API_KEY) {
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ---- Middleware
+// Old domain -> new domain (keeps shared links, incl. /cv/<slug>, working)
+const OLD_HOSTS = new Set(['getcv.decompliance.uk']);
+const NEW_ORIGIN = process.env.CANONICAL_ORIGIN || 'https://reevecv.app';
+app.use((req, res, next) => {
+  const host = String(req.headers.host || '').split(':')[0].toLowerCase();
+  if (OLD_HOSTS.has(host)) {
+    return res.redirect(req.method === 'GET' || req.method === 'HEAD' ? 301 : 308, NEW_ORIGIN + req.originalUrl);
+  }
+  next();
+});
 app.use(cors()); // same-origin in production; open for local dev
 app.use(express.json({ limit: '2mb' }));
 // Static files: force revalidation on every request for HTML/JS instead of

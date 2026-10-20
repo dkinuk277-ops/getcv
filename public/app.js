@@ -1,5 +1,5 @@
 // ============================================================
-// Reeve frontend — powered by Decompliance · AI GRC Intelligence
+// Reeve frontend
 // ============================================================
 const API = ''; // same origin; set to full URL if frontend hosted separately
 
@@ -264,7 +264,7 @@ function showUploadError(title, hint){
     <h3>${title}</h3>
     <p>${hint}</p>
     <button class="btn btn-primary" type="button" id="uploadTryAgain">Choose a different file</button>
-    <div class="upload-error-help">Need help? Email <a href="mailto:hello@decompliance-uk.com">hello@decompliance-uk.com</a></div>
+    <div class="upload-error-help">Need help? Email <a href="mailto:hello@compsilon.com">hello@compsilon.com</a></div>
   </div>`;
   $('#uploadTryAgain').addEventListener('click', ()=>{
     // Restore the original dropzone
@@ -2822,7 +2822,7 @@ function resumeHTML(forExport=false){
 
   const extrasBlock = R.extra_sections.map(s=>`<h2>${esc(s.heading)}</h2><ul>${(s.items||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`).join('');
 
-  const foot = `<div class="gcv-foot">Built with Reeve · <a href="https://www.decompliance.uk">www.decompliance.uk</a> · AI GRC Intelligence by DeCompliance</div>`;
+  const foot = `<div class="gcv-foot">Built with Reeve · AI Resume Builder</div>`;
 
   // ---- LAYOUT COMPOSER: user-arranged section order feeds every layout
   const blockMap = {summary:aopBlock, skills:skillsBlock, accomplishments:accomplishmentsBlock,
@@ -3660,7 +3660,7 @@ $('#btnConfirmDelete').addEventListener('click', async ()=>{
     } else if(/rate|Too many/i.test(msg)){
       _showDeleteError('Too many attempts — please wait a few minutes and try again.');
     } else {
-      _showDeleteError('Could not delete account: ' + (msg || 'unknown error') + '. Please try again or email hello@decompliance-uk.com for help.');
+      _showDeleteError('Could not delete account: ' + (msg || 'unknown error') + '. Please try again or email hello@compsilon.com for help.');
     }
   }
 });

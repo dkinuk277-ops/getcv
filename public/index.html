@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reeve — AI Resume Builder by DeCompliance</title>
+<title>Reeve — AI Resume Builder</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='%2334C98A'/><stop offset='.45' stop-color='%230FA968'/><stop offset='1' stop-color='%23067A4B'/></linearGradient></defs><rect width='64' height='64' rx='14' fill='url(%23g)'/><rect x='12' y='16' width='40' height='32' rx='5' fill='white'/><rect x='17' y='21' width='11' height='11' rx='2.5' fill='%230FA968'/><circle cx='22.5' cy='24.7' r='2.1' fill='white'/><path d='M18.6 32a3.9 3.9 0 0 1 7.8 0z' fill='white'/><rect x='31' y='22' width='16' height='3' rx='1.5' fill='%230FA968'/><rect x='31' y='27.5' width='16' height='3' rx='1.5' fill='%230FA968'/><rect x='17' y='36' width='14' height='3' rx='1.5' fill='%230FA968'/><rect x='17' y='41.5' width='30' height='3' rx='1.5' fill='%230FA968'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  /* Decompliance chrome (dark) */
+  /* App chrome */
   --dc-ink:#0A1220; --dc-panel:#101B2E; --dc-line:#1E2D45;
   --dc-blue:#5BC8F5; --dc-text:#E8EEF6; --dc-muted:#8FA3BD; --dc-gold:#E3B341;
   /* Light working surface */
@@ -29,7 +29,7 @@ input:focus,textarea:focus{border-color:var(--accent)}
 textarea{resize:vertical;min-height:80px;overflow-wrap:break-word;word-break:break-word}
 label{font-size:12px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
 
-/* ---------- Layout: dark Decompliance chrome ---------- */
+/* ---------- Layout: app chrome ---------- */
 header{background:linear-gradient(180deg,#0C1526,#0A1220);border-bottom:1px solid var(--dc-line);
   padding:13px 26px;display:flex;align-items:center;justify-content:space-between;gap:14px;
   position:sticky;top:0;z-index:50;flex-wrap:wrap}
@@ -1797,7 +1797,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 <header>
   <div class="brand" id="brandHome" title="Back to Home">
     <h1><span class="rv-mark" aria-hidden="true"><span class="ph"></span><span class="b1"></span><span class="b2"></span><span class="b3"></span><span class="b4"></span></span>Reeve</h1>
-    <div class="brand-sub">Powered by <a href="https://www.decompliance.uk" target="_blank" rel="noopener">DeCompliance</a> · AI GRC Intelligence</div>
+    <div class="brand-sub">AI Resume Builder</div>
   </div>
   <div class="hdr-right" id="hdrRight" style="display:none">
     <button class="hdr-help" id="hdrHelp" type="button" title="Help &amp; FAQs">? Help</button>
@@ -1821,7 +1821,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
   <section class="ld-hero">
     <div class="ld-hwrap">
       <div>
-        <div class="ld-kick">&#9670; Reeve &middot; AI Resume Builder &middot; by DeCompliance</div>
+        <div class="ld-kick">&#9670; Reeve &middot; AI Resume Builder</div>
         <h1>Tell it what to change.<br>Watch your resume <span class="ld-shiny">rewrite itself</span>.</h1>
         <div class="ld-type"><span id="ldTyper"></span><span class="ld-cursor"></span></div>
         <p class="ld-sub">Type "add my AWS certification" or "fix the grammar in my summary" &mdash; Reeve's AI Builder does it live, right in front of you. No forms, no menus, just say what you need.</p>
@@ -2010,7 +2010,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
     </ul>
     <button class="ld-cta" data-ldgo="signup" type="button">Create your free account &rarr;</button>
   </section>
-  <footer class="ld-ftr">&copy; 2026 DeCompliance &middot; Reeve &mdash; AI Resume Builder &middot; <a href="/privacy-policy">Privacy Policy</a> &middot; <a href="/terms-of-use">Terms of Use</a> &middot; Powered by <a href="https://www.decompliance.uk" target="_blank" rel="noopener">decompliance.uk</a></footer>
+  <footer class="ld-ftr">&copy; 2026 Reeve &mdash; AI Resume Builder &middot; <a href="/privacy-policy">Privacy Policy</a> &middot; <a href="/terms-of-use">Terms of Use</a></footer>
 </div>
 
 <div class="view on" id="view-login">
@@ -2760,8 +2760,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 </div>
 
 <footer class="app-footer">
-  © <span id="footYear">2026</span> DeCompliance · Reeve — AI Resume Builder<br>
-  Powered by <a href="https://www.decompliance.uk" target="_blank" rel="noopener">Decompliance · AI GRC Intelligence</a> ·
+  © <span id="footYear">2026</span> Reeve — AI Resume Builder<br>
   <a href="/privacy-policy" target="_blank" rel="noopener">Privacy Policy</a> <span class="sep">·</span>
   <a href="/terms-of-use" target="_blank" rel="noopener">Terms of Use</a>
 </footer>
@@ -2769,7 +2768,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20261004d"></script>
+<script src="app.js?v=20261020a"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>

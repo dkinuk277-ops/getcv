@@ -1,6 +1,6 @@
 # GetCV — AI Resume Builder
 
-An AI-powered resume builder by DeCompliance (www.decompliance.uk).
+An AI-powered resume builder.
 
 ## Local development
 
