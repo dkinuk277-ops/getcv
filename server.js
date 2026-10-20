@@ -1259,8 +1259,11 @@ app.get(['/help', '/help.html'], (req, res) => {
 app.get('/privacy-policy', (req, res) => res.sendFile(path.join(__dirname, 'public', 'legal', 'privacy-policy.html')));
 app.get('/terms-of-use',   (req, res) => res.sendFile(path.join(__dirname, 'public', 'legal', 'terms-of-use.html')));
 
+const backupMod = require('./backup');
+const backupStatus = backupMod.status;
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, model: MODEL, keyConfigured: !!process.env.ANTHROPIC_API_KEY });
+  res.json({ ok: true, model: MODEL, keyConfigured: !!process.env.ANTHROPIC_API_KEY,
+    backup: { configured: backupStatus.configured, lastOk: backupStatus.lastOk, lastError: backupStatus.lastError } });
 });
 
 // ---- 1. Parse an uploaded resume ---------------------------
@@ -2039,4 +2042,5 @@ module.exports = { app, _internals: { cleanJSONText, extractText } };
 if (require.main === module) app.listen(PORT, () => {
   console.log(`✅ AI Resume Builder running at http://localhost:${PORT}`);
   console.log(`   Model: ${MODEL} | API key configured: ${!!process.env.ANTHROPIC_API_KEY}`);
+  backupMod.startScheduler(DATA_DIR);
 });
