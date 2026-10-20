@@ -360,7 +360,7 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
-// GDPR: user can delete their entire account + all saved resumes
+// GDPR: user can delete their entire account + all saved resumes, cover letters and published pages
 app.post('/api/auth/delete-account', requireAuth, (req, res) => {
   const { password } = req.body || {};
   const rec = users[req.user.email];
@@ -370,6 +370,8 @@ app.post('/api/auth/delete-account', requireAuth, (req, res) => {
   const email = req.user.email;
   // remove all saved resumes for this user
   try { fsx.unlinkSync(resumesFile(email)); } catch {}
+  // remove all saved cover letters for this user
+  try { fsx.unlinkSync(coverLettersFile(email)); } catch {}
   // wipe every active session for this user
   Object.keys(sessions).forEach(t => { if (sessions[t].email === email) delete sessions[t]; });
   saveJSON(SESS_FILE, sessions);
@@ -377,7 +379,10 @@ app.post('/api/auth/delete-account', requireAuth, (req, res) => {
   delete users[email];
   saveJSON(USERS_FILE, users);
   clearSessionCookie(res);
-  res.json({ success: true });
+  // take down every public page this user published (hard delete)
+  withPublishedIndex(idx => {
+    Object.keys(idx).forEach(slug => { if (idx[slug].ownerEmail === email) delete idx[slug]; });
+  }).catch(() => {}).then(() => res.json({ success: true }));
 });
 
 app.get('/api/auth/me', (req, res) => {

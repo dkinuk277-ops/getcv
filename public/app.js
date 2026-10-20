@@ -264,7 +264,7 @@ function showUploadError(title, hint){
     <h3>${title}</h3>
     <p>${hint}</p>
     <button class="btn btn-primary" type="button" id="uploadTryAgain">Choose a different file</button>
-    <div class="upload-error-help">Need help? Email <a href="mailto:hello@compsilon.com">hello@compsilon.com</a></div>
+    <div class="upload-error-help">Need help? Email <a href="mailto:hellocompsilon@gmail.com">hellocompsilon@gmail.com</a></div>
   </div>`;
   $('#uploadTryAgain').addEventListener('click', ()=>{
     // Restore the original dropzone
@@ -3660,7 +3660,7 @@ $('#btnConfirmDelete').addEventListener('click', async ()=>{
     } else if(/rate|Too many/i.test(msg)){
       _showDeleteError('Too many attempts — please wait a few minutes and try again.');
     } else {
-      _showDeleteError('Could not delete account: ' + (msg || 'unknown error') + '. Please try again or email hello@compsilon.com for help.');
+      _showDeleteError('Could not delete account: ' + (msg || 'unknown error') + '. Please try again or email hellocompsilon@gmail.com for help.');
     }
   }
 });
