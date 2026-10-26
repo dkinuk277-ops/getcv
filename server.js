@@ -321,6 +321,16 @@ function requireAuth(req, res, next){
   next();
 }
 
+// ---- Plans / entitlements (see plans.js; enforcement is gated by PLANS_ENFORCED) ----
+const plans = require('./plans');
+function userTier(req){ return plans.tierOf(users[req.user.email]); }
+function requireFeature(feature, msg){
+  return (req, res, next) => {
+    if (plans.can(userTier(req), feature)) return next();
+    res.status(402).json({ error: msg || 'This feature is not included in your plan', upgrade: true, feature, plan: plans.describe(users[req.user.email]) });
+  };
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 app.post('/api/auth/signup', authLimiter, (req, res) => {
@@ -389,7 +399,23 @@ app.get('/api/auth/me', (req, res) => {
   const t = getToken(req);
   const s = t && sessions[t];
   if (!s || !users[s.email]) return res.status(401).json({ error: 'Not signed in' });
-  res.json({ success: true, user: { email: s.email, name: users[s.email].name } });
+  res.json({ success: true, user: { email: s.email, name: users[s.email].name }, plan: plans.describe(users[s.email]) });
+});
+
+// Test/admin only: set a user's plan (ADMIN_EMAILS). Real purchases will go through the payment webhook.
+app.post('/api/admin/set-plan', requireAuth, (req, res) => {
+  if (!plans.adminEmails().includes(req.user.email)) return res.status(403).json({ error: 'Forbidden' });
+  const { email, tier, days } = req.body || {};
+  const em = String(email || req.user.email).trim().toLowerCase();
+  if (!users[em]) return res.status(404).json({ error: 'No such user' });
+  if (tier === 'none' || tier === null) { delete users[em].plan; }
+  else {
+    if (!plans.RANK[tier]) return res.status(400).json({ error: 'tier must be one of ' + plans.TIERS.join(', ') });
+    const d = Math.min(3650, Math.max(1, parseInt(days, 10) || 14));
+    users[em].plan = { tier, status: 'active', validUntil: new Date(Date.now() + d * 86400000).toISOString(), source: 'admin' };
+  }
+  saveJSON(USERS_FILE, users);
+  res.json({ success: true, plan: plans.describe(users[em]) });
 });
 
 
@@ -416,8 +442,9 @@ app.get('/api/resumes', requireAuth, (req, res) => {
 });
 
 // Save / update
-app.post('/api/resumes', requireAuth, (req, res) => {
+app.post('/api/resumes', requireAuth, requireFeature('save', 'Saving resumes to your account is included in the Standard plan and above'), (req, res) => {
   const { id, name, template, data } = req.body || {};
+  if (template && !plans.templateAllowed(userTier(req), template)) return res.status(402).json({ error: 'That template is not included in your plan', upgrade: true, feature: 'template' });
   const hasFolder = typeof (req.body||{}).folder === 'string';
   const folder = hasFolder ? req.body.folder.trim().slice(0, 60) : '';
   if (!name || !name.trim()) return res.status(400).json({ error: 'Please give this resume a name' });
@@ -485,7 +512,7 @@ const MAX_SAVED_CL = 20;
 const CL_TONES = ['formal', 'confident', 'warm'];
 
 // List (lightweight)
-app.get('/api/cover-letters', requireAuth, (req, res) => {
+app.get('/api/cover-letters', requireAuth, requireFeature('coverLetters', 'Cover letters are included in the Pro plan and above'), (req, res) => {
   const list = loadCoverLetters(req.user.email).map(c => ({
     id: c.id, company: c.company, role: c.role, tone: c.tone,
     resumeName: c.resumeName || '', updated: c.updated
@@ -495,7 +522,7 @@ app.get('/api/cover-letters', requireAuth, (req, res) => {
 });
 
 // Save / update
-app.post('/api/cover-letters', requireAuth, (req, res) => {
+app.post('/api/cover-letters', requireAuth, requireFeature('coverLetters', 'Cover letters are included in the Pro plan and above'), (req, res) => {
   const { id, company, role, tone, content, resumeId, resumeName } = req.body || {};
   if (!company || !company.trim()) return res.status(400).json({ error: 'Company name is required' });
   if (!role || !role.trim()) return res.status(400).json({ error: 'Job title is required' });
@@ -564,7 +591,7 @@ function summarizeResumeForLetter(data){
   return lines.join('\n');
 }
 
-app.post('/api/cover-letter/generate', aiLimiter, requireAuth, async (req, res) => {
+app.post('/api/cover-letter/generate', aiLimiter, requireAuth, requireFeature('coverLetters', 'Cover letters are included in the Pro plan and above'), async (req, res) => {
   const { company, role, tone, note, resumeData } = req.body || {};
   const companyName = (company || '').trim();
   const roleName = (role || '').trim();
@@ -774,7 +801,7 @@ function buildPublicProjection(resumeData, fields){
   return projection;
 }
 
-app.get('/api/publish/check-slug', requireAuth, (req, res) => {
+app.get('/api/publish/check-slug', requireAuth, requireFeature('publish', 'Publishing a public CV page is included in the Pro plan and above'), (req, res) => {
   // Uses "reason", not "error" — the shared client api() helper treats any
   // response body containing an "error" key as a failed request and throws,
   // but an unavailable slug is a normal, expected outcome here, not a
@@ -800,7 +827,7 @@ app.get('/api/publish', requireAuth, (req, res) => {
   res.json({ success: true, sites: mine });
 });
 
-app.post('/api/publish', requireAuth, (req, res) => {
+app.post('/api/publish', requireAuth, requireFeature('publish', 'Publishing a public CV page is included in the Pro plan and above'), (req, res) => {
   const { resumeId, resumeData, fields, indexable, customSlug, template } = req.body || {};
   if (!resumeData || typeof resumeData !== 'object') return res.status(400).json({ error: 'No resume data to publish' });
   const name = (resumeData.personal && resumeData.personal.name || '').trim();
@@ -1045,7 +1072,7 @@ app.get('/cv/:slug', publicSiteLimiter, (req, res) => {
 // anything not verifiable from the resume is returned with
 // verified:false so the client defaults it OFF.
 // ============================================================
-app.post('/api/tailor', tailorLimiter, requireAuth, async (req, res) => {
+app.post('/api/tailor', tailorLimiter, requireAuth, requireFeature('tailor', 'Job Tailor is included in the Pro plan and above'), async (req, res) => {
   try {
     if (!requireKey(res)) return;
     const { jobTitle, company, jobDescription, resume } = req.body || {};
@@ -1219,6 +1246,10 @@ SCORING LINKAGE — this drives a live "projected score" as the candidate select
       s.resolved_by = (s.resolved_by || []).filter(id => changeIds.has(id));
     });
 
+    // ATS match score / fit analysis is Advanced-only: strip it server-side for Pro
+    if (!plans.can(userTier(req), 'atsScore')) {
+      out.match_score = null; out.match_summary = ''; out.skills_coverage = []; out.ats_locked = true;
+    }
     res.json({ success: true, result: out });
   } catch (err) {
     console.error('tailor error:', err.message);
