@@ -2037,6 +2037,17 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Global error handler: malformed URLs / bad request bodies get a clean 4xx
+// (no stack trace in the logs); real server errors are logged once, briefly.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = err.status || err.statusCode || (err instanceof URIError ? 400 : 500);
+  if (status >= 500) console.error('Server error:', req.method, req.path, '-', err.message);
+  const msg = status >= 500 ? 'Something went wrong' : (status === 400 ? 'Bad request' : (err.message || 'Request error'));
+  if (req.path.startsWith('/api/')) return res.status(status).json({ error: msg });
+  res.status(status).type('text/plain').send(msg);
+});
+
 module.exports = { app, _internals: { cleanJSONText, extractText } };
 
 if (require.main === module) app.listen(PORT, () => {
