@@ -429,7 +429,7 @@ function resumesFile(email){
 }
 function loadResumes(email){ return loadJSON(resumesFile(email), []); }
 function saveResumes(email, list){ saveJSON(resumesFile(email), list); }
-const MAX_SAVED = 100;
+const MAX_SAVED = 50; // hidden safety cap, not shown in plan copy
 
 // List (lightweight - no full data)
 app.get('/api/resumes', requireAuth, (req, res) => {
@@ -459,7 +459,7 @@ app.post('/api/resumes', requireAuth, requireFeature('save', 'Saving resumes to 
     if (hasFolder) existing.folder = folder;
     existing.updated = now;
   } else {
-    if (list.length >= MAX_SAVED) return res.status(400).json({ error: `Maximum ${MAX_SAVED} saved resumes — delete one first` });
+    if (list.length >= MAX_SAVED) return res.status(400).json({ error: `You have reached the limit of ${MAX_SAVED} saved resumes — please delete one you no longer need` });
     list.push({ id: crypto.randomBytes(8).toString('hex'), name: name.trim().slice(0, 80),
       template: template || 'exec-navy', folder, data, created: now, updated: now });
   }
