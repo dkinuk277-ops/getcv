@@ -79,4 +79,4 @@ function aiLimit(tier, kind, env = process.env){
   return AI_LIMITS[enforced(env) ? tier : 'advanced'] || AI_LIMITS.none;
 }
 
-module.exports = { testEmails, aiLimit, HARD_FACTOR, RANK, TIERS, FEATURE_MIN, BASIC_TPL, STANDARD_TPL, enforced, adminEmails, tierOf, can, allowedTemplates, templateAllowed, describe };
+module.exports = { AI_LIMITS, TAILOR_LIMIT, testEmails, aiLimit, HARD_FACTOR, RANK, TIERS, FEATURE_MIN, BASIC_TPL, STANDARD_TPL, enforced, adminEmails, tierOf, can, allowedTemplates, templateAllowed, describe };
