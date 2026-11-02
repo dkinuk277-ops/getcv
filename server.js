@@ -347,13 +347,14 @@ app.get('/admin', (req, res) => {
   if (!isAdmin(req)) {
     return res.send(`<!doctype html><meta charset=utf-8><meta name=robots content=noindex><meta name=viewport content="width=device-width,initial-scale=1"><title>Reeve admin</title><style>${ADMIN_PAGE_CSS}</style><div class=box><h1>Reeve admin</h1><form id=f><label>Username<input name=u autocomplete=username required></label><label>Password<input name=p type=password autocomplete=current-password required></label><div class=err id=e></div><button>Sign in</button></form></div><script>f.onsubmit=async function(ev){ev.preventDefault();e.textContent='';var r=await fetch('/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:f.u.value,password:f.p.value})});if(r.ok)location.reload();else{var j={};try{j=await r.json()}catch(x){}e.textContent=j.error||'Sign-in failed'}}</script>`);
   }
-  res.send(`<!doctype html><meta charset=utf-8><meta name=robots content=noindex><meta name=viewport content="width=device-width,initial-scale=1"><title>Reeve admin</title><style>${ADMIN_PAGE_CSS}.w{max-width:960px;margin:24px auto;padding:0 16px}table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #dfe6e2;padding:8px;text-align:left;font-size:14px}.OVER{color:#b00020;font-weight:700}.NEAR{color:#a35f00;font-weight:700}.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}input{width:auto;margin:0}</style><div class=w><div class=top><h1>Test a plan</h1></div><p>Give a Reeve account a plan so you can sign in as that user and test. Needs PLANS_ENFORCED=test (only the emails in PLANS_TEST_EMAILS are limited) or true.</p><div class=top style="justify-content:flex-start"><input id=pe placeholder="user email" style="min-width:220px"> <select id=pt><option value=none>No plan</option><option>basic</option><option>standard</option><option>pro</option><option>advanced</option></select> <input id=pd type=number value=14 min=1 style="width:70px" title=days> <button id=ps>Set plan</button> <span id=pm></span></div><div class=top><h1>AI usage</h1><div><input type=date id=d> <button id=go>Show</button> <button id=rf>Refresh</button> <button id=out style="background:#555">Sign out</button></div></div><p id=sum></p><table id=t></table></div><script>
+  res.send(`<!doctype html><meta charset=utf-8><meta name=robots content=noindex><meta name=viewport content="width=device-width,initial-scale=1"><title>Reeve admin</title><style>${ADMIN_PAGE_CSS}.w{max-width:960px;margin:24px auto;padding:0 16px}table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #dfe6e2;padding:8px;text-align:left;font-size:14px}.OVER{color:#b00020;font-weight:700}.NEAR{color:#a35f00;font-weight:700}.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}input{width:auto;margin:0}</style><div class=w><div class=top><h1>Test a plan</h1></div><p>Give a Reeve account a plan so you can sign in as that user and test. Needs PLANS_ENFORCED=test (only the emails in PLANS_TEST_EMAILS are limited) or true.</p><div class=top style="justify-content:flex-start"><input id=pe placeholder="user email" style="min-width:220px"> <select id=pt><option value=none>No plan</option><option>basic</option><option>standard</option><option>pro</option><option>advanced</option></select> <input id=pd type=number value=14 min=1 style="width:70px" title=days> <button id=ps>Set plan</button> <span id=pm></span></div><div class=top><h1>Accounts</h1></div><table id=at></table><div class=top><h1>Plan changes</h1></div><table id=ht></table><div class=top><h1>AI usage</h1><div><input type=date id=d> <button id=go>Show</button> <button id=rf>Refresh</button> <button id=out style="background:#555">Sign out</button></div></div><p id=sum></p><table id=t></table></div><script>
 var d=document.getElementById('d');d.value=new Date().toISOString().slice(0,10);
 function esc(x){return String(x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 async function load(){var r=await fetch('/api/admin/usage?date='+d.value);if(r.status==401){sum.textContent='Session expired — signing in again…';setTimeout(function(){location.reload()},900);return}var j=await r.json();
 sum.textContent='Updated '+new Date().toLocaleTimeString()+' · '+j.totals.users+' users · '+j.totals.ai+' AI calls · '+j.totals.tailor+' tailor calls · '+j.totals.over+' over allowance';
 t.innerHTML='<tr><th>User<th>Plan<th>AI<th>Tailor<th>Status</tr>'+(j.rows.map(function(r){return '<tr><td>'+esc(r.email)+'<td>'+r.tier+'<td>'+r.ai+'/'+r.aiLimit+'<td>'+r.tailor+'/'+r.tailorLimit+'<td class='+r.status+'>'+r.status+'</tr>'}).join('')||'<tr><td colspan=5>No usage on this date</tr>')}
-ps.onclick=async function(){pm.textContent='';var r=await fetch('/api/admin/set-plan',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:pe.value,tier:pt.value,days:+pd.value})});var j=await r.json().catch(function(){return {}});pm.textContent=r.ok?('Set: '+j.plan.tier+(j.plan.validUntil?' until '+j.plan.validUntil.slice(0,10):'')):(j.error||'Failed')};go.onclick=load;rf.onclick=async function(){rf.disabled=true;rf.textContent='Refreshing…';await Promise.all([load(),new Promise(function(r){setTimeout(r,500)})]);rf.textContent='Refreshed ✓';setTimeout(function(){rf.textContent='Refresh';rf.disabled=false},1200)};out.onclick=async function(){await fetch('/admin/logout',{method:'POST'});location.reload()};load();
+async function loadAcc(){var r=await fetch('/api/admin/accounts');if(!r.ok)return;var j=await r.json();function ds(x){return x?String(x).slice(0,16).replace('T',' '):'—'}at.innerHTML='<tr><th>Account<th>Name<th>Plan now<th>Valid until<th>Joined</tr>'+(j.accounts.map(function(a){return '<tr><td>'+esc(a.email)+'<td>'+esc(a.name)+'<td>'+(a.tier==='none'&&a.rawTier!=='none'?'expired ('+a.rawTier+')':a.tier)+'<td>'+ds(a.validUntil)+'<td>'+ds(a.created)+'</tr>'}).join('')||'<tr><td colspan=5>No accounts</tr>');ht.innerHTML='<tr><th>When<th>Account<th>Plan set<th>Valid until<th>By</tr>'+(j.history.map(function(h){return '<tr><td>'+ds(h.at)+'<td>'+esc(h.email)+'<td>'+h.tier+'<td>'+ds(h.validUntil)+'<td>'+esc(h.by)+'</tr>'}).join('')||'<tr><td colspan=5>No plan changes recorded yet</tr>')}
+ps.onclick=async function(){pm.textContent='';var r=await fetch('/api/admin/set-plan',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:pe.value,tier:pt.value,days:+pd.value})});var j=await r.json().catch(function(){return {}});if(r.ok)loadAcc();pm.textContent=r.ok?('Set: '+j.plan.tier+(j.plan.validUntil?' until '+j.plan.validUntil.slice(0,10):'')):(j.error||'Failed')};loadAcc();go.onclick=load;rf.onclick=async function(){rf.disabled=true;rf.textContent='Refreshing…';await Promise.all([load(),loadAcc(),new Promise(function(r){setTimeout(r,500)})]);rf.textContent='Refreshed ✓';setTimeout(function(){rf.textContent='Refresh';rf.disabled=false},1200)};out.onclick=async function(){await fetch('/admin/logout',{method:'POST'});location.reload()};load();
 </script>`);
 });
 app.post('/admin/login', adminLimiter, (req, res) => {
@@ -518,6 +519,17 @@ app.get('/api/auth/me', (req, res) => {
 });
 
 // Test/admin only: set a user's plan (ADMIN_EMAILS). Real purchases will go through the payment webhook.
+const PLAN_HIST_FILE = path.join(DATA_DIR, 'plan-history.json');
+app.get('/api/admin/accounts', requireAdmin, (req, res) => {
+  const accounts = Object.entries(users).map(([email, u]) => ({
+    email, name: u.name || '', created: u.created || '',
+    tier: plans.tierOf(u), rawTier: u.plan ? u.plan.tier : 'none',
+    validUntil: u.plan ? u.plan.validUntil : null, source: u.plan ? (u.plan.source || '') : ''
+  })).sort((a, b) => String(b.created).localeCompare(String(a.created)));
+  const history = loadJSON(PLAN_HIST_FILE, []).slice().reverse().slice(0, 200);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ success: true, accounts, history });
+});
 app.post('/api/admin/set-plan', requireAdmin, (req, res) => {
   const { email, tier, days } = req.body || {};
   const em = String(email || '').trim().toLowerCase();
@@ -529,6 +541,9 @@ app.post('/api/admin/set-plan', requireAdmin, (req, res) => {
     users[em].plan = { tier, status: 'active', validUntil: new Date(Date.now() + d * 86400000).toISOString(), source: 'admin' };
   }
   saveJSON(USERS_FILE, users);
+  const hist = loadJSON(PLAN_HIST_FILE, []);
+  hist.push({ at: new Date().toISOString(), email: em, tier: users[em].plan ? users[em].plan.tier : 'none', validUntil: users[em].plan ? users[em].plan.validUntil : null, by: 'admin' });
+  saveJSON(PLAN_HIST_FILE, hist.slice(-1000));
   res.json({ success: true, plan: plans.describe(users[em]), email: em });
 });
 
