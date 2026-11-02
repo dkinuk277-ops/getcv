@@ -1790,6 +1790,26 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 .ai-done-toast.show{transform:translateX(0);opacity:1}
 
 
+/* ---- Plans: locks, upgrade prompt, ATS upsell ---- */
+.plan-locked{opacity:.7;border-style:dashed !important}
+.plan-locked::after{content:" \1F512";font-size:.85em}
+.tpl-card{position:relative}
+.tpl-card.tpl-locked{opacity:.6;filter:grayscale(.8)}
+.tpl-lock{position:absolute;top:8px;right:8px;background:var(--rv-ink);color:#fff;width:22px;height:22px;border-radius:99px;display:grid;place-items:center;font-size:11px}
+.pl-veil{position:fixed;inset:0;background:rgba(10,24,18,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:9000}
+.pl-veil.on{display:flex}
+.pl-box{background:#fff;color:var(--rv-ink);border-radius:16px;width:min(440px,100%);padding:22px;position:relative;max-height:90vh;overflow:auto;box-shadow:0 14px 40px rgba(0,0,0,.3)}
+.pl-box h3{margin:0 0 6px;font-size:20px}
+.pl-box ul{margin:10px 0;padding-left:18px}.pl-box li{margin:3px 0}
+.pl-price{font-size:26px;font-weight:800;margin:6px 0}.pl-price small{font-size:13px;font-weight:400;color:var(--rv-ink-soft)}
+.pl-sub{color:var(--rv-ink-soft);font-size:14px;margin:8px 0}
+.pl-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.pl-chk{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:13px;color:var(--rv-ink-soft)}
+.pl-chk input{margin-top:3px}
+.pl-x{position:absolute;top:8px;right:10px;border:0;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:var(--rv-ink-soft);padding:4px 8px}
+.tl-ats-upsell{display:none;background:#fff7e6;border:1px solid #f1d49b;border-radius:12px;padding:14px;margin:10px 0}
+#tlResults.ats-locked .tl-ats-upsell{display:block}
+#tlResults.ats-locked .tl-scorehead,#tlResults.ats-locked .tl-legend-top,#tlResults.ats-locked .match-band{display:none}
 </style>
 </head>
 <body>
@@ -2454,6 +2474,11 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
             <div class="tl-leg-item"><span class="sk absent">Not found</span><span class="tl-leg-txt">Nothing in your CV relates to this at all — a genuine gap, not a wording problem.</span></div>
           </div>
         </div>
+        <div class="tl-ats-upsell" id="tlAtsUpsell">
+          <b>&#128274; ATS match score and fit analysis are on the Advanced plan</b>
+          <p style="margin:6px 0 10px;color:var(--rv-ink-soft)">Your tailored changes are below. Advanced adds the match score, fit analysis against the job and guided fixes to raise it.</p>
+          <button class="btn btn-gold" id="tlAtsUpBtn" type="button">See Advanced</button>
+        </div>
         <div class="match-band">
           <div class="match-info">
             <h4 id="tlMatchTitle">Your resume vs. this job</h4>
@@ -2768,7 +2793,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20261020b"></script>
+<script src="app.js?v=20261102a"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>

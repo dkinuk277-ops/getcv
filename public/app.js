@@ -90,8 +90,108 @@ function toast(msg, ms=3500){
 async function api(path, opts={}){
   const res = await fetch(API + path, opts);
   const data = await res.json().catch(()=>({error:'Server returned a non-JSON response'}));
+  noteAiUsage(res);
+  if(res.status === 402 && data.upgrade){
+    if(data.plan) PLAN = data.plan;
+    applyPlanUI();
+    showUpgrade(data.feature);
+    const e = new Error(data.error || 'This is not included in your plan'); e.upgrade = true; throw e;
+  }
   if(!res.ok || data.error) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
+}
+
+// ============================================================
+// Plans — what the signed-in user's plan includes. The server is the
+// authority (it returns 402 for anything not included); this drives the
+// locks, upgrade prompts and the download gate. When the server has plan
+// enforcement off, PLAN.enforced is false and everything stays unlocked.
+// ============================================================
+let PLAN = {enforced:false, tier:'none', features:{}, templates:null};
+const PLAN_INFO = {
+  basic:{name:'Basic', price:'£5'}, standard:{name:'Standard', price:'£10'},
+  pro:{name:'Pro', price:'£18'}, advanced:{name:'Advanced', price:'£25'}
+};
+const FEATURE_INFO = {
+  download:{need:'basic', title:'Download your CV', bullets:['Download your CV as a PDF or Word file','Build with 3 templates']},
+  save:{need:'standard', title:'Saving to your account', bullets:['Save resumes to your account','Open them any time, from any device','10 templates and direct download']},
+  coverLetters:{need:'pro', title:'Cover letters', bullets:['AI cover letters for each job','Save and edit them in your account','All 25 templates']},
+  tailor:{need:'pro', title:'Job Tailor', bullets:['Paste a job description and get a tailored CV','Review and accept each change, nothing is invented','Save a tailored copy per job in its own folder']},
+  publish:{need:'pro', title:'Publishing your CV page', bullets:['A public link to your CV','Share one URL with recruiters','Cover letters and Job Tailor included']},
+  atsScore:{need:'advanced', title:'ATS score and fit analysis', bullets:['ATS filter checks','Match score and fit analysis for each job','Guided fixes to lift your score']},
+  template:{need:'standard', title:'More templates', bullets:['Standard has 10 templates','Pro and Advanced have all 25']}
+};
+const STD_IDS = new Set(['classic-teal','modern-indigo','ats-plain','exec-navy','minimal-slate','forest-pro','ocean-blue','graphite','emerald','steel-corp']);
+function planCan(f){ return !PLAN.enforced || !!(PLAN.features && PLAN.features[f]); }
+function tplAllowed(id){ return !PLAN.templates || PLAN.templates.indexOf(id) > -1; }
+
+let _aiNoted = false;
+function noteAiUsage(res){
+  const used = +res.headers.get('X-AI-Used'), limit = +res.headers.get('X-AI-Limit');
+  if(!limit || _aiNoted) return;
+  if(used + 1 >= Math.ceil(limit * 0.8)){
+    _aiNoted = true;
+    toast('You are close to today\u2019s AI allowance. You can keep going. It resets at midnight.', 6000);
+  }
+}
+
+function planModal(html){
+  let v = document.getElementById('planVeil');
+  if(!v){
+    v = document.createElement('div'); v.id = 'planVeil'; v.className = 'pl-veil';
+    v.addEventListener('click', e=>{ if(e.target === v || e.target.closest('[data-plclose]')) v.classList.remove('on'); });
+    document.addEventListener('keydown', e=>{ if(e.key === 'Escape') v.classList.remove('on'); });
+    document.body.appendChild(v);
+  }
+  v.innerHTML = '<div class="pl-box" role="dialog" aria-modal="true"><button class="pl-x" data-plclose aria-label="Close" type="button">\u00d7</button>' + html + '</div>';
+  v.classList.add('on');
+  return v;
+}
+function showUpgrade(feature, needOverride){
+  const f = FEATURE_INFO[feature] || FEATURE_INFO.template;
+  const need = needOverride || f.need, p = PLAN_INFO[need];
+  const cur = PLAN.tier === 'none' ? 'No plan yet' : (PLAN_INFO[PLAN.tier] || {name:PLAN.tier}).name;
+  const v = planModal(
+    '<h3>' + esc(f.title) + ' is on ' + p.name + '</h3>' +
+    '<div class="pl-price">' + p.price + ' <small>for the first 14 days</small></div>' +
+    '<ul>' + f.bullets.map(b=>'<li>' + esc(b) + '</li>').join('') + '</ul>' +
+    '<p class="pl-sub">Your plan today: <b>' + esc(cur) + '</b>. Your work stays exactly as it is.</p>' +
+    '<div class="pl-row"><button class="btn btn-gold" data-plbuy="' + need + '" type="button">Choose ' + p.name + '</button><button class="btn btn-ghost" data-plclose type="button">Not now</button></div>');
+  v.querySelector('[data-plbuy]').addEventListener('click', e=> startCheckout(e.currentTarget.dataset.plbuy));
+}
+// Checkout: shows the required 14-day / monthly disclaimer. The payment step
+// itself is connected in the billing stage; until then nobody is charged.
+function startCheckout(tier){
+  const p = PLAN_INFO[tier];
+  const v = planModal(
+    '<h3>Confirm ' + p.name + '</h3>' +
+    '<div class="pl-price">' + p.price + ' <small>today, for the first 14 days</small></div>' +
+    '<p class="pl-sub">After 14 days the plan renews every month at <b>' + p.price + '</b> until you cancel. We email you before each renewal. Cancel any time from your account. Prices are in GBP and taxes may apply.</p>' +
+    '<label class="pl-chk"><input type="checkbox" id="plAgree"> <span>I understand the plan runs for 14 days, then renews monthly at the same price until I cancel.</span></label>' +
+    '<div class="pl-row"><button class="btn btn-gold" id="plPay" type="button" disabled>Pay ' + p.price + '</button><button class="btn btn-ghost" data-plclose type="button">Cancel</button></div>' +
+    '<p class="pl-sub" id="plMsg"></p>');
+  v.querySelector('#plAgree').addEventListener('change', e=>{ v.querySelector('#plPay').disabled = !e.target.checked; });
+  v.querySelector('#plPay').addEventListener('click', ()=>{
+    v.querySelector('#plMsg').textContent = 'Online payment is being set up and opens soon. You have not been charged.';
+  });
+}
+
+async function refreshPlan(){
+  try{
+    const out = await api('/api/auth/me');
+    if(out.plan) PLAN = out.plan;
+  }catch{}
+  if(!tplAllowed(selectedTemplate)){
+    const first = TEMPLATES.find(t=>tplAllowed(t.id));
+    if(first) selectedTemplate = first.id;
+  }
+  applyPlanUI();
+}
+function applyPlanUI(){
+  const map = [['.js-save','save'],['.js-coverletter','coverLetters'],['.js-tailor','tailor'],['.js-pdf','download'],['.js-word','download'],['#pvHtml','download']];
+  map.forEach(([sel, f])=> document.querySelectorAll(sel).forEach(b=> b.classList.toggle('plan-locked', !planCan(f))));
+  document.querySelectorAll('[data-publish]').forEach(b=> b.classList.toggle('plan-locked', !planCan('publish')));
+  const g = document.querySelector('[data-templategrid]'); if(g && typeof renderTemplateGrid === 'function'){ try{ renderTemplateGrid(); }catch{} }
 }
 
 // ============================================================
@@ -2974,9 +3074,11 @@ function renderTemplateGrid(){
   document.querySelectorAll('[data-templategrid]').forEach(grid=>{
     grid.innerHTML = '';
     TEMPLATES.forEach(t=>{
-      const b = el('button',{class:'tpl-card'+(t.id===selectedTemplate?' sel':''),type:'button'},
-        `${templateMini(t)}<div class="tpl-name">${t.name}</div>`);
+      const ok = tplAllowed(t.id);
+      const b = el('button',{class:'tpl-card'+(t.id===selectedTemplate?' sel':'')+(ok?'':' tpl-locked'),type:'button'},
+        `${templateMini(t)}<div class="tpl-name">${t.name}</div>${ok?'':'<span class="tpl-lock" aria-label="Locked">\u{1F512}</span>'}`);
       b.addEventListener('click', ()=>{
+        if(!ok){ showUpgrade('template', STD_IDS.has(t.id) ? 'standard' : 'pro'); return; }
         selectedTemplate = t.id;
         renderTemplateGrid();
         const sel = $('#tplSelName'); if(sel) sel.textContent = getTemplate().name;
@@ -3024,6 +3126,7 @@ function safeFileName(){
 // clean A4 page breaks. (Canvas-capture engines proved unreliable across
 // Chrome builds — native printing never is.)
 function downloadPDF(){
+  if(!planCan('download')) return showUpgrade('download');
   const pw = window.open('', '_blank');
   if(!pw) return toast('Please allow pop-ups for this site, then click PDF again', 5000);
   const t = getTemplate();
@@ -3080,6 +3183,7 @@ document.querySelectorAll('.js-pdf').forEach(b => b.addEventListener('click', do
 
 // Word: HTML wrapped with Word-compatible headers, saved as .doc
 function downloadWord(){
+  if(!planCan('download')) return showUpgrade('download');
   const html = resumeHTML(true);
   const wordDoc = html.replace('<html>',
     `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">`)
@@ -3095,6 +3199,7 @@ document.querySelectorAll('.js-word').forEach(b => b.addEventListener('click', d
 
 // HTML download kept as a third option
 $('#pvHtml').addEventListener('click', ()=>{
+  if(!planCan('download')) return showUpgrade('download');
   const blob = new Blob([resumeHTML(true)], {type:'text/html'});
   const url = URL.createObjectURL(blob);
   const a = el('a',{href:url,download:safeFileName()+'.html'});
@@ -3280,6 +3385,7 @@ async function doLogout(){
 
 function setUser(user){
   currentUser = user;
+  refreshPlan();
   refreshUserChips();
   showView('home');
   loadSavedList();
@@ -3325,6 +3431,7 @@ function resumeIsEmpty(){
 }
 
 async function saveCurrentResume(){
+  if(!planCan('save')) return showUpgrade('save');
   if(resumeIsEmpty()) return toast('Nothing to save yet — import or build a resume first');
   const suggested = (R.personal.name ? R.personal.name + ' — ' : '') + 'CV ' + new Date().toLocaleDateString();
   const name = window.prompt('Name this resume:', currentResumeName || suggested);
@@ -3787,6 +3894,7 @@ function clShowPane(pane){
 }
 
 document.querySelectorAll('.js-coverletter').forEach(b => b.addEventListener('click', ()=>{
+  if(!planCan('coverLetters')) return showUpgrade('coverLetters');
   if(resumeIsEmpty()) return toast('Import or open a resume first — then write a cover letter for it.', 5000);
   $('#clErr').classList.remove('on');
   $('#clSaveErr').classList.remove('on');
@@ -4001,6 +4109,7 @@ function pubError(msg){
 }
 
 async function openPublishModal(resumeId, resumeName){
+  if(!planCan('publish')) return showUpgrade('publish');
   pubResumeId = resumeId;
   // Fetched here rather than reused from R, which is only the resume
   // currently open in the editor — not necessarily the one this row
@@ -4135,6 +4244,7 @@ $('#pubUnpublish').addEventListener('click', async ()=>{
 });
 
 document.querySelectorAll('.js-tailor').forEach(b => b.addEventListener('click', ()=>{
+  if(!planCan('tailor')) return showUpgrade('tailor');
   if(resumeIsEmpty()) return toast('Import or open a resume first — then tailor it for a job.', 5000);
   $('#tlErr').classList.remove('on');
   $('#tlErr2').classList.remove('on');
@@ -4247,6 +4357,7 @@ $('#tlAnalyse').addEventListener('click', async ()=>{
 
 function renderTailorResults(){
   const r = tailorResult;
+  $('#tlResults').classList.toggle('ats-locked', !!r.ats_locked);
   $('#tlLoading').style.display = 'none';
   $('#tlResults').classList.remove('hidden');
 
@@ -7407,3 +7518,5 @@ function decoratePreviewHeader(){
     head.appendChild(wrap);
   });
 }
+
+$('#tlAtsUpBtn').addEventListener('click', ()=> showUpgrade('atsScore'));
