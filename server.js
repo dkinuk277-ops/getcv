@@ -331,6 +331,64 @@ function requireFeature(feature, msg){
   };
 }
 
+// ---- AI usage metering (soft limits, never blocks at the allowance; alerts the owner) ----
+const USAGE_FILE = path.join(DATA_DIR, 'usage.json');
+let usageDb = loadJSON(USAGE_FILE, {});
+const alerted = new Set();
+function today(){ return new Date().toISOString().slice(0, 10); }
+function saveUsage(){
+  const keep = Object.keys(usageDb).sort().slice(-35);
+  Object.keys(usageDb).forEach(k => { if (!keep.includes(k)) delete usageDb[k]; });
+  saveJSON(USAGE_FILE, usageDb);
+}
+async function sendAlert(msg){
+  console.warn('⚠️ USAGE ALERT: ' + msg);
+  const url = process.env.ALERT_WEBHOOK_URL;
+  if (!url) return;
+  try { await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text: 'Reeve: ' + msg, content: 'Reeve: ' + msg }) }); } catch (e) { /* alerting is best-effort */ }
+}
+function aiMeter(kind){
+  return (req, res, next) => {
+    const email = req.user.email, tier = plans.tierOf(users[email]);
+    const limit = plans.aiLimit(tier, kind), hard = limit * plans.HARD_FACTOR;
+    const day = (usageDb[today()] = usageDb[today()] || {});
+    const rec = (day[email] = day[email] || { ai: 0, tailor: 0 });
+    const used = rec[kind] || 0;
+    res.setHeader('X-AI-Used', String(used)); res.setHeader('X-AI-Limit', String(limit));
+    if (used >= hard) {
+      sendAlert(`${email} hit the hard ceiling (${used}/${limit} ${kind}) — blocked`);
+      return res.status(429).json({ error: 'You’ve done a lot of AI actions today — please come back tomorrow. Your work is safe.', limited: true });
+    }
+    res.on('finish', () => {
+      if (res.statusCode >= 400) return;           // only successful calls count
+      rec[kind] = (rec[kind] || 0) + 1;
+      const n = rec[kind];
+      const k80 = `${today()}|${email}|${kind}|80`, k100 = `${today()}|${email}|${kind}|100`;
+      if (n >= limit && !alerted.has(k100)) { alerted.add(k100); sendAlert(`${email} (${tier}) passed their daily ${kind} allowance: ${n}/${limit}`); }
+      else if (n >= Math.ceil(limit * 0.8) && !alerted.has(k80)) { alerted.add(k80); sendAlert(`${email} (${tier}) reached 80% of daily ${kind} allowance: ${n}/${limit}`); }
+      saveUsage();
+    });
+    next();
+  };
+}
+
+app.get('/api/admin/usage', requireAuth, (req, res) => {
+  if (!plans.adminEmails().includes(req.user.email)) return res.status(403).json({ error: 'Forbidden' });
+  const day = req.query.date || today();
+  const rows = Object.entries(usageDb[day] || {}).map(([email, r]) => {
+    const tier = plans.tierOf(users[email]);
+    const la = plans.aiLimit(tier, 'ai'), lt = plans.aiLimit(tier, 'tailor');
+    return { email, tier, ai: r.ai || 0, aiLimit: la, tailor: r.tailor || 0, tailorLimit: lt,
+      status: (r.ai >= la || r.tailor >= lt) ? 'OVER' : ((r.ai >= la * 0.8 || r.tailor >= lt * 0.8) ? 'NEAR' : 'ok') };
+  }).sort((a, b) => b.ai + b.tailor - a.ai - a.tailor);
+  const totals = { users: rows.length, ai: rows.reduce((s, r) => s + r.ai, 0), tailor: rows.reduce((s, r) => s + r.tailor, 0), over: rows.filter(r => r.status === 'OVER').length };
+  if (req.query.format === 'json') return res.json({ success: true, date: day, totals, rows });
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(`<!doctype html><meta charset=utf-8><title>Reeve usage</title><body style="font-family:system-ui;margin:24px;max-width:900px"><h2>AI usage — ${esc(day)}</h2><p>${totals.users} users · ${totals.ai} AI calls · ${totals.tailor} tailor calls · ${totals.over} over allowance</p><table border=1 cellpadding=6 style="border-collapse:collapse;width:100%"><tr><th>User<th>Plan<th>AI<th>Tailor<th>Status</tr>${rows.map(r => `<tr><td>${esc(r.email)}<td>${r.tier}<td>${r.ai}/${r.aiLimit}<td>${r.tailor}/${r.tailorLimit}<td>${r.status}</tr>`).join('') || '<tr><td colspan=5>No usage yet today</tr>'}</table><p><a href="?date=${esc(day)}&format=json">JSON</a></p>`);
+});
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 app.post('/api/auth/signup', authLimiter, (req, res) => {
@@ -591,7 +649,7 @@ function summarizeResumeForLetter(data){
   return lines.join('\n');
 }
 
-app.post('/api/cover-letter/generate', aiLimiter, requireAuth, requireFeature('coverLetters', 'Cover letters are included in the Pro plan and above'), async (req, res) => {
+app.post('/api/cover-letter/generate', aiLimiter, requireAuth, aiMeter('ai'), requireFeature('coverLetters', 'Cover letters are included in the Pro plan and above'), async (req, res) => {
   const { company, role, tone, note, resumeData } = req.body || {};
   const companyName = (company || '').trim();
   const roleName = (role || '').trim();
@@ -1072,7 +1130,7 @@ app.get('/cv/:slug', publicSiteLimiter, (req, res) => {
 // anything not verifiable from the resume is returned with
 // verified:false so the client defaults it OFF.
 // ============================================================
-app.post('/api/tailor', tailorLimiter, requireAuth, requireFeature('tailor', 'Job Tailor is included in the Pro plan and above'), async (req, res) => {
+app.post('/api/tailor', tailorLimiter, requireAuth, aiMeter('tailor'), requireFeature('tailor', 'Job Tailor is included in the Pro plan and above'), async (req, res) => {
   try {
     if (!requireKey(res)) return;
     const { jobTitle, company, jobDescription, resume } = req.body || {};
@@ -1298,7 +1356,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ---- 1. Parse an uploaded resume ---------------------------
-app.post('/api/parse-resume', aiLimiter, requireAuth, upload.single('resume'), handleUploadErrors, async (req, res) => {
+app.post('/api/parse-resume', aiLimiter, requireAuth, aiMeter('ai'), upload.single('resume'), handleUploadErrors, async (req, res) => {
   try {
     if (!requireKey(res)) return;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -1424,7 +1482,7 @@ ${resumeText}`;
 // A "unit" is one addressable piece of text: the summary, one job's
 // description, one skill, one accomplishment. Fixing unit-by-unit means the
 // resume's array shapes can never be mangled by a bad split.
-app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
+app.post('/api/ai-builder', aiLimiter, requireAuth, aiMeter('ai'), async (req, res) => {
   try {
     const { command, resume } = req.body;
     if (!requireKey(res)) return;
@@ -1911,7 +1969,7 @@ app.post('/api/ai-builder', aiLimiter, requireAuth, async (req, res) => {
 });
 
 // ---- Ask AI about one section: free-text request scoped to a block ----
-app.post('/api/ask-section', aiLimiter, requireAuth, async (req, res) => {
+app.post('/api/ask-section', aiLimiter, requireAuth, aiMeter('ai'), async (req, res) => {
   try {
     const { request, text, scope } = req.body;
     if (!requireKey(res)) return;
@@ -1938,7 +1996,7 @@ app.post('/api/ask-section', aiLimiter, requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/quality-fix', aiLimiter, requireAuth, async (req, res) => {
+app.post('/api/quality-fix', aiLimiter, requireAuth, aiMeter('ai'), async (req, res) => {
   try {
     const { text, errorType, errorDesc } = req.body;
     if (!requireKey(res)) return;
@@ -1967,7 +2025,7 @@ ${String(text).slice(0, 6000)}`;
   }
 });
 
-app.post('/api/enhance', aiLimiter, requireAuth, async (req, res) => {
+app.post('/api/enhance', aiLimiter, requireAuth, aiMeter('ai'), async (req, res) => {
   try {
     const { text, context } = req.body;
     if (!requireKey(res)) return;
@@ -1989,7 +2047,7 @@ ${text.slice(0, 4000)}`;
 });
 
 // ---- 3. Build a fresher resume from scratch -----------------
-app.post('/api/fresher-build', aiLimiter, requireAuth, async (req, res) => {
+app.post('/api/fresher-build', aiLimiter, requireAuth, aiMeter('ai'), async (req, res) => {
   try {
     const { name, field, education, institution, course, specialization, year, courses, projects, skills } = req.body;
     if (!requireKey(res)) return;
@@ -2036,7 +2094,7 @@ Respond ONLY with JSON matching:
 });
 
 // ---- 4. Single field AI suggestion ------------------------
-app.post('/api/ask-field', aiLimiter, requireAuth, async (req, res) => {
+app.post('/api/ask-field', aiLimiter, requireAuth, aiMeter('ai'), async (req, res) => {
   try {
     if (!requireKey(res)) return;
     const { field, value, context } = req.body;

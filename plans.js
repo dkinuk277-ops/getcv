@@ -68,4 +68,13 @@ function describe(user, env = process.env){
   };
 }
 
-module.exports = { RANK, TIERS, FEATURE_MIN, BASIC_TPL, STANDARD_TPL, enforced, adminEmails, tierOf, can, allowedTemplates, templateAllowed, describe };
+// Daily AI allowance (soft). Never blocks at the allowance; only a hard ceiling (x3) stops runaway/abuse.
+const AI_LIMITS = { none: 5, basic: 30, standard: 30, pro: 60, advanced: 100 };
+const TAILOR_LIMIT = 10;
+const HARD_FACTOR = 3;
+function aiLimit(tier, kind, env = process.env){
+  if (kind === 'tailor') return TAILOR_LIMIT;
+  return AI_LIMITS[enforced(env) ? tier : 'advanced'] || AI_LIMITS.none;
+}
+
+module.exports = { aiLimit, HARD_FACTOR, RANK, TIERS, FEATURE_MIN, BASIC_TPL, STANDARD_TPL, enforced, adminEmails, tierOf, can, allowedTemplates, templateAllowed, describe };
