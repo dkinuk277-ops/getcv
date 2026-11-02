@@ -4358,6 +4358,13 @@ $('#tlAnalyse').addEventListener('click', async ()=>{
 function renderTailorResults(){
   const r = tailorResult;
   $('#tlResults').classList.toggle('ats-locked', !!r.ats_locked);
+  document.querySelectorAll('#tlResults .tl-scorehead > :not(.tl-ats-upsell)').forEach(n=>{ if(r.ats_locked) n.setAttribute('aria-hidden','true'); else n.removeAttribute('aria-hidden'); });
+  if(r.ats_locked){
+    // Decoy numbers only: the real score and statuses never leave the server on this plan.
+    $('#tlFoundNum').textContent = '4'; $('#tlPartialNum').textContent = '3'; $('#tlMissingNum').textContent = '3';
+    const tz = r.ats_teaser || {};
+    if(tz.requirements) $('#tlAtsTease').textContent = 'We checked ' + tz.requirements + ' requirements in this job against your CV' + (tz.needAttention ? ' and ' + tz.needAttention + ' need attention' : '') + '. Advanced shows your score, which ones fall short, and guided fixes to raise it.';
+  }
   $('#tlLoading').style.display = 'none';
   $('#tlResults').classList.remove('hidden');
 
@@ -4376,7 +4383,9 @@ function renderTailorResults(){
 
   updateTailorCount();
 
-  if((r.skills_coverage || []).length){
+  if(r.ats_locked){
+    animateTlScore(64);
+  } else if((r.skills_coverage || []).length){
     tlRefreshScore(true);
   } else {
     animateTlScore(r.match_score || 0);

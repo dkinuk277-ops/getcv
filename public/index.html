@@ -1807,9 +1807,12 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 .pl-chk{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:13px;color:var(--rv-ink-soft)}
 .pl-chk input{margin-top:3px}
 .pl-x{position:absolute;top:8px;right:10px;border:0;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:var(--rv-ink-soft);padding:4px 8px}
-.tl-ats-upsell{display:none;background:#fff7e6;border:1px solid #f1d49b;border-radius:12px;padding:14px;margin:10px 0}
-#tlResults.ats-locked .tl-ats-upsell{display:block}
-#tlResults.ats-locked .tl-scorehead,#tlResults.ats-locked .tl-legend-top,#tlResults.ats-locked .match-band{display:none}
+.tl-ats-upsell{display:none}
+#tlResults.ats-locked .tl-scorehead{position:relative;min-height:220px}
+#tlResults.ats-locked .tl-scorehead > :not(.tl-ats-upsell){filter:blur(8px);opacity:.75;pointer-events:none;user-select:none}
+#tlResults.ats-locked .tl-ats-upsell{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px;position:absolute;inset:0;padding:14px;z-index:2;background:rgba(255,255,255,.35);border-radius:12px}
+#tlResults.ats-locked .tl-ats-upsell p{margin:0;max-width:440px;color:var(--rv-ink);font-size:14px}
+#tlResults.ats-locked .tl-legend-top,#tlResults.ats-locked .match-band{display:none}
 </style>
 </head>
 <body>
@@ -2464,6 +2467,11 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
               <li>It's an indication of your screening chances with the ATS software recruiters use — not a guarantee of getting an interview. That decision always stays with the recruiter.</li>
             </ul>
           </div>
+          <div class="tl-ats-upsell" id="tlAtsUpsell">
+            <b>&#128274; Your ATS match score is ready</b>
+            <p id="tlAtsTease">Advanced shows your score, which requirements fall short, and guided fixes to raise it.</p>
+            <button class="btn btn-gold" id="tlAtsUpBtn" type="button">Unlock with Advanced</button>
+          </div>
         </div>
         <div class="tl-legend-top">
           <p class="tl-cov-label" style="margin-top:0">What the matching statuses mean:</p>
@@ -2473,11 +2481,6 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
             <div class="tl-leg-item"><span class="sk missing">Missing</span><span class="tl-leg-txt">Related experience exists, but this specific requirement isn't stated.</span></div>
             <div class="tl-leg-item"><span class="sk absent">Not found</span><span class="tl-leg-txt">Nothing in your CV relates to this at all — a genuine gap, not a wording problem.</span></div>
           </div>
-        </div>
-        <div class="tl-ats-upsell" id="tlAtsUpsell">
-          <b>&#128274; ATS match score and fit analysis are on the Advanced plan</b>
-          <p style="margin:6px 0 10px;color:var(--rv-ink-soft)">Your tailored changes are below. Advanced adds the match score, fit analysis against the job and guided fixes to raise it.</p>
-          <button class="btn btn-gold" id="tlAtsUpBtn" type="button">See Advanced</button>
         </div>
         <div class="match-band">
           <div class="match-info">
@@ -2793,7 +2796,7 @@ header .rv-mark .ph::before, header .rv-mark .ph::after{background:#fff}
 
 <div id="toast"></div>
 
-<script src="app.js?v=20261102a"></script>
+<script src="app.js?v=20261102b"></script>
 <div class="fix-toast" id="fixToast"><span class="ft-icon">✓</span><span id="fixToastMsg">Error fixed!</span><span class="ft-score" id="fixToastScore"></span></div>
 </body>
 </html>

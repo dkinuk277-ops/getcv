@@ -1378,6 +1378,9 @@ SCORING LINKAGE — this drives a live "projected score" as the candidate select
 
     // ATS match score / fit analysis is Advanced-only: strip it server-side for Pro
     if (!plans.can(userTier(req), 'atsScore')) {
+      // Only counts leave the server (a teaser); the score, statuses and wording stay here.
+      const cov = Array.isArray(out.skills_coverage) ? out.skills_coverage : [];
+      out.ats_teaser = { requirements: cov.length, needAttention: cov.filter(c => c.status !== 'have').length };
       out.match_score = null; out.match_summary = ''; out.skills_coverage = []; out.ats_locked = true;
     }
     res.json({ success: true, result: out });
