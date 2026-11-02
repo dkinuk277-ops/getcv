@@ -20,7 +20,9 @@ const FEATURE_MIN = {
   download: 'basic'        // paid to download (enforced client-side + billing stage)
 };
 
-function enforced(env = process.env){ return String(env.PLANS_ENFORCED || '').toLowerCase() === 'true'; }
+// PLANS_ENFORCED: 'true' = everyone, 'test' = only PLANS_TEST_EMAILS (everyone else keeps full access)
+function enforced(env = process.env){ return ['true', 'test'].includes(String(env.PLANS_ENFORCED || '').toLowerCase()); }
+function testEmails(env = process.env){ return String(env.PLANS_TEST_EMAILS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean); }
 
 function adminEmails(env = process.env){
   return String(env.ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -77,4 +79,4 @@ function aiLimit(tier, kind, env = process.env){
   return AI_LIMITS[enforced(env) ? tier : 'advanced'] || AI_LIMITS.none;
 }
 
-module.exports = { aiLimit, HARD_FACTOR, RANK, TIERS, FEATURE_MIN, BASIC_TPL, STANDARD_TPL, enforced, adminEmails, tierOf, can, allowedTemplates, templateAllowed, describe };
+module.exports = { testEmails, aiLimit, HARD_FACTOR, RANK, TIERS, FEATURE_MIN, BASIC_TPL, STANDARD_TPL, enforced, adminEmails, tierOf, can, allowedTemplates, templateAllowed, describe };

@@ -347,13 +347,13 @@ app.get('/admin', (req, res) => {
   if (!isAdmin(req)) {
     return res.send(`<!doctype html><meta charset=utf-8><meta name=robots content=noindex><meta name=viewport content="width=device-width,initial-scale=1"><title>Reeve admin</title><style>${ADMIN_PAGE_CSS}</style><div class=box><h1>Reeve admin</h1><form id=f><label>Username<input name=u autocomplete=username required></label><label>Password<input name=p type=password autocomplete=current-password required></label><div class=err id=e></div><button>Sign in</button></form></div><script>f.onsubmit=async function(ev){ev.preventDefault();e.textContent='';var r=await fetch('/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:f.u.value,password:f.p.value})});if(r.ok)location.reload();else{var j={};try{j=await r.json()}catch(x){}e.textContent=j.error||'Sign-in failed'}}</script>`);
   }
-  res.send(`<!doctype html><meta charset=utf-8><meta name=robots content=noindex><meta name=viewport content="width=device-width,initial-scale=1"><title>Reeve admin</title><style>${ADMIN_PAGE_CSS}.w{max-width:960px;margin:24px auto;padding:0 16px}table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #dfe6e2;padding:8px;text-align:left;font-size:14px}.OVER{color:#b00020;font-weight:700}.NEAR{color:#a35f00;font-weight:700}.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}input{width:auto;margin:0}</style><div class=w><div class=top><h1>AI usage</h1><div><input type=date id=d> <button id=go>Show</button> <button id=out style="background:#555">Sign out</button></div></div><p id=sum></p><table id=t></table></div><script>
+  res.send(`<!doctype html><meta charset=utf-8><meta name=robots content=noindex><meta name=viewport content="width=device-width,initial-scale=1"><title>Reeve admin</title><style>${ADMIN_PAGE_CSS}.w{max-width:960px;margin:24px auto;padding:0 16px}table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #dfe6e2;padding:8px;text-align:left;font-size:14px}.OVER{color:#b00020;font-weight:700}.NEAR{color:#a35f00;font-weight:700}.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}input{width:auto;margin:0}</style><div class=w><div class=top><h1>Test a plan</h1></div><p>Give a Reeve account a plan so you can sign in as that user and test. Needs PLANS_ENFORCED=test (only the emails in PLANS_TEST_EMAILS are limited) or true.</p><div class=top style="justify-content:flex-start"><input id=pe placeholder="user email" style="min-width:220px"> <select id=pt><option value=none>No plan</option><option>basic</option><option>standard</option><option>pro</option><option>advanced</option></select> <input id=pd type=number value=14 min=1 style="width:70px" title=days> <button id=ps>Set plan</button> <span id=pm></span></div><div class=top><h1>AI usage</h1><div><input type=date id=d> <button id=go>Show</button> <button id=out style="background:#555">Sign out</button></div></div><p id=sum></p><table id=t></table></div><script>
 var d=document.getElementById('d');d.value=new Date().toISOString().slice(0,10);
 function esc(x){return String(x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 async function load(){var r=await fetch('/api/admin/usage?date='+d.value);if(r.status==401){location.reload();return}var j=await r.json();
 sum.textContent=j.totals.users+' users · '+j.totals.ai+' AI calls · '+j.totals.tailor+' tailor calls · '+j.totals.over+' over allowance';
 t.innerHTML='<tr><th>User<th>Plan<th>AI<th>Tailor<th>Status</tr>'+(j.rows.map(function(r){return '<tr><td>'+esc(r.email)+'<td>'+r.tier+'<td>'+r.ai+'/'+r.aiLimit+'<td>'+r.tailor+'/'+r.tailorLimit+'<td class='+r.status+'>'+r.status+'</tr>'}).join('')||'<tr><td colspan=5>No usage on this date</tr>')}
-go.onclick=load;out.onclick=async function(){await fetch('/admin/logout',{method:'POST'});location.reload()};load();
+ps.onclick=async function(){pm.textContent='';var r=await fetch('/api/admin/set-plan',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:pe.value,tier:pt.value,days:+pd.value})});var j=await r.json().catch(function(){return {}});pm.textContent=r.ok?('Set: '+j.plan.tier+(j.plan.validUntil?' until '+j.plan.validUntil.slice(0,10):'')):(j.error||'Failed')};go.onclick=load;out.onclick=async function(){await fetch('/admin/logout',{method:'POST'});location.reload()};load();
 </script>`);
 });
 app.post('/admin/login', adminLimiter, (req, res) => {
@@ -376,11 +376,18 @@ app.post('/admin/logout', (req, res) => {
 
 // ---- Plans / entitlements (see plans.js; enforcement is gated by PLANS_ENFORCED) ----
 const plans = require('./plans');
-function userTier(req){ return plans.tierOf(users[req.user.email]); }
+// In PLANS_ENFORCED=test mode only PLANS_TEST_EMAILS are limited; everyone else behaves as full access.
+function planUser(email){
+  if (String(process.env.PLANS_ENFORCED || '').toLowerCase() === 'test' && !plans.testEmails().includes(String(email).toLowerCase())) {
+    return { plan: { tier: 'advanced', status: 'active' } };
+  }
+  return users[email];
+}
+function userTier(req){ return plans.tierOf(planUser(req.user.email)); }
 function requireFeature(feature, msg){
   return (req, res, next) => {
     if (plans.can(userTier(req), feature)) return next();
-    res.status(402).json({ error: msg || 'This feature is not included in your plan', upgrade: true, feature, plan: plans.describe(users[req.user.email]) });
+    res.status(402).json({ error: msg || 'This feature is not included in your plan', upgrade: true, feature, plan: plans.describe(planUser(req.user.email)) });
   };
 }
 
@@ -403,7 +410,7 @@ async function sendAlert(msg){
 }
 function aiMeter(kind){
   return (req, res, next) => {
-    const email = req.user.email, tier = plans.tierOf(users[email]);
+    const email = req.user.email, tier = plans.tierOf(planUser(email));
     const limit = plans.aiLimit(tier, kind), hard = limit * plans.HARD_FACTOR;
     const day = (usageDb[today()] = usageDb[today()] || {});
     const rec = (day[email] = day[email] || { ai: 0, tailor: 0 });
@@ -507,7 +514,7 @@ app.get('/api/auth/me', (req, res) => {
   const t = getToken(req);
   const s = t && sessions[t];
   if (!s || !users[s.email]) return res.status(401).json({ error: 'Not signed in' });
-  res.json({ success: true, user: { email: s.email, name: users[s.email].name }, plan: plans.describe(users[s.email]) });
+  res.json({ success: true, user: { email: s.email, name: users[s.email].name }, plan: plans.describe(planUser(s.email)) });
 });
 
 // Test/admin only: set a user's plan (ADMIN_EMAILS). Real purchases will go through the payment webhook.
@@ -522,7 +529,7 @@ app.post('/api/admin/set-plan', requireAdmin, (req, res) => {
     users[em].plan = { tier, status: 'active', validUntil: new Date(Date.now() + d * 86400000).toISOString(), source: 'admin' };
   }
   saveJSON(USERS_FILE, users);
-  res.json({ success: true, plan: plans.describe(users[em]) });
+  res.json({ success: true, plan: plans.describe(users[em]), email: em });
 });
 
 
