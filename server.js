@@ -321,6 +321,59 @@ function requireAuth(req, res, next){
   next();
 }
 
+// ---- Admin console: separate login (ADMIN_USERNAME + ADMIN_PASSWORD set in Railway) ----
+const adminSessions = new Map();          // token -> expiry (memory only; restart logs admin out)
+const ADMIN_TTL = 8 * 3600 * 1000;
+function adminToken(req){ const m = (req.headers.cookie || '').match(/(?:^|;\s*)gcv_admin=([a-f0-9]+)/); return m ? m[1] : null; }
+function isAdmin(req){
+  const t = adminToken(req), exp = t && adminSessions.get(t);
+  if (!exp) return false;
+  if (exp < Date.now()) { adminSessions.delete(t); return false; }
+  return true;
+}
+function requireAdmin(req, res, next){
+  if (isAdmin(req)) return next();
+  res.status(401).json({ error: 'Admin sign-in required' });
+}
+function safeEq(a, b){
+  const ha = crypto.createHash('sha256').update(String(a)).digest(), hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+const adminLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false,
+  message: { error: 'Too many attempts — try again in 15 minutes' } });
+const ADMIN_PAGE_CSS = 'body{font-family:system-ui,sans-serif;background:#f4f6f5;margin:0;color:#14231c}.box{max-width:420px;margin:12vh auto;background:#fff;padding:28px;border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08)}h1{font-size:20px;margin:0 0 16px}input{width:100%;box-sizing:border-box;padding:10px;margin:6px 0 14px;border:1px solid #c5d0ca;border-radius:8px;font-size:15px}button{background:#0f7a55;color:#fff;border:0;padding:10px 18px;border-radius:8px;font-size:15px;cursor:pointer}.err{color:#b00020;min-height:20px}';
+app.get('/admin', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Robots-Tag', 'noindex');
+  if (!isAdmin(req)) {
+    return res.send(`<!doctype html><meta charset=utf-8><meta name=robots content=noindex><meta name=viewport content="width=device-width,initial-scale=1"><title>Reeve admin</title><style>${ADMIN_PAGE_CSS}</style><div class=box><h1>Reeve admin</h1><form id=f><label>Username<input name=u autocomplete=username required></label><label>Password<input name=p type=password autocomplete=current-password required></label><div class=err id=e></div><button>Sign in</button></form></div><script>f.onsubmit=async function(ev){ev.preventDefault();e.textContent='';var r=await fetch('/admin/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:f.u.value,password:f.p.value})});if(r.ok)location.reload();else{var j={};try{j=await r.json()}catch(x){}e.textContent=j.error||'Sign-in failed'}}</script>`);
+  }
+  res.send(`<!doctype html><meta charset=utf-8><meta name=robots content=noindex><meta name=viewport content="width=device-width,initial-scale=1"><title>Reeve admin</title><style>${ADMIN_PAGE_CSS}.w{max-width:960px;margin:24px auto;padding:0 16px}table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #dfe6e2;padding:8px;text-align:left;font-size:14px}.OVER{color:#b00020;font-weight:700}.NEAR{color:#a35f00;font-weight:700}.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}input{width:auto;margin:0}</style><div class=w><div class=top><h1>AI usage</h1><div><input type=date id=d> <button id=go>Show</button> <button id=out style="background:#555">Sign out</button></div></div><p id=sum></p><table id=t></table></div><script>
+var d=document.getElementById('d');d.value=new Date().toISOString().slice(0,10);
+function esc(x){return String(x).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+async function load(){var r=await fetch('/api/admin/usage?date='+d.value);if(r.status==401){location.reload();return}var j=await r.json();
+sum.textContent=j.totals.users+' users · '+j.totals.ai+' AI calls · '+j.totals.tailor+' tailor calls · '+j.totals.over+' over allowance';
+t.innerHTML='<tr><th>User<th>Plan<th>AI<th>Tailor<th>Status</tr>'+(j.rows.map(function(r){return '<tr><td>'+esc(r.email)+'<td>'+r.tier+'<td>'+r.ai+'/'+r.aiLimit+'<td>'+r.tailor+'/'+r.tailorLimit+'<td class='+r.status+'>'+r.status+'</tr>'}).join('')||'<tr><td colspan=5>No usage on this date</tr>')}
+go.onclick=load;out.onclick=async function(){await fetch('/admin/logout',{method:'POST'});location.reload()};load();
+</script>`);
+});
+app.post('/admin/login', adminLimiter, (req, res) => {
+  const U = process.env.ADMIN_USERNAME, P = process.env.ADMIN_PASSWORD;
+  if (!U || !P || P.length < 12) return res.status(503).json({ error: 'Admin sign-in is not configured' });
+  const { username, password } = req.body || {};
+  const ok = safeEq(username || '', U) & safeEq(password || '', P);
+  if (!ok) { console.warn('Admin login failed from ' + (req.ip || '?')); return res.status(401).json({ error: 'Wrong username or password' }); }
+  const token = crypto.randomBytes(32).toString('hex');
+  adminSessions.set(token, Date.now() + ADMIN_TTL);
+  const secure = process.env.COOKIE_SECURE === 'true' ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `gcv_admin=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${ADMIN_TTL / 1000}${secure}`);
+  res.json({ success: true });
+});
+app.post('/admin/logout', (req, res) => {
+  const t = adminToken(req); if (t) adminSessions.delete(t);
+  res.setHeader('Set-Cookie', 'gcv_admin=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+  res.json({ success: true });
+});
+
 // ---- Plans / entitlements (see plans.js; enforcement is gated by PLANS_ENFORCED) ----
 const plans = require('./plans');
 function userTier(req){ return plans.tierOf(users[req.user.email]); }
@@ -373,8 +426,7 @@ function aiMeter(kind){
   };
 }
 
-app.get('/api/admin/usage', requireAuth, (req, res) => {
-  if (!plans.adminEmails().includes(req.user.email)) return res.status(403).json({ error: 'Forbidden' });
+app.get('/api/admin/usage', requireAdmin, (req, res) => {
   const day = req.query.date || today();
   const rows = Object.entries(usageDb[day] || {}).map(([email, r]) => {
     const tier = plans.tierOf(users[email]);
@@ -383,10 +435,8 @@ app.get('/api/admin/usage', requireAuth, (req, res) => {
       status: (r.ai >= la || r.tailor >= lt) ? 'OVER' : ((r.ai >= la * 0.8 || r.tailor >= lt * 0.8) ? 'NEAR' : 'ok') };
   }).sort((a, b) => b.ai + b.tailor - a.ai - a.tailor);
   const totals = { users: rows.length, ai: rows.reduce((s, r) => s + r.ai, 0), tailor: rows.reduce((s, r) => s + r.tailor, 0), over: rows.filter(r => r.status === 'OVER').length };
-  if (req.query.format === 'json') return res.json({ success: true, date: day, totals, rows });
-  const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   res.setHeader('Cache-Control', 'no-store');
-  res.send(`<!doctype html><meta charset=utf-8><title>Reeve usage</title><body style="font-family:system-ui;margin:24px;max-width:900px"><h2>AI usage — ${esc(day)}</h2><p>${totals.users} users · ${totals.ai} AI calls · ${totals.tailor} tailor calls · ${totals.over} over allowance</p><table border=1 cellpadding=6 style="border-collapse:collapse;width:100%"><tr><th>User<th>Plan<th>AI<th>Tailor<th>Status</tr>${rows.map(r => `<tr><td>${esc(r.email)}<td>${r.tier}<td>${r.ai}/${r.aiLimit}<td>${r.tailor}/${r.tailorLimit}<td>${r.status}</tr>`).join('') || '<tr><td colspan=5>No usage yet today</tr>'}</table><p><a href="?date=${esc(day)}&format=json">JSON</a></p>`);
+  res.json({ success: true, date: day, totals, rows });
 });
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -461,10 +511,9 @@ app.get('/api/auth/me', (req, res) => {
 });
 
 // Test/admin only: set a user's plan (ADMIN_EMAILS). Real purchases will go through the payment webhook.
-app.post('/api/admin/set-plan', requireAuth, (req, res) => {
-  if (!plans.adminEmails().includes(req.user.email)) return res.status(403).json({ error: 'Forbidden' });
+app.post('/api/admin/set-plan', requireAdmin, (req, res) => {
   const { email, tier, days } = req.body || {};
-  const em = String(email || req.user.email).trim().toLowerCase();
+  const em = String(email || '').trim().toLowerCase();
   if (!users[em]) return res.status(404).json({ error: 'No such user' });
   if (tier === 'none' || tier === null) { delete users[em].plan; }
   else {
